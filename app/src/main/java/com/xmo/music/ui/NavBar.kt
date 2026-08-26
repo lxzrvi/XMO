@@ -1,5 +1,6 @@
 package com.xmo.music.ui
 
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -29,41 +30,66 @@ private val BarH = 64.dp
 private val RestW = 78.dp
 private val RestH = 56.dp
 
-private val HoldW = 102.dp
-private val HoldH = 80.dp
-
-private val SlotStep = 80.dp 
+private val Grow = 12.dp
+private val Travel = 160.dp
 
 @Composable
 fun BoxScope.NavBar(
     selected: Int,
     select: (Int) -> Unit
 ) {
-    var pos by remember { mutableFloatStateOf(selected.toFloat()) }
-    var down by remember { mutableStateOf(false) }
-    var velocity by remember { mutableFloatStateOf(0f) }
+    var pos by remember {
+        mutableFloatStateOf(selected.toFloat())
+    }
 
+    var down by remember {
+        mutableStateOf(false)
+    }
+
+    var velocity by remember {
+        mutableFloatStateOf(0f)
+    }
+
+    /*
+     * Keep position synchronized with external selection.
+     */
     LaunchedEffect(selected) {
         if (!down) {
             pos = selected.toFloat()
         }
     }
 
+    /*
+     * Smooth selector position after release.
+     */
     val settle by animateFloatAsState(
         targetValue = pos,
-        animationSpec = spring(dampingRatio = 0.68f, stiffness = 750f),
+        animationSpec = spring(
+            dampingRatio = 0.68f,
+            stiffness = 750f
+        ),
         label = "selectorPosition"
     )
 
+    /*
+     * 0 = 78x56
+     * 1 = 102x80
+     */
     val grow by animateFloatAsState(
         targetValue = if (down) 1f else 0f,
-        animationSpec = spring(dampingRatio = 0.72f, stiffness = 700f),
+        animationSpec = spring(
+            dampingRatio = 0.72f,
+            stiffness = 700f
+        ),
         label = "selectorGrow"
     )
 
     val barScale by animateFloatAsState(
         targetValue = if (down) 1.04f else 1f,
-        animationSpec = spring(dampingRatio = 0.75f, stiffness = 750f),
+        animationSpec = spring(
+            dampingRatio = 0.75f,
+            stiffness = 750f
+        ),
         label = "barScale"
     )
 
@@ -78,33 +104,55 @@ fun BoxScope.NavBar(
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
             .padding(bottom = 52.dp)
-            .size(BarW, 110.dp) // Outer space clip defense
+            .size(BarW, 96.dp)
             .pointerInput(selected) {
+
                 awaitEachGesture {
-                    val first = awaitFirstDown(requireUnconsumed = false)
+
+                    val first = awaitFirstDown(
+                        requireUnconsumed = false
+                    )
+
                     val startX = first.position.x
                     val start = selected
+
                     val slot = size.width / 3f
 
                     var lastX = startX
                     var total = 0f
+
                     var change = first
 
                     down = true
                     velocity = 0f
 
                     while (change.pressed) {
+
                         val event = awaitPointerEvent()
+
                         change = event.changes.first()
 
                         if (change.pressed) {
+
                             val currentX = change.position.x
+
                             val dx = currentX - lastX
+
                             total = currentX - startX
+
                             lastX = currentX
 
-                            velocity = velocity * 0.62f + dx * 0.38f
-                            pos = (start + total / slot).coerceIn(0f, 2f)
+                            velocity =
+                                velocity * 0.62f +
+                                    dx * 0.38f
+
+                            pos = (
+                                start +
+                                    total / slot
+                                ).coerceIn(
+                                    0f,
+                                    2f
+                                )
 
                             if (abs(total) > 2f) {
                                 change.consume()
@@ -113,14 +161,33 @@ fun BoxScope.NavBar(
                     }
 
                     val target = when {
-                        abs(total) <= 7f -> (first.position.x / slot).toInt().coerceIn(0, 2)
-                        total > slot * 0.17f -> (start + 1).coerceAtMost(2)
-                        total < -slot * 0.17f -> (start - 1).coerceAtLeast(0)
-                        else -> start
+
+                        abs(total) <= 7f -> {
+                            (
+                                first.position.x / slot
+                            )
+                                .toInt()
+                                .coerceIn(0, 2)
+                        }
+
+                        total > slot * 0.17f -> {
+                            (start + 1)
+                                .coerceAtMost(2)
+                        }
+
+                        total < -slot * 0.17f -> {
+                            (start - 1)
+                                .coerceAtLeast(0)
+                        }
+
+                        else -> {
+                            start
+                        }
                     }
 
                     down = false
                     velocity = 0f
+
                     pos = target.toFloat()
 
                     if (target != selected) {
@@ -129,9 +196,7 @@ fun BoxScope.NavBar(
                 }
             }
     ) {
-        /*
-         * MAIN BAR CONTAINER
-         */
+
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -142,12 +207,19 @@ fun BoxScope.NavBar(
                     clip = false
                 }
         ) {
-            // Glass Dock Layer
+
+            /*
+             * MAIN GLASS BAR
+             */
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(33.dp))
-                    .background(Color(0x24FFFFFF))
+                    .clip(
+                        RoundedCornerShape(33.dp)
+                    )
+                    .background(
+                        Color(0x2EFFFFFF)
+                    )
                     .border(
                         width = 0.5.dp,
                         color = Color(0x45FFFFFF),
@@ -156,80 +228,128 @@ fun BoxScope.NavBar(
             )
 
             /*
-             * ABSOLUTE COORD MATCHING FOR LIQUID PILL
+             * LIQUID SELECTOR
              */
-            val curW = RestW + (HoldW - RestW) * grow
-            val curH = RestH + (HoldH - RestH) * grow
+            val selectorW = RestW + 24.dp * grow
+            val selectorH = RestH + 24.dp * grow
 
-            // Left base = 4dp (rest). Hold offset shift = (102 - 78) / 2 = 12dp
-            val selectorX = 4.dp + (SlotStep * settle) - (12.dp * grow)
-            
-            // Vertical balance: Rest Y = 4dp (top & bottom 4dp). Hold Y = -8dp (top & bottom 8dp overflow)
-            val selectorY = 4.dp - (12.dp * grow)
+            val selectorX = 4.dp + Travel * (settle / 2f) - Grow * grow
 
-            val stretch = if (down) (abs(velocity) / 19f).coerceIn(0f, 1f) else 0f
+            // FIX: Explicit Y-offset centering so it expands equally upwards and downwards
+            val selectorY = (BarH - selectorH) / 2f
+
+            val stretch = if (down) {
+                (abs(velocity) / 19f).coerceIn(0f, 1f)
+            } else {
+                0f
+            }
+
+            // FIX: Renamed local variables to avoid name collision with graphicsLayer scope
             val liquidScaleX = 1f + stretch * 0.20f
             val liquidScaleY = 1f - stretch * 0.09f
+
             val skew = (velocity * 0.32f).coerceIn(-6f, 6f)
             val rotation = (velocity * 0.09f).coerceIn(-1.7f, 1.7f)
 
             Box(
                 modifier = Modifier
-                    .offset(x = selectorX, y = selectorY)
-                    .size(width = curW, height = curH)
+                    .align(Alignment.TopStart)
+                    .offset(
+                        x = selectorX,
+                        y = selectorY
+                    )
+                    .size(
+                        width = selectorW,
+                        height = selectorH
+                    )
                     .graphicsLayer {
                         scaleX = liquidScaleX
                         scaleY = liquidScaleY
                         rotationZ = rotation
                         rotationY = skew * 0.20f
                         cameraDistance = 16f * density
-                        // Vertical middle transform origin anchor to freeze center shift
-                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
                         clip = false
                     }
-                    .clip(RoundedCornerShape(if (down) 42.dp else 29.dp))
-                    .background(if (down) Color(0x08FFFFFF) else Color(0x1AFFFFFF))
+                    .clip(
+                        RoundedCornerShape(
+                            if (down) {
+                                42.dp
+                            } else {
+                                29.dp
+                            }
+                        )
+                    )
+                    .background(
+                        if (down) {
+                            Color(0x03FFFFFF)
+                        } else {
+                            Color(0x12FFFFFF)
+                        }
+                    )
                     .border(
                         width = 0.55.dp,
-                        color = if (down) Color(0x52FFFFFF) else Color(0x45FFFFFF),
-                        shape = RoundedCornerShape(if (down) 42.dp else 29.dp)
+                        color = if (down) {
+                            Color(0x52FFFFFF)
+                        } else {
+                            Color(0x45FFFFFF)
+                        },
+                        shape = RoundedCornerShape(
+                            if (down) {
+                                42.dp
+                            } else {
+                                29.dp
+                            }
+                        )
                     )
             )
 
             /*
-             * ICON ROW LAYER
+             * ICON ROW
              */
             Row(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .padding(horizontal = 4.dp)
             ) {
+
                 icons.forEachIndexed { index, icon ->
+
                     val active = abs(settle - index) < 0.5f
 
                     val iconScale by animateFloatAsState(
-                        targetValue = if (active && down) 1.10f else 1f,
-                        animationSpec = spring(dampingRatio = 0.70f, stiffness = 850f),
+                        targetValue = if (active && down) {
+                            1.10f
+                        } else {
+                            1f
+                        },
+                        animationSpec = spring(
+                            dampingRatio = 0.70f,
+                            stiffness = 850f
+                        ),
                         label = "iconScale$index"
                     )
 
                     Box(
                         modifier = Modifier
-                            .weight(1f)
+                            .width(78.dp)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
+
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = if (active) Color.White else Color(0x3DFFFFFF),
+                            tint = if (active) {
+                                Color.White
+                            } else {
+                                Color(0x62FFFFFF)
+                            },
                             modifier = Modifier
                                 .size(25.dp)
-                                .graphicsLayer(
-                                    scaleX = iconScale,
+                                .graphicsLayer {
+                                    scaleX = iconScale
                                     scaleY = iconScale
-                                )
+                                }
                         )
                     }
                 }
