@@ -1,6 +1,5 @@
 package com.xmo.music.ui
 
-import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
@@ -38,64 +37,31 @@ fun BoxScope.NavBar(
     selected: Int,
     select: (Int) -> Unit
 ) {
-    var pos by remember {
-        mutableFloatStateOf(selected.toFloat())
-    }
+    var pos by remember { mutableFloatStateOf(selected.toFloat()) }
+    var down by remember { mutableStateOf(false) }
+    var velocity by remember { mutableFloatStateOf(0f) }
 
-    var down by remember {
-        mutableStateOf(false)
-    }
-
-    var velocity by remember {
-        mutableFloatStateOf(0f)
-    }
-
-    /*
-     * Keep position synchronized with external selection.
-     */
     LaunchedEffect(selected) {
         if (!down) {
             pos = selected.toFloat()
         }
     }
 
-    /*
-     * Smooth selector position after release.
-     */
     val settle by animateFloatAsState(
         targetValue = pos,
-        animationSpec = spring(
-            dampingRatio = 0.68f,
-            stiffness = 750f
-        ),
+        animationSpec = spring(dampingRatio = 0.68f, stiffness = 750f),
         label = "selectorPosition"
     )
 
-    /*
-     * 0 = 78x56
-     * 1 = 102x80
-     */
     val grow by animateFloatAsState(
         targetValue = if (down) 1f else 0f,
-        animationSpec = spring(
-            dampingRatio = 0.72f,
-            stiffness = 700f
-        ),
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 700f),
         label = "selectorGrow"
     )
 
-    /*
-     * HTML:
-     * .bar.hold {
-     *     transform: scale(1.04);
-     * }
-     */
     val barScale by animateFloatAsState(
         targetValue = if (down) 1.04f else 1f,
-        animationSpec = spring(
-            dampingRatio = 0.75f,
-            stiffness = 750f
-        ),
+        animationSpec = spring(dampingRatio = 0.75f, stiffness = 750f),
         label = "barScale"
     )
 
@@ -105,6 +71,11 @@ fun BoxScope.NavBar(
         Icons.Rounded.Settings
     )
 
+    /*
+     * Outer Container (96dp high)
+     * Iska size 96dp rakha hai taaki inner drop (80dp height) parent visual bar (64dp) se
+     * top aur bottom dono taraf 8dp bahar aasaani se nikal sake (Overflow ho sake).
+     */
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
@@ -145,20 +116,10 @@ fun BoxScope.NavBar(
                     }
 
                     val target = when {
-                        abs(total) <= 7f -> {
-                            (first.position.x / slot)
-                                .toInt()
-                                .coerceIn(0, 2)
-                        }
-                        total > slot * 0.17f -> {
-                            (start + 1).coerceAtMost(2)
-                        }
-                        total < -slot * 0.17f -> {
-                            (start - 1).coerceAtLeast(0)
-                        }
-                        else -> {
-                            start
-                        }
+                        abs(total) <= 7f -> (first.position.x / slot).toInt().coerceIn(0, 2)
+                        total > slot * 0.17f -> (start + 1).coerceAtMost(2)
+                        total < -slot * 0.17f -> (start - 1).coerceAtLeast(0)
+                        else -> start
                     }
 
                     down = false
@@ -171,6 +132,54 @@ fun BoxScope.NavBar(
                 }
             }
     ) {
+        // Drop dimensions matching HTML (78x56 rest, 102x80 hold)
+        val selectorW = RestW + 24.dp * grow
+        val selectorH = RestH + 24.dp * grow
+
+        // HTML X calculation with -12dp grow offset (GROW = 12.dp)
+        val selectorX = 4.dp + Travel * (settle / 2f) - Grow * grow
+
+        val stretch = if (down) (abs(velocity) / 19f).coerceIn(0f, 1f) else 0f
+        val liquidScaleX = 1f + stretch * 0.20f
+        val liquidScaleY = 1f - stretch * 0.09f
+        val skew = (velocity * 0.32f).coerceIn(-6f, 6f)
+        val rotation = (velocity * 0.09f).coerceIn(-1.7f, 1.7f)
+
+        /*
+         * ============================================================
+         * 1. LIQUID DROP (BACKGROUND SELECTOR)
+         * ============================================================
+         * Main Visual Bar se pehle render kar rahe hain taaki Visual Bar
+         * ke andar overlay ho sake aur visual bar ke scale hone par
+         * Drop bhi smoothly grow overflow manage kare.
+         */
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterStart)
+                .offset(x = selectorX)
+                .size(width = selectorW, height = selectorH)
+                .graphicsLayer {
+                    scaleX = liquidScaleX * barScale
+                    scaleY = liquidScaleY * barScale
+                    rotationZ = rotation
+                    rotationY = skew * 0.20f
+                    cameraDistance = 16f * density
+                    clip = false
+                }
+                .clip(RoundedCornerShape(if (down) 42.dp else 29.dp))
+                .background(if (down) Color(0x03FFFFFF) else Color(0x12FFFFFF))
+                .border(
+                    width = 0.55.dp,
+                    color = if (down) Color(0x52FFFFFF) else Color(0x45FFFFFF),
+                    shape = RoundedCornerShape(if (down) 42.dp else 29.dp)
+                )
+        )
+
+        /*
+         * ============================================================
+         * 2. MAIN GLASS BAR (246 x 64)
+         * ============================================================
+         */
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
@@ -181,7 +190,7 @@ fun BoxScope.NavBar(
                     clip = false
                 }
         ) {
-            /* MAIN GLASS BAR */
+            // Main Glass Dock Area
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -194,57 +203,7 @@ fun BoxScope.NavBar(
                     )
             )
 
-            /* LIQUID SELECTOR */
-            val selectorW = RestW + 24.dp * grow
-            val selectorH = RestH + 24.dp * grow
-
-            val selectorX = 4.dp + Travel * (settle / 2f) - Grow * grow
-
-            val stretch = if (down) {
-                (abs(velocity) / 19f).coerceIn(0f, 1f)
-            } else {
-                0f
-            }
-
-            // External scale variables ko local names de diye taaki graphicsLayer scope me ambiguity na ho
-            val liquidScaleX = 1f + stretch * 0.20f
-            val liquidScaleY = 1f - stretch * 0.09f
-            val skew = (velocity * 0.32f).coerceIn(-6f, 6f)
-            val rotation = (velocity * 0.09f).coerceIn(-1.7f, 1.7f)
-
-            Box(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .offset(x = selectorX)
-                    .size(width = selectorW, height = selectorH)
-                    .graphicsLayer {
-                        /* Liquid stretch using explicit variables */
-                        scaleX = liquidScaleX
-                        scaleY = liquidScaleY
-
-                        rotationZ = rotation
-                        rotationY = skew * 0.20f
-                        cameraDistance = 16f * density
-                        clip = false
-                    }
-                    .clip(
-                        RoundedCornerShape(
-                            if (down) 42.dp else 29.dp
-                        )
-                    )
-                    .background(
-                        if (down) Color(0x03FFFFFF) else Color(0x12FFFFFF)
-                    )
-                    .border(
-                        width = 0.55.dp,
-                        color = if (down) Color(0x52FFFFFF) else Color(0x45FFFFFF),
-                        shape = RoundedCornerShape(
-                            if (down) 42.dp else 29.dp
-                        )
-                    )
-            )
-
-            /* ICON ROW */
+            // Icons Layer (Always stay inside 246x64 bounds)
             Row(
                 modifier = Modifier
                     .fillMaxSize()
@@ -255,10 +214,7 @@ fun BoxScope.NavBar(
 
                     val iconScale by animateFloatAsState(
                         targetValue = if (active && down) 1.10f else 1f,
-                        animationSpec = spring(
-                            dampingRatio = 0.70f,
-                            stiffness = 850f
-                        ),
+                        animationSpec = spring(dampingRatio = 0.70f, stiffness = 850f),
                         label = "iconScale$index"
                     )
 
