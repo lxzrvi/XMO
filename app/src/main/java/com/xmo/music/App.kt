@@ -14,7 +14,7 @@ fun App() {
         when (tab) {
             0 -> Home()
             1 -> Search()
-            else -> Settings()
+            2 -> Settings()
         }
         NavBar(tab) { tab = it }
     }
