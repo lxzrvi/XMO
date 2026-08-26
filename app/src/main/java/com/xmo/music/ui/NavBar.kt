@@ -3,10 +3,10 @@ package com.xmo.music.ui
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Search
@@ -14,35 +14,52 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
-import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import kotlin.math.roundToInt
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.abs
 
-private val Slot = 72.dp
-private const val Slots = 3
+private val W = 222.dp
+private val H = 64.dp
+private val SW = 74.dp
+private val SH = 54.dp
 
 @Composable
 fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
-    var drag by remember { mutableFloatStateOf(selected.toFloat()) }
+    var pos by remember { mutableFloatStateOf(selected.toFloat()) }
+    var pressed by remember { mutableStateOf(false) }
     var held by remember { mutableStateOf(false) }
-    var dragging by remember { mutableStateOf(false) }
 
     LaunchedEffect(selected) {
-        if (!dragging) drag = selected.toFloat()
+        if (!pressed) pos = selected.toFloat()
     }
 
-    val position by animateFloatAsState(
-        drag,
-        spring(.72f, 900f),
-        label = "position"
+    val x by animateFloatAsState(
+        pos,
+        spring(.76f, 1000f),
+        label = "x"
     )
-    val scale by animateFloatAsState(
-        if (held) 1.22f else 1f,
-        spring(.62f, 650f),
-        label = "scale"
+
+    val selectorScale by animateFloatAsState(
+        when {
+            held -> 1.24f
+            pressed -> 1.08f
+            else -> 1f
+        },
+        spring(.66f, 800f),
+        label = "selector"
+    )
+
+    val parentScale by animateFloatAsState(
+        if (held) 1.045f
+        else if (pressed) 1.018f
+        else 1f,
+        spring(.72f, 900f),
+        label = "parent"
     )
 
     val icons = listOf(
@@ -55,75 +72,138 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         Modifier
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
-            .padding(bottom = 18.dp)
-            .width(Slot * Slots)
-            .height(Slot)
-            .pointerInput(Unit) {
-                detectTapGestures { p ->
-                    select(
-                        (p.x / (size.width / Slots))
-                            .toInt()
-                            .coerceIn(0, 2)
-                    )
-                }
+            .padding(bottom = 32.dp)
+            .size(W, H)
+            .graphicsLayer {
+                scaleX = parentScale
+                scaleY = parentScale
             }
             .pointerInput(selected) {
-                detectDragGesturesAfterLongPress(
-                    onDragStart = {
-                        held = true
-                        dragging = true
-                        drag = selected.toFloat()
-                    },
-                    onDrag = { change, amount ->
-                        change.consume()
-                        drag = (
-                            drag + amount.x / (size.width / Slots)
-                        ).coerceIn(0f, 2f)
-                    },
-                    onDragCancel = {
+                awaitEachGesture {
+                    coroutineScope {
+                        val down = awaitFirstDown()
+                        pressed = true
                         held = false
-                        dragging = false
-                        drag = selected.toFloat()
-                    },
-                    onDragEnd = {
-                        val target = drag.roundToInt().coerceIn(0, 2)
+
+                        val startX = down.position.x
+                        val startTab = selected
+                        var dx = 0f
+
+                        val holdJob = launch {
+                            delay(170)
+                            held = true
+                        }
+
+                        var event = awaitPointerEvent()
+                        var change = event.changes.first()
+
+                        while (change.pressed) {
+                            dx = change.position.x - startX
+
+                            if (abs(dx) > 3f) {
+                                holdJob.cancel()
+
+                                val slot = size.width / 3f
+                                pos = (
+                                    startTab + dx / slot
+                                ).coerceIn(
+                                    (startTab - 1)
+                                        .coerceAtLeast(0).toFloat(),
+                                    (startTab + 1)
+                                        .coerceAtMost(2).toFloat()
+                                )
+
+                                change.consume()
+                            }
+
+                            event = awaitPointerEvent()
+                            change = event.changes.first()
+                        }
+
+                        holdJob.cancel()
+
+                        val slot = size.width / 3f
+
+                        val target = when {
+                            abs(dx) > slot * .18f ->
+                                if (dx > 0)
+                                    (startTab + 1).coerceAtMost(2)
+                                else
+                                    (startTab - 1).coerceAtLeast(0)
+
+                            abs(dx) <= 6f -> {
+                                (down.position.x / slot)
+                                    .toInt()
+                                    .coerceIn(0, 2)
+                            }
+
+                            else -> startTab
+                        }
+
+                        pressed = false
                         held = false
-                        dragging = false
-                        drag = target.toFloat()
-                        select(target)
+                        pos = target.toFloat()
+
+                        if (target != selected)
+                            select(target)
                     }
-                )
+                }
             }
     ) {
-        // Parent glass capsule
+        // Parent
         Box(
             Modifier
                 .matchParentSize()
-                .clip(CircleShape)
-                .background(Color(0xB52B292D))
+                .graphicsLayer {
+                    shape = RoundedCornerShape(32.dp)
+                    clip = true
+                }
+                .background(Color(0x9A302B30))
+                .border(
+                    .8.dp,
+                    Color(0x34FFFFFF),
+                    RoundedCornerShape(32.dp)
+                )
         )
 
-        // Sliding capsule
+        // Selector: 5dp equal resting gap top/bottom
         Box(
             Modifier
-                .offset(x = Slot * position)
-                .size(Slot)
+                .align(Alignment.CenterStart)
+                .offset(x = ((W - SW) / 2f) * x)
+                .size(SW, SH)
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = selectorScale
+                    scaleY = selectorScale
+                    shape = RoundedCornerShape(24.dp)
+                    clip = true
                 }
-                .clip(CircleShape)
-                .background(Color(0x3DFFFFFF))
-                .border(1.dp, Color(0x28FFFFFF), CircleShape)
+                .background(Color(0x48FFFFFF))
+                .border(
+                    .8.dp,
+                    Color(0x50FFFFFF),
+                    RoundedCornerShape(24.dp)
+                )
         )
 
-        // Fixed icon slots
         Row(Modifier.fillMaxSize()) {
             icons.forEachIndexed { index, icon ->
-                val active = (position - index).let { kotlin.math.abs(it) < .45f }
+                val active = abs(x - index) < .48f
+
+                val iconScale by animateFloatAsState(
+                    when {
+                        active && held -> 1.14f
+                        active && pressed -> 1.07f
+                        else -> 1f
+                    },
+                    spring(.7f, 950f),
+                    label = "i$index"
+                )
 
                 Box(
-                    Modifier.size(Slot),
+                    Modifier
+                        .weight(1f)
+                        .fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -131,9 +211,13 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         null,
                         tint = if (active)
                             Color.White
-                        else
-                            Color(0xFF8B858A),
-                        modifier = Modifier.size(25.dp)
+                        else Color(0xFF887D82),
+                        modifier = Modifier
+                            .size(25.dp)
+                            .graphicsLayer {
+                                scaleX = iconScale
+                                scaleY = iconScale
+                            }
                     )
                 }
             }
