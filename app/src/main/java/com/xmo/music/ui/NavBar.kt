@@ -143,7 +143,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         )
 
         val activeW = RestW + 24.dp * grow
-        val activeH = RestH + 24.dp * grow
+        val activeH = RestH + 32.dp * grow
         val travel = 160.dp
 
         val stretch =
