@@ -26,12 +26,16 @@ import kotlin.math.abs
 private val BarW = 246.dp
 private val BarH = 64.dp
 
+// HTML: width: 78px, height: 56px, left: 4px, top: 4px
 private val RestW = 78.dp
 private val RestH = 56.dp
 
+// HTML: hold width: 102px, height: 80px -> grow 24px (12px on each side)
 private val GrowX = 12.dp
 private val GrowY = 12.dp
-private val Travel = 164.dp // HTML: 246 - 8 (pad) - 74 = 164dp
+
+// Travel distance between slot 0 and slot 2 (246 - (4*2) - 78 = 160dp total travel space)
+private val SlotStep = 80.dp 
 
 @Composable
 fun BoxScope.NavBar(
@@ -130,7 +134,7 @@ fun BoxScope.NavBar(
     ) {
 
         /*
-         * MAIN BAR CONTAINER (Centered 246x64)
+         * MAIN BAR CONTAINER (246 x 64)
          */
         Box(
             modifier = Modifier
@@ -142,7 +146,7 @@ fun BoxScope.NavBar(
                     clip = false
                 }
         ) {
-            // HTML Glass Dock Layer
+            // Glass Dock Layer
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -156,17 +160,13 @@ fun BoxScope.NavBar(
             )
 
             /*
-             * LIQUID SELECTOR PILL (Directly inside 64dp Container)
-             * Rest: 78x56 (top 4px, left 4px)
-             * Hold: 102x80 (top -8px, left -8px)
+             * LIQUID SELECTOR PILL (Exact 1:1 Placement logic with HTML)
              */
-            val selectorW = RestW + 24.dp * grow
-            val selectorH = RestH + 24.dp * grow
+            val selectorW = RestW + (24.dp * grow)
+            val selectorH = RestH + (24.dp * grow)
 
-            // Left offset matching HTML: 4.px - GrowX(12dp) * grow
-            val selectorX = 4.dp + Travel * (settle / 2f) - (GrowX * grow)
-
-            // Top offset matching HTML: (64-56)/2 = 4dp rest, -8dp when expanded
+            // Dynamic offset: 4dp starting pad + (slot distance * current_pos) - (GrowX * grow)
+            val selectorX = 4.dp + (SlotStep * settle) - (GrowX * grow)
             val selectorY = 4.dp - (GrowY * grow)
 
             val stretch = if (down) (abs(velocity) / 19f).coerceIn(0f, 1f) else 0f
@@ -198,7 +198,6 @@ fun BoxScope.NavBar(
 
             /*
              * ICON ROW LAYER
-             * Positioned exactly over the bar slots: 78dp per item
              */
             Row(
                 modifier = Modifier
@@ -217,14 +216,14 @@ fun BoxScope.NavBar(
 
                     Box(
                         modifier = Modifier
-                            .width(78.dp)
+                            .weight(1f)
                             .fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = icon,
                             contentDescription = null,
-                            tint = if (active) Color.White else Color(0x3DFFFFFF), // HTML #ffffff3d
+                            tint = if (active) Color.White else Color(0x3DFFFFFF),
                             modifier = Modifier
                                 .size(25.dp)
                                 .graphicsLayer(
