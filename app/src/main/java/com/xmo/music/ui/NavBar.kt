@@ -143,7 +143,11 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         )
 
         val activeW = RestW + 24.dp * grow
-        val activeH = RestH + 32.dp * grow
+
+        // 56dp rest -> 92dp pressed.
+        // This makes top/bottom clearly escape the grown parent.
+        val activeH = RestH + 36.dp * grow
+
         val travel = 160.dp
 
         val stretch =
@@ -153,6 +157,8 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
 
         Box(
             Modifier
+                // Center anchor is important:
+                // extra height grows equally upward and downward.
                 .align(Alignment.CenterStart)
                 .offset(
                     x = 4.dp +
@@ -176,7 +182,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 }
                 .graphicsLayer {
                     shape = RoundedCornerShape(
-                        if (down) 42.dp else 29.dp
+                        if (down) 46.dp else 29.dp
                     )
                     clip = true
                 }
@@ -188,7 +194,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                     else
                         Color(0x45FFFFFF),
                     RoundedCornerShape(
-                        if (down) 42.dp else 29.dp
+                        if (down) 46.dp else 29.dp
                     )
                 )
         )
@@ -199,8 +205,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 .fillMaxSize()
         ) {
             icons.forEachIndexed { index, icon ->
-                val distance = abs(settle - index)
-                val active = distance < .5f
+                val active = abs(settle - index) < .5f
 
                 val iconScale by animateFloatAsState(
                     if (active && down) 1.10f else 1f,
