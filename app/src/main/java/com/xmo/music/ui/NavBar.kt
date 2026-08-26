@@ -35,7 +35,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         if (!down) pos = selected.toFloat()
     }
 
-    val x by animateFloatAsState(
+    val settle by animateFloatAsState(
         pos,
         spring(.68f, 750f),
         label = "position"
@@ -47,7 +47,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         label = "grow"
     )
 
-    val barScale by animateFloatAsState(
+    val parentGrow by animateFloatAsState(
         if (down) 1.04f else 1f,
         spring(.75f, 750f),
         label = "bar"
@@ -66,14 +66,14 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
             .padding(bottom = 52.dp)
             .size(BarW, BarH)
             .graphicsLayer {
-                scaleX = barScale
-                scaleY = barScale
+                scaleX = parentGrow
+                scaleY = parentGrow
             }
             .pointerInput(selected) {
                 awaitEachGesture {
                     val first = awaitFirstDown()
                     val startX = first.position.x
-                    val start = selected
+                    val startTab = selected
                     val slot = size.width / 3f
 
                     var lastX = startX
@@ -95,7 +95,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             velocity = velocity * .62f + dx * .38f
 
                             pos = (
-                                start + total / slot
+                                startTab + total / slot
                             ).coerceIn(0f, 2f)
 
                             if (abs(total) > 2f)
@@ -110,12 +110,12 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                                 .coerceIn(0, 2)
 
                         total > slot * .17f ->
-                            (start + 1).coerceAtMost(2)
+                            (startTab + 1).coerceAtMost(2)
 
                         total < -slot * .17f ->
-                            (start - 1).coerceAtLeast(0)
+                            (startTab - 1).coerceAtLeast(0)
 
-                        else -> start
+                        else -> startTab
                     }
 
                     down = false
@@ -127,7 +127,6 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 }
             }
     ) {
-        // Transparent parent pill
         Box(
             Modifier
                 .matchParentSize()
@@ -135,16 +134,16 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                     shape = RoundedCornerShape(33.dp)
                     clip = true
                 }
-                .background(Color(0x22FFFFFF))
+                .background(Color(0x2EFFFFFF))
                 .border(
                     .5.dp,
-                    Color(0x3DFFFFFF),
+                    Color(0x45FFFFFF),
                     RoundedCornerShape(33.dp)
                 )
         )
 
-        val selectorW = RestW + 24.dp * grow
-        val selectorH = RestH + 24.dp * grow
+        val activeW = RestW + 24.dp * grow
+        val activeH = RestH + 24.dp * grow
         val travel = 160.dp
 
         val stretch =
@@ -152,26 +151,28 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 (abs(velocity) / 19f).coerceIn(0f, 1f)
             else 0f
 
-        // Liquid selector
         Box(
             Modifier
                 .align(Alignment.CenterStart)
                 .offset(
                     x = 4.dp +
-                        travel * (x / 2f) -
+                        travel * (settle / 2f) -
                         12.dp * grow
                 )
-                .size(selectorW, selectorH)
+                .size(activeW, activeH)
                 .graphicsLayer {
+                    val direction =
+                        (velocity * .32f).coerceIn(-6f, 6f)
+
                     scaleX = 1f + stretch * .20f
                     scaleY = 1f - stretch * .09f
+
                     rotationZ =
                         (velocity * .09f)
                             .coerceIn(-1.7f, 1.7f)
 
-                    rotationY =
-                        (velocity * .064f)
-                            .coerceIn(-1.2f, 1.2f)
+                    cameraDistance = 16f * density
+                    rotationY = direction * .20f
                 }
                 .graphicsLayer {
                     shape = RoundedCornerShape(
@@ -198,15 +199,11 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 .fillMaxSize()
         ) {
             icons.forEachIndexed { index, icon ->
-                val distance = abs(x - index)
+                val distance = abs(settle - index)
                 val active = distance < .5f
 
                 val iconScale by animateFloatAsState(
-                    when {
-                        active && down -> 1.18f
-                        active -> 1.10f
-                        else -> 1f
-                    },
+                    if (active && down) 1.10f else 1f,
                     spring(.7f, 850f),
                     label = "icon$index"
                 )
@@ -222,9 +219,9 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         null,
                         tint = if (active)
                             Color.White
-                        else Color(0x58FFFFFF),
+                        else Color(0x62FFFFFF),
                         modifier = Modifier
-                            .size(26.dp)
+                            .size(25.dp)
                             .graphicsLayer {
                                 scaleX = iconScale
                                 scaleY = iconScale
