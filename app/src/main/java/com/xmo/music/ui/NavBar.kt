@@ -43,7 +43,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         Icons.Rounded.Settings
     )
 
-    // Outer invisible container room for overflow clipping defense
+    // Outer invisible container gives Compose room for overflow
     Box(
         Modifier
             .align(Alignment.BottomCenter)
@@ -98,7 +98,6 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 .graphicsLayer {
                     scaleX = barScale
                     scaleY = barScale
-                    clip = false // Overflow allowed!
                 }
         ) {
             // Background Glass Dock
@@ -116,9 +115,9 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
             val travel = 160.dp
             val stretch = if (down) (abs(velocity) / 19f).coerceIn(0f, 1f) else 0f
 
-            // Absolute Centering Offset Formulas:
+            // Absolute Centering Math:
             val selectorX = 4.dp + travel * (settle / 2f) - 12.dp * grow
-            val selectorY = (BarH - selectorH) / 2f // Top aur Bottom symmetrical math (-8dp on hold)
+            val selectorY = (BarH - selectorH) / 2f // Top aur Bottom symmetrical overflow (-8dp)
 
             // Liquid Pill Selector
             Box(
@@ -132,7 +131,6 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         rotationZ = (velocity * .09f).coerceIn(-1.7f, 1.7f)
                         cameraDistance = 16f * density
                         rotationY = skew * .20f
-                        clip = false
                     }
                     .clip(RoundedCornerShape(if (down) 42.dp else 29.dp))
                     .background(if (down) Color(0x03FFFFFF) else Color(0x12FFFFFF))
