@@ -36,7 +36,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         if (!down) pos = selected.toFloat()
     }
 
-    val settle by animateFloatAsState(
+    val x by animateFloatAsState(
         pos, spring(.68f, 750f), label = "position"
     )
     val grow by animateFloatAsState(
@@ -114,7 +114,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 }
             }
     ) {
-        // Visible 246x64 parent
+        // Parent
         Box(
             Modifier
                 .align(Alignment.Center)
@@ -133,8 +133,9 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
         )
 
-        // 78x56 REST -> 102x80 PRESSED
-        val selectorW = RestW + 24.dp * grow
+        // Rest 78x56
+        // Press 110x80
+        val selectorW = RestW + 32.dp * grow
         val selectorH = RestH + 24.dp * grow
         val travel = 160.dp
 
@@ -142,15 +143,13 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
             (abs(velocity) / 19f).coerceIn(0f, 1f)
         else 0f
 
-        // IMPORTANT: selector is sibling of parent,
-        // therefore it can really grow past 64dp.
         Box(
             Modifier
                 .align(Alignment.CenterStart)
                 .offset(
                     x = 4.dp +
-                        travel * (settle / 2f) -
-                        12.dp * grow
+                        travel * (x / 2f) -
+                        16.dp * grow
                 )
                 .size(selectorW, selectorH)
                 .graphicsLayer {
@@ -159,6 +158,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
 
                     scaleX = 1f + stretch * .20f
                     scaleY = 1f - stretch * .09f
+
                     rotationZ =
                         (velocity * .09f)
                             .coerceIn(-1.7f, 1.7f)
@@ -190,7 +190,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
         )
 
-        // Icons remain inside exact 64dp visual bar
+        // Exact three equal icon slots
         Row(
             Modifier
                 .align(Alignment.Center)
@@ -199,7 +199,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             icons.forEachIndexed { index, icon ->
-                val active = abs(settle - index) < .5f
+                val active = abs(x - index) < .5f
 
                 val iconScale by animateFloatAsState(
                     if (active && down) 1.10f else 1f,
@@ -218,8 +218,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         null,
                         tint = if (active)
                             Color.White
-                        else
-                            Color(0x62FFFFFF),
+                        else Color(0x62FFFFFF),
                         modifier = Modifier
                             .size(25.dp)
                             .graphicsLayer {
