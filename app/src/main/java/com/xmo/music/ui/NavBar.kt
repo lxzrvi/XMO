@@ -19,7 +19,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
-import kotlin.math.roundToInt
 
 private val BarW = 246.dp
 private val BarH = 64.dp
@@ -36,7 +35,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         if (!down) pos = selected.toFloat()
     }
 
-    val settle by animateFloatAsState(
+    val x by animateFloatAsState(
         pos,
         spring(.68f, 750f),
         label = "position"
@@ -48,7 +47,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         label = "grow"
     )
 
-    val parentGrow by animateFloatAsState(
+    val barScale by animateFloatAsState(
         if (down) 1.04f else 1f,
         spring(.75f, 750f),
         label = "bar"
@@ -64,17 +63,17 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         Modifier
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
-            .padding(bottom = 38.dp)
+            .padding(bottom = 52.dp)
             .size(BarW, BarH)
             .graphicsLayer {
-                scaleX = parentGrow
-                scaleY = parentGrow
+                scaleX = barScale
+                scaleY = barScale
             }
             .pointerInput(selected) {
                 awaitEachGesture {
                     val first = awaitFirstDown()
                     val startX = first.position.x
-                    val startTab = selected
+                    val start = selected
                     val slot = size.width / 3f
 
                     var lastX = startX
@@ -96,7 +95,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             velocity = velocity * .62f + dx * .38f
 
                             pos = (
-                                startTab + total / slot
+                                start + total / slot
                             ).coerceIn(0f, 2f)
 
                             if (abs(total) > 2f)
@@ -111,12 +110,12 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                                 .coerceIn(0, 2)
 
                         total > slot * .17f ->
-                            (startTab + 1).coerceAtMost(2)
+                            (start + 1).coerceAtMost(2)
 
                         total < -slot * .17f ->
-                            (startTab - 1).coerceAtLeast(0)
+                            (start - 1).coerceAtLeast(0)
 
-                        else -> startTab
+                        else -> start
                     }
 
                     down = false
@@ -128,7 +127,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 }
             }
     ) {
-        // Glass parent
+        // Transparent parent pill
         Box(
             Modifier
                 .matchParentSize()
@@ -136,42 +135,43 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                     shape = RoundedCornerShape(33.dp)
                     clip = true
                 }
-                .background(Color(0x2EFFFFFF))
+                .background(Color(0x22FFFFFF))
                 .border(
                     .5.dp,
-                    Color(0x45FFFFFF),
+                    Color(0x3DFFFFFF),
                     RoundedCornerShape(33.dp)
                 )
         )
 
-        val activeW = RestW + 24.dp * grow
-        val activeH = RestH + 24.dp * grow
-
-        // HTML has 4dp inset and 160px total travel.
+        val selectorW = RestW + 24.dp * grow
+        val selectorH = RestH + 24.dp * grow
         val travel = 160.dp
+
         val stretch =
-            if (down) (abs(velocity) / 19f).coerceIn(0f, 1f)
+            if (down)
+                (abs(velocity) / 19f).coerceIn(0f, 1f)
             else 0f
 
+        // Liquid selector
         Box(
             Modifier
+                .align(Alignment.CenterStart)
                 .offset(
-                    x = 4.dp + travel * (settle / 2f) - 12.dp * grow,
-                    y = 4.dp - 12.dp * grow
+                    x = 4.dp +
+                        travel * (x / 2f) -
+                        12.dp * grow
                 )
-                .size(activeW, activeH)
+                .size(selectorW, selectorH)
                 .graphicsLayer {
-                    val direction =
-                        (velocity * .32f).coerceIn(-6f, 6f)
-
                     scaleX = 1f + stretch * .20f
                     scaleY = 1f - stretch * .09f
                     rotationZ =
-                        (velocity * .09f).coerceIn(-1.7f, 1.7f)
+                        (velocity * .09f)
+                            .coerceIn(-1.7f, 1.7f)
 
-                    // Native approximation of CSS skewX
-                    cameraDistance = 16f * density
-                    rotationY = direction * .20f
+                    rotationY =
+                        (velocity * .064f)
+                            .coerceIn(-1.2f, 1.2f)
                 }
                 .graphicsLayer {
                     shape = RoundedCornerShape(
@@ -198,11 +198,15 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 .fillMaxSize()
         ) {
             icons.forEachIndexed { index, icon ->
-                val distance = abs(settle - index)
+                val distance = abs(x - index)
                 val active = distance < .5f
 
                 val iconScale by animateFloatAsState(
-                    if (active && down) 1.10f else 1f,
+                    when {
+                        active && down -> 1.18f
+                        active -> 1.10f
+                        else -> 1f
+                    },
                     spring(.7f, 850f),
                     label = "icon$index"
                 )
@@ -218,9 +222,9 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         null,
                         tint = if (active)
                             Color.White
-                        else Color(0x62FFFFFF),
+                        else Color(0x58FFFFFF),
                         modifier = Modifier
-                            .size(25.dp)
+                            .size(26.dp)
                             .graphicsLayer {
                                 scaleX = iconScale
                                 scaleY = iconScale
