@@ -71,11 +71,6 @@ fun BoxScope.NavBar(
         Icons.Rounded.Settings
     )
 
-    /*
-     * Outer Container (96dp high)
-     * Iska size 96dp rakha hai taaki inner drop (80dp height) parent visual bar (64dp) se
-     * top aur bottom dono taraf 8dp bahar aasaani se nikal sake (Overflow ho sake).
-     */
     Box(
         modifier = Modifier
             .align(Alignment.BottomCenter)
@@ -132,12 +127,36 @@ fun BoxScope.NavBar(
                 }
             }
     ) {
-        // Drop dimensions matching HTML (78x56 rest, 102x80 hold)
+        /*
+         * MAIN GLASS BAR (246 x 64)
+         */
+        Box(
+            modifier = Modifier
+                .align(Alignment.Center)
+                .size(BarW, BarH)
+                .graphicsLayer {
+                    scaleX = barScale
+                    scaleY = barScale
+                    clip = false
+                }
+                .clip(RoundedCornerShape(33.dp))
+                .background(Color(0x2EFFFFFF))
+                .border(
+                    width = 0.5.dp,
+                    color = Color(0x45FFFFFF),
+                    shape = RoundedCornerShape(33.dp)
+                )
+        )
+
+        /*
+         * LIQUID SELECTOR PILL (Rest: 78x56 -> Hold: 102x80)
+         * - Sides side-overflow & centering fix.
+         */
         val selectorW = RestW + 24.dp * grow
         val selectorH = RestH + 24.dp * grow
 
-        // HTML X calculation with -12dp grow offset (GROW = 12.dp)
-        val selectorX = 4.dp + Travel * (settle / 2f) - Grow * grow
+        // 4dp rest padding - (12dp * grow) left expansion offset
+        val selectorX = 4.dp + Travel * (settle / 2f) - (Grow * grow)
 
         val stretch = if (down) (abs(velocity) / 19f).coerceIn(0f, 1f) else 0f
         val liquidScaleX = 1f + stretch * 0.20f
@@ -145,14 +164,6 @@ fun BoxScope.NavBar(
         val skew = (velocity * 0.32f).coerceIn(-6f, 6f)
         val rotation = (velocity * 0.09f).coerceIn(-1.7f, 1.7f)
 
-        /*
-         * ============================================================
-         * 1. LIQUID DROP (BACKGROUND SELECTOR)
-         * ============================================================
-         * Main Visual Bar se pehle render kar rahe hain taaki Visual Bar
-         * ke andar overlay ho sake aur visual bar ke scale hone par
-         * Drop bhi smoothly grow overflow manage kare.
-         */
         Box(
             modifier = Modifier
                 .align(Alignment.CenterStart)
@@ -176,11 +187,10 @@ fun BoxScope.NavBar(
         )
 
         /*
-         * ============================================================
-         * 2. MAIN GLASS BAR (246 x 64)
-         * ============================================================
+         * ICON ROW (Aligned to Center)
+         * Direct alignment within 96dp parent ensures active icon stays centered in the Pill.
          */
-        Box(
+        Row(
             modifier = Modifier
                 .align(Alignment.Center)
                 .size(BarW, BarH)
@@ -189,53 +199,34 @@ fun BoxScope.NavBar(
                     scaleY = barScale
                     clip = false
                 }
+                .padding(horizontal = 4.dp)
         ) {
-            // Main Glass Dock Area
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(33.dp))
-                    .background(Color(0x2EFFFFFF))
-                    .border(
-                        width = 0.5.dp,
-                        color = Color(0x45FFFFFF),
-                        shape = RoundedCornerShape(33.dp)
-                    )
-            )
+            icons.forEachIndexed { index, icon ->
+                val active = abs(settle - index) < 0.5f
 
-            // Icons Layer (Always stay inside 246x64 bounds)
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 4.dp)
-            ) {
-                icons.forEachIndexed { index, icon ->
-                    val active = abs(settle - index) < 0.5f
+                val iconScale by animateFloatAsState(
+                    targetValue = if (active && down) 1.10f else 1f,
+                    animationSpec = spring(dampingRatio = 0.70f, stiffness = 850f),
+                    label = "iconScale$index"
+                )
 
-                    val iconScale by animateFloatAsState(
-                        targetValue = if (active && down) 1.10f else 1f,
-                        animationSpec = spring(dampingRatio = 0.70f, stiffness = 850f),
-                        label = "iconScale$index"
-                    )
-
-                    Box(
+                Box(
+                    modifier = Modifier
+                        .width(78.dp)
+                        .fillMaxHeight(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = if (active) Color.White else Color(0x62FFFFFF),
                         modifier = Modifier
-                            .width(78.dp)
-                            .fillMaxHeight(),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector = icon,
-                            contentDescription = null,
-                            tint = if (active) Color.White else Color(0x62FFFFFF),
-                            modifier = Modifier
-                                .size(25.dp)
-                                .graphicsLayer(
-                                    scaleX = iconScale,
-                                    scaleY = iconScale
-                                )
-                        )
-                    }
+                            .size(25.dp)
+                            .graphicsLayer(
+                                scaleX = iconScale,
+                                scaleY = iconScale
+                            )
+                    )
                 }
             }
         }
