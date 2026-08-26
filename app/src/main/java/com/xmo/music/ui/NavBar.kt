@@ -29,6 +29,9 @@ private val BarH = 64.dp
 private val RestW = 78.dp
 private val RestH = 56.dp
 
+private val HoldW = 102.dp
+private val HoldH = 80.dp
+
 private val SlotStep = 80.dp 
 
 @Composable
@@ -75,7 +78,7 @@ fun BoxScope.NavBar(
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
             .padding(bottom = 52.dp)
-            .size(BarW, 96.dp)
+            .size(BarW, 110.dp) // Outer space clip defense
             .pointerInput(selected) {
                 awaitEachGesture {
                     val first = awaitFirstDown(requireUnconsumed = false)
@@ -126,9 +129,8 @@ fun BoxScope.NavBar(
                 }
             }
     ) {
-
         /*
-         * MAIN BAR CONTAINER (246 x 64)
+         * MAIN BAR CONTAINER
          */
         Box(
             modifier = Modifier
@@ -154,16 +156,16 @@ fun BoxScope.NavBar(
             )
 
             /*
-             * LIQUID SELECTOR PILL (Equal 4-Side Expansion Fix)
+             * ABSOLUTE COORD MATCHING FOR LIQUID PILL
              */
-            val selectorW = RestW + (24.dp * grow) // 78dp -> 102dp
-            val selectorH = RestH + (24.dp * grow) // 56dp -> 80dp
+            val curW = RestW + (HoldW - RestW) * grow
+            val curH = RestH + (HoldH - RestH) * grow
 
-            // Center vertical alignment mapping (64 - Height) / 2:
-            // Rest: (64 - 56) / 2 = 4dp top & 4dp bottom
-            // Hold: (64 - 80) / 2 = -8dp top & -8dp bottom overflow!
+            // Left base = 4dp (rest). Hold offset shift = (102 - 78) / 2 = 12dp
             val selectorX = 4.dp + (SlotStep * settle) - (12.dp * grow)
-            val selectorY = (BarH - selectorH) / 2f
+            
+            // Vertical balance: Rest Y = 4dp (top & bottom 4dp). Hold Y = -8dp (top & bottom 8dp overflow)
+            val selectorY = 4.dp - (12.dp * grow)
 
             val stretch = if (down) (abs(velocity) / 19f).coerceIn(0f, 1f) else 0f
             val liquidScaleX = 1f + stretch * 0.20f
@@ -174,13 +176,15 @@ fun BoxScope.NavBar(
             Box(
                 modifier = Modifier
                     .offset(x = selectorX, y = selectorY)
-                    .size(width = selectorW, height = selectorH)
+                    .size(width = curW, height = curH)
                     .graphicsLayer {
                         scaleX = liquidScaleX
                         scaleY = liquidScaleY
                         rotationZ = rotation
                         rotationY = skew * 0.20f
                         cameraDistance = 16f * density
+                        // Vertical middle transform origin anchor to freeze center shift
+                        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
                         clip = false
                     }
                     .clip(RoundedCornerShape(if (down) 42.dp else 29.dp))
