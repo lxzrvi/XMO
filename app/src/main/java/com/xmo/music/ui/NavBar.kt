@@ -39,10 +39,12 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
     val x by animateFloatAsState(
         pos, spring(.68f, 750f), label = "position"
     )
+
     val grow by animateFloatAsState(
         if (down) 1f else 0f,
         spring(.72f, 700f), label = "grow"
     )
+
     val barScale by animateFloatAsState(
         if (down) 1.04f else 1f,
         spring(.75f, 750f), label = "bar"
@@ -58,7 +60,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         Modifier
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
-            .padding(bottom = 52.dp)
+            .padding(bottom = 44.dp)
             .size(BarW, 96.dp)
             .pointerInput(selected) {
                 awaitEachGesture {
@@ -84,10 +86,12 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             lastX = change.position.x
 
                             velocity = velocity * .62f + dx * .38f
+
                             pos = (start + total / slot)
                                 .coerceIn(0f, 2f)
 
-                            if (abs(total) > 2f) change.consume()
+                            if (abs(total) > 2f)
+                                change.consume()
                         }
                     }
 
@@ -110,11 +114,11 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                     velocity = 0f
                     pos = target.toFloat()
 
-                    if (target != selected) select(target)
+                    if (target != selected)
+                        select(target)
                 }
             }
     ) {
-        // Parent
         Box(
             Modifier
                 .align(Alignment.Center)
@@ -133,8 +137,6 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
         )
 
-        // Rest 78x56
-        // Press 110x80
         val selectorW = RestW + 32.dp * grow
         val selectorH = RestH + 24.dp * grow
         val travel = 160.dp
@@ -190,7 +192,6 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
         )
 
-        // Exact three equal icon slots
         Row(
             Modifier
                 .align(Alignment.Center)
@@ -220,6 +221,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             Color.White
                         else Color(0x62FFFFFF),
                         modifier = Modifier
+                            .offset(x = if (index == 2) 2.dp else 0.dp)
                             .size(25.dp)
                             .graphicsLayer {
                                 scaleX = iconScale
