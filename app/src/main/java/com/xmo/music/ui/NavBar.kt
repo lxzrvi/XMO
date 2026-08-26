@@ -26,15 +26,12 @@ import kotlin.math.abs
 private val BarW = 246.dp
 private val BarH = 64.dp
 
-// HTML: width: 78px, height: 56px, left: 4px, top: 4px
 private val RestW = 78.dp
 private val RestH = 56.dp
 
-// HTML: hold width: 102px, height: 80px -> grow 24px (12px on each side)
 private val GrowX = 12.dp
-private val GrowY = 12.dp
+private val GrowY = 12.dp // Rest 4dp -> Hold -8dp (Total 12dp shift up)
 
-// Travel distance between slot 0 and slot 2 (246 - (4*2) - 78 = 160dp total travel space)
 private val SlotStep = 80.dp 
 
 @Composable
@@ -151,21 +148,21 @@ fun BoxScope.NavBar(
                 modifier = Modifier
                     .fillMaxSize()
                     .clip(RoundedCornerShape(33.dp))
-                    .background(Color(0x24FFFFFF)) // HTML rgba(255, 255, 255, 0.14)
+                    .background(Color(0x24FFFFFF))
                     .border(
                         width = 0.5.dp,
-                        color = Color(0x45FFFFFF), // HTML #ffffff45
+                        color = Color(0x45FFFFFF),
                         shape = RoundedCornerShape(33.dp)
                     )
             )
 
             /*
-             * LIQUID SELECTOR PILL (Exact 1:1 Placement logic with HTML)
+             * LIQUID SELECTOR PILL (Vertical & Horizontal Symmetric Overflow Fix)
              */
             val selectorW = RestW + (24.dp * grow)
             val selectorH = RestH + (24.dp * grow)
 
-            // Dynamic offset: 4dp starting pad + (slot distance * current_pos) - (GrowX * grow)
+            // Dynamic offsets (Matches HTML CSS: top: 4px -> -8px | left: 4px -> -8px)
             val selectorX = 4.dp + (SlotStep * settle) - (GrowX * grow)
             val selectorY = 4.dp - (GrowY * grow)
 
