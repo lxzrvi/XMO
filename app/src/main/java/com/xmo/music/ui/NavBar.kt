@@ -60,7 +60,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         Modifier
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
-            .padding(bottom = 44.dp)
+            .padding(bottom = 35.dp)
             .size(BarW, 96.dp)
             .pointerInput(selected) {
                 awaitEachGesture {
