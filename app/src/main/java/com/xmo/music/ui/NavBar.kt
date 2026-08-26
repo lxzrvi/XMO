@@ -36,17 +36,21 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
     }
 
     val settle by animateFloatAsState(
-        pos, spring(.68f, 750f), label = "position"
+        pos,
+        spring(.68f, 750f),
+        label = "position"
     )
 
     val grow by animateFloatAsState(
         if (down) 1f else 0f,
-        spring(.72f, 700f), label = "grow"
+        spring(.72f, 700f),
+        label = "grow"
     )
 
-    val parentGrow by animateFloatAsState(
+    val barScale by animateFloatAsState(
         if (down) 1.04f else 1f,
-        spring(.75f, 750f), label = "bar"
+        spring(.75f, 750f),
+        label = "bar"
     )
 
     val icons = listOf(
@@ -55,7 +59,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         Icons.Rounded.Settings
     )
 
-    // 96dp outer area allows selector to escape vertically.
+    // Larger invisible host only gives Compose room for overflow.
     Box(
         Modifier
             .align(Alignment.BottomCenter)
@@ -91,8 +95,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                                 start + total / slot
                             ).coerceIn(0f, 2f)
 
-                            if (abs(total) > 2f)
-                                change.consume()
+                            if (abs(total) > 2f) change.consume()
                         }
                     }
 
@@ -115,19 +118,19 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                     velocity = 0f
                     pos = target.toFloat()
 
-                    if (target != selected)
-                        select(target)
+                    if (target != selected) select(target)
                 }
             }
     ) {
-        // Actual 246 × 64 parent stays centered.
+
+        // Exact 246 × 64 HTML bar
         Box(
             Modifier
                 .align(Alignment.Center)
                 .size(BarW, BarH)
                 .graphicsLayer {
-                    scaleX = parentGrow
-                    scaleY = parentGrow
+                    scaleX = barScale
+                    scaleY = barScale
                     shape = RoundedCornerShape(33.dp)
                     clip = true
                 }
@@ -139,27 +142,32 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
         )
 
-        val activeW = RestW + 24.dp * grow
-        val activeH = RestH + 36.dp * grow
+        // Exact HTML:
+        // 78x56 -> 102x80
+        val selectorW = RestW + 24.dp * grow
+        val selectorH = RestH + 24.dp * grow
         val travel = 160.dp
 
-        val stretch =
-            if (down)
-                (abs(velocity) / 19f).coerceIn(0f, 1f)
-            else 0f
+        val stretch = if (down)
+            (abs(velocity) / 19f).coerceIn(0f, 1f)
+        else 0f
 
-        // Selector now has real vertical space to overflow.
         Box(
             Modifier
                 .align(Alignment.CenterStart)
+
+                // Rest left = 4
+                // Drag adds -12 just like x - GROW in JS
                 .offset(
                     x = 4.dp +
                         travel * (settle / 2f) -
                         12.dp * grow
                 )
-                .size(activeW, activeH)
+
+                .size(selectorW, selectorH)
+
                 .graphicsLayer {
-                    val direction =
+                    val skew =
                         (velocity * .32f).coerceIn(-6f, 6f)
 
                     scaleX = 1f + stretch * .20f
@@ -170,27 +178,31 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             .coerceIn(-1.7f, 1.7f)
 
                     cameraDistance = 16f * density
-                    rotationY = direction * .20f
+                    rotationY = skew * .20f
                 }
+
                 .graphicsLayer {
                     shape = RoundedCornerShape(
-                        if (down) 46.dp else 29.dp
+                        if (down) 42.dp else 29.dp
                     )
                     clip = true
                 }
+
                 .background(Color(0x12FFFFFF))
+
                 .border(
                     .55.dp,
                     if (down)
                         Color(0x52FFFFFF)
-                    else Color(0x45FFFFFF),
+                    else
+                        Color(0x45FFFFFF),
                     RoundedCornerShape(
-                        if (down) 46.dp else 29.dp
+                        if (down) 42.dp else 29.dp
                     )
                 )
         )
 
-        // Icons remain aligned to the actual 64dp parent.
+        // Exact 64dp visual bar region
         Row(
             Modifier
                 .align(Alignment.Center)
@@ -217,7 +229,8 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         null,
                         tint = if (active)
                             Color.White
-                        else Color(0x62FFFFFF),
+                        else
+                            Color(0x62FFFFFF),
                         modifier = Modifier
                             .size(25.dp)
                             .graphicsLayer {
