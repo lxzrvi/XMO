@@ -35,22 +35,18 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         if (!down) pos = selected.toFloat()
     }
 
-    val settle by animateFloatAsState(
-        pos,
-        spring(.68f, 750f),
-        label = "position"
+    val x by animateFloatAsState(
+        pos, spring(.68f, 750f), label = "position"
     )
 
     val grow by animateFloatAsState(
         if (down) 1f else 0f,
-        spring(.72f, 700f),
-        label = "grow"
+        spring(.72f, 700f), label = "grow"
     )
 
     val barScale by animateFloatAsState(
         if (down) 1.04f else 1f,
-        spring(.75f, 750f),
-        label = "bar"
+        spring(.75f, 750f), label = "bar"
     )
 
     val icons = listOf(
@@ -59,13 +55,12 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         Icons.Rounded.Settings
     )
 
-    // Larger invisible host only gives Compose room for overflow.
     Box(
         Modifier
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
             .padding(bottom = 52.dp)
-            .size(BarW, 96.dp)
+            .size(BarW, 104.dp)
             .pointerInput(selected) {
                 awaitEachGesture {
                     val first = awaitFirstDown()
@@ -90,10 +85,8 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             lastX = change.position.x
 
                             velocity = velocity * .62f + dx * .38f
-
-                            pos = (
-                                start + total / slot
-                            ).coerceIn(0f, 2f)
+                            pos = (start + total / slot)
+                                .coerceIn(0f, 2f)
 
                             if (abs(total) > 2f) change.consume()
                         }
@@ -122,8 +115,6 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 }
             }
     ) {
-
-        // Exact 246 × 64 HTML bar
         Box(
             Modifier
                 .align(Alignment.Center)
@@ -142,67 +133,65 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
         )
 
-        // Exact HTML:
-        // 78x56 -> 102x80
-        val selectorW = RestW + 24.dp * grow
-        val selectorH = RestH + 24.dp * grow
-        val travel = 160.dp
+        /*
+         * Pressed parent after 1.04 scale:
+         * one tab width 82dp x height 66.56dp.
+         *
+         * Selector = 106 x 90.56
+         *
+         * Therefore selector extends exactly:
+         * 12dp left
+         * 12dp right
+         * 12dp top
+         * 12dp bottom
+         */
+        val pressedW = 106.dp
+        val pressedH = 90.56.dp
 
-        val stretch = if (down)
-            (abs(velocity) / 19f).coerceIn(0f, 1f)
-        else 0f
+        val selectorW = RestW + (pressedW - RestW) * grow
+        val selectorH = RestH + (pressedH - RestH) * grow
+
+        // Resting centers:
+        // Home 43, Search 123, Settings 203
+        val centerTravel = 160.dp
+
+        val stretch =
+            if (down)
+                (abs(velocity) / 30f).coerceIn(0f, 1f)
+            else 0f
 
         Box(
             Modifier
                 .align(Alignment.CenterStart)
-
-                // Rest left = 4
-                // Drag adds -12 just like x - GROW in JS
                 .offset(
                     x = 4.dp +
-                        travel * (settle / 2f) -
-                        12.dp * grow
+                        centerTravel * (x / 2f) -
+                        ((pressedW - RestW) / 2f) * grow
                 )
-
                 .size(selectorW, selectorH)
-
                 .graphicsLayer {
-                    val skew =
-                        (velocity * .32f).coerceIn(-6f, 6f)
-
-                    scaleX = 1f + stretch * .20f
-                    scaleY = 1f - stretch * .09f
+                    // Very subtle liquid deformation.
+                    scaleX = 1f + stretch * .035f
+                    scaleY = 1f - stretch * .015f
 
                     rotationZ =
-                        (velocity * .09f)
-                            .coerceIn(-1.7f, 1.7f)
-
-                    cameraDistance = 16f * density
-                    rotationY = skew * .20f
+                        (velocity * .04f)
+                            .coerceIn(-1f, 1f)
                 }
-
                 .graphicsLayer {
-                    shape = RoundedCornerShape(
-                        if (down) 42.dp else 29.dp
-                    )
+                    shape = RoundedCornerShape(46.dp)
                     clip = true
                 }
-
                 .background(Color(0x12FFFFFF))
-
                 .border(
                     .55.dp,
                     if (down)
                         Color(0x52FFFFFF)
-                    else
-                        Color(0x45FFFFFF),
-                    RoundedCornerShape(
-                        if (down) 42.dp else 29.dp
-                    )
+                    else Color(0x45FFFFFF),
+                    RoundedCornerShape(46.dp)
                 )
         )
 
-        // Exact 64dp visual bar region
         Row(
             Modifier
                 .align(Alignment.Center)
@@ -210,7 +199,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 .padding(horizontal = 4.dp)
         ) {
             icons.forEachIndexed { index, icon ->
-                val active = abs(settle - index) < .5f
+                val active = abs(x - index) < .5f
 
                 val iconScale by animateFloatAsState(
                     if (active && down) 1.10f else 1f,
@@ -229,8 +218,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         null,
                         tint = if (active)
                             Color.White
-                        else
-                            Color(0x62FFFFFF),
+                        else Color(0x62FFFFFF),
                         modifier = Modifier
                             .size(25.dp)
                             .graphicsLayer {
