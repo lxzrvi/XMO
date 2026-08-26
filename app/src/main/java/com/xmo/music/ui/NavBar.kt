@@ -1,8 +1,6 @@
 package com.xmo.music.ui
 
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -15,119 +13,129 @@ import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.*
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-private const val SLOT = 68f
+private val Slot = 72.dp
+private const val Slots = 3
 
 @Composable
 fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
-    var drag by remember { mutableFloatStateOf(selected * SLOT) }
+    var drag by remember { mutableFloatStateOf(selected.toFloat()) }
     var held by remember { mutableStateOf(false) }
     var dragging by remember { mutableStateOf(false) }
 
     LaunchedEffect(selected) {
-        if (!dragging) drag = selected * SLOT
+        if (!dragging) drag = selected.toFloat()
     }
 
-    val x by animateDpAsState(
-        drag.dp,
-        spring(dampingRatio = .72f, stiffness = 850f),
-        label = "x"
+    val position by animateFloatAsState(
+        drag,
+        spring(.72f, 900f),
+        label = "position"
     )
     val scale by animateFloatAsState(
-        if (held) 1.20f else 1f,
-        spring(dampingRatio = .65f, stiffness = 700f),
+        if (held) 1.22f else 1f,
+        spring(.62f, 650f),
         label = "scale"
+    )
+
+    val icons = listOf(
+        Icons.Rounded.Home,
+        Icons.Rounded.Search,
+        Icons.Rounded.Settings
     )
 
     Box(
         Modifier
             .align(Alignment.BottomCenter)
             .navigationBarsPadding()
-            .padding(bottom = 12.dp)
-            .size(220.dp, 68.dp)
-            .clip(CircleShape)
-            .background(Color(0xB81B1B1B))
+            .padding(bottom = 18.dp)
+            .width(Slot * Slots)
+            .height(Slot)
             .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { p ->
-                        select(
-                            (p.x / (size.width / 3f))
-                                .toInt()
-                                .coerceIn(0, 2)
-                        )
-                    }
-                )
+                detectTapGestures { p ->
+                    select(
+                        (p.x / (size.width / Slots))
+                            .toInt()
+                            .coerceIn(0, 2)
+                    )
+                }
             }
             .pointerInput(selected) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
                         held = true
                         dragging = true
-                        drag = selected * SLOT
+                        drag = selected.toFloat()
                     },
                     onDrag = { change, amount ->
                         change.consume()
-                        drag = (drag + amount.x / density)
-                            .coerceIn(0f, SLOT * 2)
+                        drag = (
+                            drag + amount.x / (size.width / Slots)
+                        ).coerceIn(0f, 2f)
                     },
                     onDragCancel = {
                         held = false
                         dragging = false
-                        drag = selected * SLOT
+                        drag = selected.toFloat()
                     },
                     onDragEnd = {
-                        val target = (drag / SLOT)
-                            .roundToInt()
-                            .coerceIn(0, 2)
-
+                        val target = drag.roundToInt().coerceIn(0, 2)
                         held = false
                         dragging = false
-                        drag = target * SLOT
+                        drag = target.toFloat()
                         select(target)
                     }
                 )
             }
     ) {
-        Row(
-            Modifier.fillMaxSize(),
-            horizontalArrangement = Arrangement.SpaceEvenly
-        ) {
-            listOf(
-                Icons.Rounded.Home,
-                Icons.Rounded.Search,
-                Icons.Rounded.Settings
-            ).forEach { icon ->
-                Box(
-                    Modifier.size(68.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        icon,
-                        null,
-                        tint = Color(0xFFD5D5D5),
-                        modifier = Modifier.size(23.dp)
-                    )
-                }
-            }
-        }
-
+        // Parent glass capsule
         Box(
             Modifier
-                .align(Alignment.CenterStart)
-                .offset(x = 8.dp + x)
-                .size(52.dp)
+                .matchParentSize()
+                .clip(CircleShape)
+                .background(Color(0xB52B292D))
+        )
+
+        // Sliding capsule
+        Box(
+            Modifier
+                .offset(x = Slot * position)
+                .size(Slot)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
                 }
                 .clip(CircleShape)
-                .background(Color(0x35FFFFFF))
+                .background(Color(0x3DFFFFFF))
+                .border(1.dp, Color(0x28FFFFFF), CircleShape)
         )
+
+        // Fixed icon slots
+        Row(Modifier.fillMaxSize()) {
+            icons.forEachIndexed { index, icon ->
+                val active = (position - index).let { kotlin.math.abs(it) < .45f }
+
+                Box(
+                    Modifier.size(Slot),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        icon,
+                        null,
+                        tint = if (active)
+                            Color.White
+                        else
+                            Color(0xFF8B858A),
+                        modifier = Modifier.size(25.dp)
+                    )
+                }
+            }
+        }
     }
 }
