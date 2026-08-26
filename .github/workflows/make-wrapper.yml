@@ -1,0 +1,28 @@
+name: XMO Setup
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.13'
+
+      - name: Create Wrapper
+        run: gradle wrapper --gradle-version 8.13
+
+      - name: Save
+        run: |
+          git config user.name "XMO"
+          git config user.email "actions@github.com"
+          git add gradlew gradlew.bat gradle/wrapper
+          git commit -m "XMO Gradle wrapper"
+          git push
