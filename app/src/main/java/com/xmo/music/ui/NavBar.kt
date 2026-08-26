@@ -29,9 +29,6 @@ private val BarH = 64.dp
 private val RestW = 78.dp
 private val RestH = 56.dp
 
-private val GrowX = 12.dp
-private val GrowY = 12.dp // Rest 4dp -> Hold -8dp (Total 12dp shift up)
-
 private val SlotStep = 80.dp 
 
 @Composable
@@ -157,14 +154,16 @@ fun BoxScope.NavBar(
             )
 
             /*
-             * LIQUID SELECTOR PILL (Vertical & Horizontal Symmetric Overflow Fix)
+             * LIQUID SELECTOR PILL (Equal 4-Side Expansion Fix)
              */
-            val selectorW = RestW + (24.dp * grow)
-            val selectorH = RestH + (24.dp * grow)
+            val selectorW = RestW + (24.dp * grow) // 78dp -> 102dp
+            val selectorH = RestH + (24.dp * grow) // 56dp -> 80dp
 
-            // Dynamic offsets (Matches HTML CSS: top: 4px -> -8px | left: 4px -> -8px)
-            val selectorX = 4.dp + (SlotStep * settle) - (GrowX * grow)
-            val selectorY = 4.dp - (GrowY * grow)
+            // Center vertical alignment mapping (64 - Height) / 2:
+            // Rest: (64 - 56) / 2 = 4dp top & 4dp bottom
+            // Hold: (64 - 80) / 2 = -8dp top & -8dp bottom overflow!
+            val selectorX = 4.dp + (SlotStep * settle) - (12.dp * grow)
+            val selectorY = (BarH - selectorH) / 2f
 
             val stretch = if (down) (abs(velocity) / 19f).coerceIn(0f, 1f) else 0f
             val liquidScaleX = 1f + stretch * 0.20f
