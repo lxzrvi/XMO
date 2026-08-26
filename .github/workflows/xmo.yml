@@ -6,24 +6,28 @@ on:
 
 jobs:
   build:
-    name: APK
+    name: XMO Kitchen
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+    steps:
+      - name: Getting XMO
+        uses: actions/checkout@v4
+
+      - name: Java is running
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Adding ingredients
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Build
+      - name: APK is cooking
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --build-cache --configuration-cache
 
-      - name: XMO
+      - name: Ready to serve
         uses: actions/upload-artifact@v4
         with:
           name: XMO
