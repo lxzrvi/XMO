@@ -18,9 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.math.abs
 
 private val W = 222.dp
@@ -39,11 +36,8 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
     }
 
     val x by animateFloatAsState(
-        pos,
-        spring(.76f, 1000f),
-        label = "x"
+        pos, spring(.76f, 1000f), label = "x"
     )
-
     val selectorScale by animateFloatAsState(
         when {
             held -> 1.24f
@@ -53,11 +47,12 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
         spring(.66f, 800f),
         label = "selector"
     )
-
     val parentScale by animateFloatAsState(
-        if (held) 1.045f
-        else if (pressed) 1.018f
-        else 1f,
+        when {
+            held -> 1.045f
+            pressed -> 1.018f
+            else -> 1f
+        },
         spring(.72f, 900f),
         label = "parent"
     )
@@ -80,77 +75,66 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
             }
             .pointerInput(selected) {
                 awaitEachGesture {
-                    coroutineScope {
-                        val down = awaitFirstDown()
-                        pressed = true
-                        held = false
+                    val down = awaitFirstDown()
+                    val start = selected
+                    val startX = down.position.x
+                    val startTime = down.uptimeMillis
 
-                        val startX = down.position.x
-                        val startTab = selected
-                        var dx = 0f
+                    var dx = 0f
+                    var lastTime = startTime
+                    var change = down
 
-                        val holdJob = launch {
-                            delay(170)
-                            held = true
+                    pressed = true
+                    held = false
+
+                    while (change.pressed) {
+                        val event = awaitPointerEvent()
+                        change = event.changes.first()
+                        lastTime = change.uptimeMillis
+                        dx = change.position.x - startX
+
+                        held = lastTime - startTime >= 170 &&
+                            abs(dx) < 12f
+
+                        if (abs(dx) > 3f) {
+                            val slot = size.width / 3f
+
+                            pos = (
+                                start + dx / slot
+                            ).coerceIn(
+                                (start - 1).coerceAtLeast(0).toFloat(),
+                                (start + 1).coerceAtMost(2).toFloat()
+                            )
+
+                            change.consume()
                         }
-
-                        var event = awaitPointerEvent()
-                        var change = event.changes.first()
-
-                        while (change.pressed) {
-                            dx = change.position.x - startX
-
-                            if (abs(dx) > 3f) {
-                                holdJob.cancel()
-
-                                val slot = size.width / 3f
-                                pos = (
-                                    startTab + dx / slot
-                                ).coerceIn(
-                                    (startTab - 1)
-                                        .coerceAtLeast(0).toFloat(),
-                                    (startTab + 1)
-                                        .coerceAtMost(2).toFloat()
-                                )
-
-                                change.consume()
-                            }
-
-                            event = awaitPointerEvent()
-                            change = event.changes.first()
-                        }
-
-                        holdJob.cancel()
-
-                        val slot = size.width / 3f
-
-                        val target = when {
-                            abs(dx) > slot * .18f ->
-                                if (dx > 0)
-                                    (startTab + 1).coerceAtMost(2)
-                                else
-                                    (startTab - 1).coerceAtLeast(0)
-
-                            abs(dx) <= 6f -> {
-                                (down.position.x / slot)
-                                    .toInt()
-                                    .coerceIn(0, 2)
-                            }
-
-                            else -> startTab
-                        }
-
-                        pressed = false
-                        held = false
-                        pos = target.toFloat()
-
-                        if (target != selected)
-                            select(target)
                     }
+
+                    val slot = size.width / 3f
+
+                    val target = when {
+                        abs(dx) > slot * .18f ->
+                            if (dx > 0)
+                                (start + 1).coerceAtMost(2)
+                            else
+                                (start - 1).coerceAtLeast(0)
+
+                        abs(dx) <= 6f ->
+                            (down.position.x / slot)
+                                .toInt()
+                                .coerceIn(0, 2)
+
+                        else -> start
+                    }
+
+                    pressed = false
+                    held = false
+                    pos = target.toFloat()
+
+                    if (target != selected) select(target)
                 }
             }
     ) {
-        // Parent
         Box(
             Modifier
                 .matchParentSize()
@@ -166,7 +150,6 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
         )
 
-        // Selector: 5dp equal resting gap top/bottom
         Box(
             Modifier
                 .align(Alignment.CenterStart)
@@ -201,9 +184,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 )
 
                 Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
+                    Modifier.weight(1f).fillMaxHeight(),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
