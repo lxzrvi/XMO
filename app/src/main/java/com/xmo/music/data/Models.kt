@@ -13,10 +13,7 @@ data class Song(
     val artwork: Uri?
 )
 
-data class Artist(
-    val name: String,
-    val songs: List<Song>
-)
+data class Artist(val name: String, val songs: List<Song>)
 
 data class Album(
     val id: Long,
@@ -24,4 +21,11 @@ data class Album(
     val artist: String,
     val songs: List<Song>,
     val artwork: Uri?
+)
+
+data class UserCategory(
+    val id: String,
+    val name: String,
+    val icon: Int,
+    val songIds: Set<Long> = emptySet()
 )
