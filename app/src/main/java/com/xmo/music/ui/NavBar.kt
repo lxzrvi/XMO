@@ -37,17 +37,21 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
     }
 
     val x by animateFloatAsState(
-        pos, spring(.68f, 750f), label = "position"
+        pos,
+        spring(.72f, 900f),
+        label = "position"
     )
 
     val grow by animateFloatAsState(
         if (down) 1f else 0f,
-        spring(.72f, 700f), label = "grow"
+        spring(.78f, 850f),
+        label = "grow"
     )
 
     val barScale by animateFloatAsState(
         if (down) 1.04f else 1f,
-        spring(.75f, 750f), label = "bar"
+        spring(.78f, 900f),
+        label = "bar"
     )
 
     val icons = listOf(
@@ -85,7 +89,8 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             total = change.position.x - startX
                             lastX = change.position.x
 
-                            velocity = velocity * .62f + dx * .38f
+                            velocity =
+                                velocity * .62f + dx * .38f
 
                             pos = (start + total / slot)
                                 .coerceIn(0f, 2f)
@@ -139,6 +144,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
 
         val selectorW = RestW + 32.dp * grow
         val selectorH = RestH + 24.dp * grow
+        val radius = 29.dp + 13.dp * grow
         val travel = 160.dp
 
         val stretch = if (down)
@@ -156,11 +162,11 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                 .size(selectorW, selectorH)
                 .graphicsLayer {
                     val skew =
-                        (velocity * .32f).coerceIn(-6f, 6f)
+                        (velocity * .32f)
+                            .coerceIn(-6f, 6f)
 
                     scaleX = 1f + stretch * .20f
                     scaleY = 1f - stretch * .09f
-
                     rotationZ =
                         (velocity * .09f)
                             .coerceIn(-1.7f, 1.7f)
@@ -169,26 +175,20 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                     rotationY = skew * .20f
                 }
                 .graphicsLayer {
-                    shape = RoundedCornerShape(
-                        if (down) 42.dp else 29.dp
-                    )
+                    shape = RoundedCornerShape(radius)
                     clip = true
                 }
                 .background(
-                    if (down)
-                        Color(0x03FFFFFF)
-                    else
-                        Color(0x12FFFFFF)
+                    Color.White.copy(
+                        alpha = .07f - .058f * grow
+                    )
                 )
                 .border(
                     .55.dp,
-                    if (down)
-                        Color(0x52FFFFFF)
-                    else
-                        Color(0x45FFFFFF),
-                    RoundedCornerShape(
-                        if (down) 42.dp else 29.dp
-                    )
+                    Color.White.copy(
+                        alpha = .27f + .05f * grow
+                    ),
+                    RoundedCornerShape(radius)
                 )
         )
 
@@ -204,7 +204,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
 
                 val iconScale by animateFloatAsState(
                     if (active && down) 1.10f else 1f,
-                    spring(.7f, 850f),
+                    spring(.75f, 900f),
                     label = "icon$index"
                 )
 
@@ -221,7 +221,11 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                             Color.White
                         else Color(0x62FFFFFF),
                         modifier = Modifier
-                            .offset(x = if (index == 2) 2.dp else 0.dp)
+                            .offset(
+                                x = if (index == 2)
+                                    2.dp
+                                else 0.dp
+                            )
                             .size(25.dp)
                             .graphicsLayer {
                                 scaleX = iconScale
