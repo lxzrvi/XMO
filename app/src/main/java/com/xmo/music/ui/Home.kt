@@ -54,43 +54,49 @@ fun Home(
                 color = c.sub,
                 fontFamily = XmoFont.normal,
                 fontSize = 13.sp,
-                modifier = Modifier.padding(18.dp, 12.dp, 18.dp, 22.dp)
+                modifier = Modifier.padding(
+                    start = 18.dp,
+                    top = 12.dp,
+                    bottom = 22.dp
+                )
             )
 
             SectionTitle(
                 "All Songs",
-                if (allowed) "All songs: ${songs.size}" else "Music access required",
+                if (allowed)
+                    "All songs: ${songs.size}"
+                else
+                    "Music access required",
                 Icons.Rounded.Album,
                 c
             )
 
-            if (!allowed) {
-                Text(
+            when {
+                !allowed -> EmptyHomeText(
                     "Allow music access to show songs on this device.",
-                    color = c.sub,
-                    fontFamily = XmoFont.normal,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(18.dp, 12.dp, 18.dp, 26.dp)
+                    c
                 )
-            } else if (songs.isEmpty()) {
-                Text(
+
+                songs.isEmpty() -> EmptyHomeText(
                     "No local music found",
-                    color = c.sub,
-                    fontFamily = XmoFont.normal,
-                    fontSize = 13.sp,
-                    modifier = Modifier.padding(18.dp, 12.dp, 18.dp, 26.dp)
+                    c
                 )
-            } else {
-                SongPages(songs, c)
+
+                else -> SongPages(songs, c)
             }
 
             val albums = Library.albums(songs)
+
             SectionTitle(
                 "Albums",
                 "${albums.size} albums",
                 Icons.Rounded.LibraryMusic,
                 c
             )
+
+            if (albums.isEmpty()) {
+                EmptyHomeText("No albums found", c)
+            }
 
             SectionTitle(
                 "Liked Songs",
@@ -99,15 +105,10 @@ fun Home(
                 c
             )
 
-            Text(
-                "No liked songs yet",
-                color = c.sub,
-                fontFamily = XmoFont.normal,
-                fontSize = 13.sp,
-                modifier = Modifier.padding(18.dp, 10.dp, 18.dp, 22.dp)
-            )
+            EmptyHomeText("No liked songs yet", c)
 
             val artists = Library.artists(songs)
+
             SectionTitle(
                 "Top Artists",
                 "${artists.size} artists",
@@ -115,15 +116,17 @@ fun Home(
                 c
             )
 
-            if (artists.isNotEmpty()) {
+            if (artists.isEmpty()) {
+                EmptyHomeText("No artists found", c)
+            } else {
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState())
-                        .padding(horizontal = 12.dp, vertical = 4.dp),
+                        .padding(horizontal = 12.dp, vertical = 5.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    artists.take(12).forEach { artist ->
+                    artists.take(15).forEach { artist ->
                         Column(
                             Modifier.width(62.dp),
                             horizontalAlignment = Alignment.CenterHorizontally
@@ -138,12 +141,18 @@ fun Home(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    artist.name.take(1).uppercase(),
+                                    artist.name
+                                        .firstOrNull()
+                                        ?.uppercase()
+                                        ?: "?",
                                     color = XmoRed,
                                     fontFamily = XmoFont.bold,
                                     fontSize = 18.sp
                                 )
                             }
+
+                            Spacer(Modifier.height(5.dp))
+
                             Text(
                                 artist.name,
                                 color = c.text,
@@ -156,14 +165,16 @@ fun Home(
                 }
             }
 
-            Spacer(Modifier.height(32.dp))
+            Spacer(Modifier.height(35.dp))
 
             Text(
                 "XMO",
                 color = c.text,
                 fontFamily = XmoFont.logo,
                 fontSize = 25.sp,
-                modifier = Modifier.align(Alignment.CenterHorizontally)
+                modifier = Modifier.align(
+                    Alignment.CenterHorizontally
+                )
             )
 
             Text(
@@ -175,40 +186,81 @@ fun Home(
                     .align(Alignment.CenterHorizontally)
                     .padding(top = 3.dp)
             )
+
+            Spacer(Modifier.height(15.dp))
         }
     }
 }
 
 @Composable
-private fun SongPages(songs: List<Song>, c: HomeColors) {
-    val pages = songs.chunked(12)
-    val scroll = rememberScrollState()
+private fun EmptyHomeText(
+    text: String,
+    c: HomeColors
+) {
+    Text(
+        text,
+        color = c.sub,
+        fontFamily = XmoFont.normal,
+        fontSize = 13.sp,
+        modifier = Modifier.padding(
+            start = 18.dp,
+            end = 18.dp,
+            top = 10.dp,
+            bottom = 22.dp
+        )
+    )
+}
 
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .horizontalScroll(scroll)
-            .padding(horizontal = 12.dp, vertical = 4.dp)
+@Composable
+private fun SongPages(
+    songs: List<Song>,
+    c: HomeColors
+) {
+    BoxWithConstraints(
+        Modifier.fillMaxWidth()
     ) {
-        pages.forEachIndexed { pageIndex, page ->
-            Column(
-                Modifier
-                    .fillParentMaxWidth()
-                    .padding(end = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                repeat(3) { row ->
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        repeat(4) { col ->
-                            val local = row * 4 + col
-                            val song = page.getOrNull(local)
+        val pageWidth = maxWidth
+        val pages = songs.chunked(12)
 
-                            Box(Modifier.weight(1f)) {
-                                if (song != null)
-                                    SongTile(song, pageIndex * 12 + local, c)
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+        ) {
+            pages.forEachIndexed { pageIndex, page ->
+                Column(
+                    Modifier
+                        .width(pageWidth)
+                        .padding(
+                            start = 12.dp,
+                            end = 12.dp,
+                            top = 4.dp,
+                            bottom = 8.dp
+                        ),
+                    verticalArrangement =
+                        Arrangement.spacedBy(8.dp)
+                ) {
+                    repeat(3) { row ->
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            horizontalArrangement =
+                                Arrangement.spacedBy(8.dp)
+                        ) {
+                            repeat(4) { col ->
+                                val local = row * 4 + col
+                                val song = page.getOrNull(local)
+
+                                Box(
+                                    Modifier.weight(1f)
+                                ) {
+                                    if (song != null) {
+                                        SongTile(
+                                            song,
+                                            pageIndex * 12 + local,
+                                            c
+                                        )
+                                    }
+                                }
                             }
                         }
                     }
