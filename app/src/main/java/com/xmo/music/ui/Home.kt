@@ -1,12 +1,11 @@
 package com.xmo.music.ui
 
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.*
-import androidx.compose.foundation.lazy.grid.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -17,15 +16,18 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xmo.music.R
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.*
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.math.roundToInt
 
-private data class Sec(
+private data class HomeSection(
     val id: String,
     val name: String,
-    val icon: String
+    val icon: Int,
+    val color: androidx.compose.ui.graphics.Color = XmoRed
 )
 
 @Composable
@@ -45,27 +47,39 @@ fun Home(
     val scope = rememberCoroutineScope()
 
     val built = listOf(
-        Sec("songs", "All Songs", "♫"),
-        Sec("albums", "Albums", "▣"),
-        Sec("liked", "Liked Songs", "♥"),
-        Sec("artists", "Top Artists", "●")
+        HomeSection("songs", "All Songs", R.drawable.ic_xmo_songs),
+        HomeSection("albums", "Albums", R.drawable.ic_xmo_album),
+        HomeSection("liked", "Liked Songs", R.drawable.ic_xmo_heart),
+        HomeSection("artists", "Artists", R.drawable.ic_xmo_artist)
     )
 
-    val symbols = listOf("★", "✦", "◆", "✿")
+    val customIcons = listOf(
+        R.drawable.ic_xmo_star,
+        R.drawable.ic_xmo_spark,
+        R.drawable.ic_xmo_diamond,
+        R.drawable.ic_xmo_bolt
+    )
+
+    val customColors = listOf(
+        androidx.compose.ui.graphics.Color(0xFFFFC107),
+        androidx.compose.ui.graphics.Color(0xFFAF52DE),
+        androidx.compose.ui.graphics.Color(0xFF00AEEF),
+        androidx.compose.ui.graphics.Color(0xFFFF7043)
+    )
 
     val custom = categories.map {
-        Sec(
+        HomeSection(
             it.id,
             it.name,
-            symbols[it.icon.mod(symbols.size)]
+            customIcons[it.icon.mod(customIcons.size)],
+            customColors[it.icon.mod(customColors.size)]
         )
     }
 
-    val sections = (built + custom).associateBy { it.id }
-
-    val validOrder =
-        order.filter { sections.containsKey(it) } +
-            sections.keys.filterNot { it in order }
+    val map = (built + custom).associateBy { it.id }
+    val currentOrder =
+        order.filter(map::containsKey) +
+            map.keys.filterNot(order::contains)
 
     var selected by remember { mutableStateOf("all") }
     var addDialog by remember { mutableStateOf(false) }
@@ -79,98 +93,87 @@ fun Home(
         LazyColumn(
             state = state,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(bottom = 340.dp)
+            contentPadding = PaddingValues(bottom = 360.dp)
         ) {
-            item(key = "header") {
-                Box(Modifier.statusBarsPadding()) {
+            item("header") {
+                Box(
+                    Modifier
+                        .statusBarsPadding()
+                        .padding(top = 4.dp)
+                ) {
                     HomeHeader(
-                        c = c,
-                        theme = theme,
-                        setTheme = setTheme,
-                        refresh = refresh
+                        c,
+                        theme,
+                        setTheme,
+                        refresh
                     )
                 }
             }
 
-            stickyHeader(key = "categories") {
-                Row(
+            stickyHeader("categories") {
+                Box(
                     Modifier
                         .fillMaxWidth()
-                        .background(c.bg.copy(.95f))
-                        .horizontalScroll(rememberScrollState())
-                        .padding(
-                            horizontal = 14.dp,
-                            vertical = 9.dp
-                        ),
-                    horizontalArrangement =
-                        Arrangement.spacedBy(8.dp)
+                        .background(c.bg.copy(.96f))
+                        .statusBarsPadding()
                 ) {
-                    CategoryChip(
-                        "All",
-                        selected == "all",
-                        c,
-                        "▦"
-                    ) {
-                        selected = "all"
+                    CategoryBar(
+                        sections = currentOrder.mapNotNull(map::get),
+                        selected = selected,
+                        c = c,
+                        onSelect = { id ->
+                            selected = id
 
-                        scope.launch {
-                            state.animateScrollToItem(0)
-                        }
-                    }
-
-                    validOrder.forEach { id ->
-                        sections[id]?.let { section ->
-                            CategoryChip(
-                                section.name,
-                                selected == id,
-                                c,
-                                section.icon
-                            ) {
-                                selected = id
-
-                                val index =
-                                    validOrder.indexOf(id)
-
+                            if (id == "all") {
                                 scope.launch {
-                                    state.animateScrollToItem(
-                                        index = 3 + index
-                                    )
+                                    state.animateScrollToItem(0)
+                                }
+                            } else {
+                                val i = currentOrder.indexOf(id)
+                                if (i >= 0) {
+                                    scope.launch {
+                                        state.animateScrollToItem(
+                                            index = 3 + i
+                                        )
+                                    }
                                 }
                             }
+                        },
+                        onMove = { from, to ->
+                            val next = currentOrder.toMutableList()
+                            val moving = next.removeAt(from)
+                            next.add(to, moving)
+                            saveOrder(next)
+                        },
+                        onAdd = {
+                            addDialog = true
                         }
-                    }
-
-                    CategoryChip(
-                        "+",
-                        false,
-                        c,
-                        "+"
-                    ) {
-                        addDialog = true
-                    }
+                    )
                 }
             }
 
-            item(key = "recent") {
+            item("recent") {
                 Column(
                     Modifier
                         .fillMaxWidth()
                         .padding(
-                            horizontal = 12.dp,
-                            vertical = 8.dp
+                            start = 12.dp,
+                            top = 12.dp,
+                            end = 12.dp,
+                            bottom = 16.dp
                         )
                 ) {
                     SectionTitle(
-                        "Recently Played",
-                        "0 tracks played",
-                        "◷",
-                        c
+                        title = "Recently Played",
+                        subtitle = "0 tracks played",
+                        icon = R.drawable.ic_xmo_history,
+                        c = c
                     )
 
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(100.dp),
+                            .height(105.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
@@ -184,25 +187,24 @@ fun Home(
             }
 
             itemsIndexed(
-                items = validOrder,
+                currentOrder,
                 key = { _, id -> id }
             ) { index, id ->
-
-                sections[id]?.let { section ->
-                    DraggableSection(
-                        sec = section,
+                map[id]?.let { section ->
+                    ReorderSection(
+                        section = section,
                         index = index,
-                        order = validOrder,
+                        count = currentOrder.size,
                         c = c,
-                        move = { from, to ->
-                            val newOrder =
-                                validOrder.toMutableList()
+                        onMove = { from, to ->
+                            val next =
+                                currentOrder.toMutableList()
 
-                            val moved =
-                                newOrder.removeAt(from)
+                            val moving =
+                                next.removeAt(from)
 
-                            newOrder.add(to, moved)
-                            saveOrder(newOrder)
+                            next.add(to, moving)
+                            saveOrder(next)
                         }
                     ) {
                         when (id) {
@@ -210,14 +212,12 @@ fun Home(
                                 SongsSection(
                                     songs,
                                     allowed,
-                                    c
+                                    c,
+                                    theme
                                 )
 
                             "albums" ->
-                                AlbumsSection(
-                                    songs,
-                                    c
-                                )
+                                AlbumsSection(songs, c)
 
                             "liked" ->
                                 LikedSection(c)
@@ -229,7 +229,7 @@ fun Home(
                                 )
 
                             else -> {
-                                val category =
+                                val cat =
                                     categories.find {
                                         it.id == id
                                     }
@@ -237,11 +237,12 @@ fun Home(
                                 CustomSection(
                                     songs.filter {
                                         it.id in (
-                                            category?.songIds
+                                            cat?.songIds
                                                 ?: emptySet()
                                             )
                                     },
-                                    c
+                                    c,
+                                    theme
                                 )
                             }
                         }
@@ -249,14 +250,11 @@ fun Home(
                 }
             }
 
-            item(key = "footer") {
+            item("footer") {
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .padding(
-                            top = 55.dp,
-                            bottom = 100.dp
-                        ),
+                        .padding(top = 58.dp),
                     horizontalAlignment =
                         Alignment.CenterHorizontally
                 ) {
@@ -264,17 +262,19 @@ fun Home(
                         "XMO",
                         color = c.text,
                         fontFamily = XmoFont.logo,
-                        fontSize = 26.sp
+                        fontSize = 20.sp
                     )
 
                     Text(
                         "lxzrvi  •  copyright © 2026",
                         color = c.sub,
                         fontFamily = XmoFont.thin,
-                        fontSize = 10.sp
+                        fontSize = 9.sp,
+                        modifier = Modifier.padding(top = 3.dp)
                     )
 
-                    Spacer(Modifier.height(160.dp))
+                    // Allows the last section to reach sticky-nav top.
+                    Spacer(Modifier.height(320.dp))
                 }
             }
         }
@@ -302,30 +302,29 @@ fun Home(
                     },
                     singleLine = true,
                     label = {
-                        Text("Name")
+                        Text("Category name")
                     }
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val clean =
+                        val name =
                             categoryName.trim()
 
-                        if (clean.isNotEmpty()) {
-                            val category =
-                                UserCategory(
-                                    id = "cat_${UUID.randomUUID()}",
-                                    name = clean,
-                                    icon = categories.size % 4
-                                )
+                        if (name.isNotEmpty()) {
+                            val cat = UserCategory(
+                                id = "cat_${UUID.randomUUID()}",
+                                name = name,
+                                icon = categories.size % 4
+                            )
 
                             saveCategories(
-                                categories + category
+                                categories + cat
                             )
 
                             saveOrder(
-                                validOrder + category.id
+                                currentOrder + cat.id
                             )
 
                             categoryName = ""
@@ -333,10 +332,7 @@ fun Home(
                         }
                     }
                 ) {
-                    Text(
-                        "Add",
-                        color = XmoRed
-                    )
+                    Text("Add", color = XmoRed)
                 }
             },
             dismissButton = {
@@ -357,22 +353,157 @@ fun Home(
 }
 
 @Composable
-private fun DraggableSection(
-    sec: Sec,
-    index: Int,
-    order: List<String>,
+private fun CategoryBar(
+    sections: List<HomeSection>,
+    selected: String,
     c: HomeColors,
-    move: (Int, Int) -> Unit,
+    onSelect: (String) -> Unit,
+    onMove: (Int, Int) -> Unit,
+    onAdd: () -> Unit
+) {
+    val scroll = rememberScrollState()
+    val haptic = LocalHapticFeedback.current
+
+    var dragging by remember {
+        mutableIntStateOf(-1)
+    }
+
+    var dragX by remember {
+        mutableFloatStateOf(0f)
+    }
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(scroll)
+            .padding(
+                start = 14.dp,
+                top = 8.dp,
+                end = 14.dp,
+                bottom = 10.dp
+            ),
+        horizontalArrangement =
+            Arrangement.spacedBy(8.dp)
+    ) {
+        CategoryChip(
+            text = "All",
+            active = selected == "all",
+            c = c,
+            icon = R.drawable.ic_xmo_all
+        ) {
+            onSelect("all")
+        }
+
+        sections.forEachIndexed { index, section ->
+            Box(
+                Modifier
+                    .graphicsLayer {
+                        translationX =
+                            if (dragging == index)
+                                dragX
+                            else 0f
+
+                        scaleX =
+                            if (dragging == index)
+                                1.06f
+                            else 1f
+
+                        scaleY =
+                            if (dragging == index)
+                                1.06f
+                            else 1f
+                    }
+                    .pointerInput(
+                        sections.map { it.id },
+                        index
+                    ) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                dragging = index
+                                dragX = 0f
+
+                                haptic.performHapticFeedback(
+                                    HapticFeedbackType.LongPress
+                                )
+                            },
+
+                            onDrag = { change, amount ->
+                                change.consume()
+                                dragX += amount.x
+                            },
+
+                            onDragEnd = {
+                                val step =
+                                    105f * density
+
+                                val target = (
+                                    index +
+                                        (dragX / step)
+                                            .roundToInt()
+                                    ).coerceIn(
+                                    sections.indices
+                                )
+
+                                if (target != index) {
+                                    onMove(
+                                        index,
+                                        target
+                                    )
+                                }
+
+                                dragging = -1
+                                dragX = 0f
+                            },
+
+                            onDragCancel = {
+                                dragging = -1
+                                dragX = 0f
+                            }
+                        )
+                    }
+            ) {
+                CategoryChip(
+                    text = section.name,
+                    active = selected == section.id,
+                    c = c,
+                    icon = section.icon,
+                    tint = section.color
+                ) {
+                    if (dragging < 0) {
+                        onSelect(section.id)
+                    }
+                }
+            }
+        }
+
+        CategoryChip(
+            text = "Add",
+            active = false,
+            c = c,
+            icon = R.drawable.ic_xmo_add,
+            tint = XmoRed,
+            onClick = onAdd
+        )
+    }
+}
+
+@Composable
+private fun ReorderSection(
+    section: HomeSection,
+    index: Int,
+    count: Int,
+    c: HomeColors,
+    onMove: (Int, Int) -> Unit,
     body: @Composable () -> Unit
 ) {
     val haptic = LocalHapticFeedback.current
 
-    var drag by remember {
-        mutableFloatStateOf(0f)
-    }
-
     var lifted by remember {
         mutableStateOf(false)
+    }
+
+    var dragY by remember {
+        mutableFloatStateOf(0f)
     }
 
     Column(
@@ -380,13 +511,33 @@ private fun DraggableSection(
             .fillMaxWidth()
             .padding(
                 horizontal = 12.dp,
-                vertical = 6.dp
+                vertical = 9.dp
             )
-            .pointerInput(order, index) {
+            .graphicsLayer {
+                translationY =
+                    if (lifted) dragY else 0f
+
+                scaleX =
+                    if (lifted) 1.015f else 1f
+
+                scaleY =
+                    if (lifted) 1.015f else 1f
+
+                alpha =
+                    if (lifted) .94f else 1f
+            }
+            .animateContentSize()
+    ) {
+        // Gesture ONLY on the section label.
+        Box(
+            Modifier.pointerInput(
+                section.id,
+                index
+            ) {
                 detectDragGesturesAfterLongPress(
                     onDragStart = {
-                        drag = 0f
                         lifted = true
+                        dragY = 0f
 
                         haptic.performHapticFeedback(
                             HapticFeedbackType.LongPress
@@ -395,53 +546,48 @@ private fun DraggableSection(
 
                     onDrag = { change, amount ->
                         change.consume()
-                        drag += amount.y
+                        dragY += amount.y
                     },
 
                     onDragEnd = {
-                        val step = 120f * density
+                        val step =
+                            145f * density
 
                         val target = (
                             index +
-                                (drag / step).toInt()
-                            ).coerceIn(order.indices)
+                                (dragY / step)
+                                    .roundToInt()
+                            ).coerceIn(
+                            0,
+                            count - 1
+                        )
 
                         if (target != index) {
-                            move(index, target)
+                            onMove(index, target)
                         }
 
-                        drag = 0f
                         lifted = false
+                        dragY = 0f
                     },
 
                     onDragCancel = {
-                        drag = 0f
                         lifted = false
+                        dragY = 0f
                     }
                 )
             }
-            .graphicsLayer {
-                translationY =
-                    if (lifted) drag else 0f
+        ) {
+            SectionTitle(
+                title = section.name,
+                subtitle = "",
+                icon = section.icon,
+                c = c
+            )
+        }
 
-                scaleX =
-                    if (lifted) 1.02f else 1f
-
-                scaleY =
-                    if (lifted) 1.02f else 1f
-
-                alpha =
-                    if (lifted) .94f else 1f
-            }
-    ) {
-        SectionTitle(
-            sec.name,
-            "",
-            sec.icon,
-            c
-        )
-
-        if (!lifted) {
+        AnimatedVisibility(
+            visible = !lifted
+        ) {
             body()
         }
     }
@@ -451,7 +597,8 @@ private fun DraggableSection(
 private fun SongsSection(
     songs: List<Song>,
     allowed: Boolean,
-    c: HomeColors
+    c: HomeColors,
+    theme: XmoTheme
 ) {
     if (!allowed) {
         Empty(
@@ -470,49 +617,87 @@ private fun SongsSection(
     }
 
     val scroll = rememberScrollState()
-    val pages = songs.chunked(12)
+    val scope = rememberCoroutineScope()
 
-    BoxWithConstraints(
-        Modifier.fillMaxWidth()
-    ) {
-        val pageWidth = maxWidth
-
+    Column {
         Row(
-            Modifier.horizontalScroll(scroll)
+            Modifier
+                .fillMaxWidth()
+                .padding(end = 10.dp),
+            horizontalArrangement =
+                Arrangement.End
         ) {
-            pages.forEachIndexed {
-                    pageIndex,
-                    page ->
+            Box(
+                Modifier
+                    .size(28.dp)
+                    .background(
+                        XmoRed.copy(.18f),
+                        CircleShape
+                    )
+                    .clickable {
+                        scope.launch {
+                            scroll.animateScrollTo(
+                                (scroll.value + 100)
+                                    .coerceAtMost(
+                                        scroll.maxValue
+                                    )
+                            )
+                        }
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                XmoIcon(
+                    R.drawable.ic_xmo_arrow,
+                    XmoRed,
+                    Modifier.size(13.dp)
+                )
+            }
+        }
 
-                Column(
-                    Modifier
-                        .width(pageWidth)
-                        .padding(4.dp),
-                    verticalArrangement =
-                        Arrangement.spacedBy(8.dp)
-                ) {
-                    repeat(3) { row ->
-                        Row(
-                            Modifier.fillMaxWidth(),
-                            horizontalArrangement =
-                                Arrangement.spacedBy(8.dp)
-                        ) {
-                            repeat(4) { column ->
-                                val local =
-                                    row * 4 + column
+        BoxWithConstraints(
+            Modifier.fillMaxWidth()
+        ) {
+            val pageWidth = maxWidth
+            val pages = songs.chunked(12)
 
-                                Box(
-                                    Modifier.weight(1f)
-                                ) {
-                                    page.getOrNull(local)
-                                        ?.let { song ->
-                                            SongTile(
-                                                song,
-                                                pageIndex * 12 +
-                                                    local,
-                                                c
-                                            )
-                                        }
+            Row(
+                Modifier.horizontalScroll(scroll)
+            ) {
+                pages.forEachIndexed {
+                        pageIndex,
+                        page ->
+
+                    Column(
+                        Modifier
+                            .width(pageWidth)
+                            .padding(4.dp),
+                        verticalArrangement =
+                            Arrangement.spacedBy(8.dp)
+                    ) {
+                        repeat(3) { row ->
+                            Row(
+                                Modifier.fillMaxWidth(),
+                                horizontalArrangement =
+                                    Arrangement.spacedBy(8.dp)
+                            ) {
+                                repeat(4) { column ->
+                                    val local =
+                                        row * 4 + column
+
+                                    Box(
+                                        Modifier.weight(1f)
+                                    ) {
+                                        page.getOrNull(local)
+                                            ?.let { song ->
+                                                SongTile(
+                                                    song,
+                                                    pageIndex * 12 +
+                                                        local,
+                                                    c,
+                                                    theme
+                                                )
+                                            }
+                                    }
                                 }
                             }
                         }
@@ -528,22 +713,18 @@ private fun AlbumsSection(
     songs: List<Song>,
     c: HomeColors
 ) {
-    val albums = Library.albums(songs)
-
     Column {
         SectionTitle(
-            "",
-            "${albums.size} albums",
-            "",
-            c,
-            "+"
+            title = "",
+            subtitle =
+                "${Library.albums(songs).size} albums",
+            icon = R.drawable.ic_xmo_album,
+            c = c,
+            action = R.drawable.ic_xmo_add
         )
 
-        if (albums.isEmpty()) {
-            Empty(
-                "No albums found",
-                c
-            )
+        if (songs.isEmpty()) {
+            Empty("No albums found", c)
         }
     }
 }
@@ -554,17 +735,14 @@ private fun LikedSection(
 ) {
     Column {
         SectionTitle(
-            "",
-            "0 favorites",
-            "",
-            c,
-            "+"
+            title = "",
+            subtitle = "0 favorites",
+            icon = R.drawable.ic_xmo_heart,
+            c = c,
+            action = R.drawable.ic_xmo_add
         )
 
-        Empty(
-            "No liked songs yet",
-            c
-        )
+        Empty("No liked songs yet", c)
     }
 }
 
@@ -577,37 +755,32 @@ private fun ArtistsSection(
         Library.artists(songs)
 
     if (artists.isEmpty()) {
-        Empty(
-            "No artists found",
-            c
-        )
+        Empty("No artists found", c)
         return
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(5),
-        modifier = Modifier
+    Row(
+        Modifier
             .fillMaxWidth()
-            .heightIn(max = 900.dp),
-        userScrollEnabled = false,
-        contentPadding = PaddingValues(4.dp),
+            .horizontalScroll(
+                rememberScrollState()
+            )
+            .padding(
+                horizontal = 5.dp,
+                vertical = 5.dp
+            ),
         horizontalArrangement =
-            Arrangement.spacedBy(8.dp),
-        verticalArrangement =
-            Arrangement.spacedBy(12.dp)
+            Arrangement.spacedBy(10.dp)
     ) {
-        items(
-            artists.take(20)
-        ) { artist ->
-
+        artists.forEach { artist ->
             Column(
+                Modifier.width(66.dp),
                 horizontalAlignment =
                     Alignment.CenterHorizontally
             ) {
                 Box(
                     Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
+                        .size(62.dp)
                         .background(
                             XmoRed.copy(.16f),
                             CircleShape
@@ -621,21 +794,20 @@ private fun ArtistsSection(
                             ?.uppercase()
                             ?: "?",
                         color = XmoRed,
-                        fontFamily = XmoFont.bold
+                        fontFamily = XmoFont.bold,
+                        fontSize = 17.sp
                     )
                 }
-
-                Spacer(
-                    Modifier.height(5.dp)
-                )
 
                 Text(
                     artist.name,
                     color = c.text,
                     fontFamily = XmoFont.medium,
                     fontSize = 9.sp,
+                    lineHeight = 10.sp,
                     maxLines = 2,
-                    lineHeight = 10.sp
+                    modifier =
+                        Modifier.padding(top = 5.dp)
                 )
             }
         }
@@ -645,7 +817,8 @@ private fun ArtistsSection(
 @Composable
 private fun CustomSection(
     songs: List<Song>,
-    c: HomeColors
+    c: HomeColors,
+    theme: XmoTheme
 ) {
     if (songs.isEmpty()) {
         Empty(
@@ -655,26 +828,34 @@ private fun CustomSection(
         return
     }
 
-    LazyVerticalGrid(
-        columns = GridCells.Fixed(6),
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(max = 1200.dp),
-        userScrollEnabled = false,
-        horizontalArrangement =
-            Arrangement.spacedBy(5.dp),
+    val rows = songs.chunked(6)
+
+    Column(
         verticalArrangement =
-            Arrangement.spacedBy(7.dp)
+            Arrangement.spacedBy(6.dp)
     ) {
-        itemsIndexed(
-            songs,
-            key = { _, song -> song.id }
-        ) { index, song ->
-            SongTile(
-                song,
-                index,
-                c
-            )
+        rows.forEachIndexed { row, items ->
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement =
+                    Arrangement.spacedBy(5.dp)
+            ) {
+                repeat(6) { column ->
+                    Box(
+                        Modifier.weight(1f)
+                    ) {
+                        items.getOrNull(column)
+                            ?.let { song ->
+                                SongTile(
+                                    song,
+                                    row * 6 + column,
+                                    c,
+                                    theme
+                                )
+                            }
+                    }
+                }
+            }
         }
     }
 }
@@ -687,9 +868,8 @@ private fun Empty(
     Box(
         Modifier
             .fillMaxWidth()
-            .height(78.dp),
-        contentAlignment =
-            Alignment.Center
+            .height(82.dp),
+        contentAlignment = Alignment.Center
     ) {
         Text(
             text,
