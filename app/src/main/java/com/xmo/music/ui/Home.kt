@@ -547,33 +547,52 @@ private fun ReorderSection(
 }
 
 @Composable
-private fun SongArrowButton(onTap: () -> Unit) {
+private fun SongArrowButton(
+    onTap: () -> Unit
+) {
+    val scope = rememberCoroutineScope()
+
     Box(
         Modifier
             .padding(end = 10.dp)
             .size(28.dp)
-            .background(XmoRed.copy(.18f), CircleShape)
+            .background(
+                XmoRed.copy(.18f),
+                CircleShape
+            )
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
                         SongsArrowBus.holding = false
 
-                        val job = launch {
+                        val job = scope.launch {
                             delay(250)
+
                             SongsArrowBus.holding = true
 
-                            while (SongsArrowBus.holding) {
+                            while (
+                                SongsArrowBus.holding
+                            ) {
                                 SongsArrowBus.tap++
                                 delay(55)
                             }
                         }
 
-                        tryAwaitRelease()
-                        job.cancel()
-                        val wasHolding = SongsArrowBus.holding
-                        SongsArrowBus.holding = false
+                        val released =
+                            tryAwaitRelease()
 
-                        if (!wasHolding) onTap()
+                        val wasHolding =
+                            SongsArrowBus.holding
+
+                        SongsArrowBus.holding = false
+                        job.cancel()
+
+                        if (
+                            released &&
+                            !wasHolding
+                        ) {
+                            onTap()
+                        }
                     }
                 )
             },
