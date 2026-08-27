@@ -16,6 +16,7 @@ import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -112,9 +113,9 @@ fun HomeHeader(
             .fillMaxWidth()
             .padding(
                 start = 16.dp,
-                top = 8.dp,
+                top = 7.dp,
                 end = 10.dp,
-                bottom = 5.dp
+                bottom = 4.dp
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -150,6 +151,7 @@ fun HomeHeader(
                 "XMO User",
                 color = c.text,
                 fontFamily = XmoFont.user,
+                fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 maxLines = 1
             )
@@ -210,7 +212,7 @@ fun HomeHeader(
                                     XmoTheme.Light -> "Light Theme"
                                     XmoTheme.Amoled -> "AMOLED"
                                 },
-                                color = if (item == theme)
+                                color = if (theme == item)
                                     XmoRed else c.text,
                                 fontFamily = XmoFont.medium,
                                 fontSize = 13.sp
@@ -245,10 +247,7 @@ fun CategoryChip(
                 else c.button
             )
             .clickable(onClick = onClick)
-            .padding(
-                horizontal = 13.dp,
-                vertical = 7.dp
-            ),
+            .padding(horizontal = 13.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -282,10 +281,7 @@ fun SectionTitle(
         modifier
             .fillMaxWidth()
             .animateContentSize()
-            .padding(
-                horizontal = 10.dp,
-                vertical = 8.dp
-            ),
+            .padding(horizontal = 10.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         XmoIcon(
@@ -344,12 +340,16 @@ fun SongTile(
     modifier: Modifier = Modifier
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+
     var dominant by remember(song.artwork) {
         mutableStateOf(Color(0xFF35353A))
     }
 
     LaunchedEffect(song.artwork) {
-        dominant = Artwork.color(context, song.artwork)
+        dominant = Artwork.color(
+            context,
+            song.artwork
+        )
     }
 
     val alpha = when (theme) {
@@ -365,7 +365,10 @@ fun SongTile(
                 Brush.linearGradient(
                     listOf(
                         dominant.copy(alpha),
-                        Artwork.end(dominant, theme)
+                        Artwork.end(
+                            dominant,
+                            theme
+                        )
                     )
                 )
             )
@@ -398,7 +401,9 @@ fun SongTile(
                 .padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(Modifier.weight(1f)) {
+            Column(
+                Modifier.weight(1f)
+            ) {
                 Text(
                     song.title,
                     color = c.text,
