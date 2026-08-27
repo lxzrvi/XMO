@@ -15,47 +15,83 @@ import com.xmo.music.data.*
 import com.xmo.music.ui.*
 import kotlinx.coroutines.launch
 
-enum class XmoTheme { Dark, Light, Amoled }
+enum class XmoTheme {
+    Dark, Light, Amoled
+}
 
 @Composable
 fun App() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val permission = if (Build.VERSION.SDK_INT >= 33)
-        Manifest.permission.READ_MEDIA_AUDIO
-    else Manifest.permission.READ_EXTERNAL_STORAGE
 
-    var tab by remember { mutableIntStateOf(0) }
-    var theme by remember { mutableStateOf(XmoTheme.Dark) }
-    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
-    var order by remember { mutableStateOf(Store.defaults) }
-    var categories by remember {
-        mutableStateOf<List<UserCategory>>(emptyList())
+    val permission =
+        if (Build.VERSION.SDK_INT >= 33)
+            Manifest.permission.READ_MEDIA_AUDIO
+        else
+            Manifest.permission.READ_EXTERNAL_STORAGE
+
+    var tab by remember {
+        mutableIntStateOf(0)
     }
-    var allowed by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, permission) ==
-                PackageManager.PERMISSION_GRANTED
+
+    var theme by remember {
+        mutableStateOf(XmoTheme.Dark)
+    }
+
+    var songs by remember {
+        mutableStateOf<List<Song>>(
+            emptyList()
         )
     }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted: Boolean ->
-        allowed = granted
+    var order by remember {
+        mutableStateOf(Store.defaults)
     }
+
+    var categories by remember {
+        mutableStateOf<List<UserCategory>>(
+            emptyList()
+        )
+    }
+
+    var allowed by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    val permissionLauncher =
+        rememberLauncherForActivityResult(
+            ActivityResultContracts
+                .RequestPermission()
+        ) { granted: Boolean ->
+            allowed = granted
+        }
 
     LaunchedEffect(allowed) {
         order = Store.order(context)
-        categories = Store.categories(context)
-        if (allowed) songs = Library.songs(context)
+        categories =
+            Store.categories(context)
+
+        if (allowed) {
+            songs = Library.songs(context)
+        }
     }
 
     LaunchedEffect(Unit) {
-        if (!allowed) permissionLauncher.launch(permission)
+        if (!allowed) {
+            permissionLauncher.launch(
+                permission
+            )
+        }
     }
 
-    Box(Modifier.fillMaxSize()) {
+    Box(
+        Modifier.fillMaxSize()
+    ) {
         when (tab) {
             0 -> Home(
                 songs = songs,
@@ -64,31 +100,46 @@ fun App() {
                 order = order,
                 categories = categories,
 
-                setTheme = { value: XmoTheme ->
+                setTheme = {
+                        value: XmoTheme ->
                     theme = value
                 },
 
                 refresh = {
                     if (!allowed) {
-                        permissionLauncher.launch(permission)
+                        permissionLauncher
+                            .launch(permission)
                     } else {
                         scope.launch {
-                            songs = Library.songs(context)
+                            songs =
+                                Library.songs(
+                                    context
+                                )
                         }
                     }
                 },
 
-                saveOrder = { value: List<String> ->
+                saveOrder = {
+                        value: List<String> ->
                     order = value
+
                     scope.launch {
-                        Store.saveOrder(context, value)
+                        Store.saveOrder(
+                            context,
+                            value
+                        )
                     }
                 },
 
-                saveCategories = { value: List<UserCategory> ->
+                saveCategories = {
+                        value: List<UserCategory> ->
                     categories = value
+
                     scope.launch {
-                        Store.saveCategories(context, value)
+                        Store.saveCategories(
+                            context,
+                            value
+                        )
                     }
                 }
             )
@@ -97,7 +148,10 @@ fun App() {
             else -> Settings()
         }
 
-        NavBar(tab) { value: Int ->
+        NavBar(
+            selected = tab,
+            theme = theme
+        ) { value ->
             tab = value
         }
     }
