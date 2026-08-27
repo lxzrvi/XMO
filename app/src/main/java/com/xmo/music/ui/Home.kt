@@ -366,33 +366,32 @@ fun Home(
              * last category can also reach the same
              * top position underneath sticky dock.
              */
-            item(
-                    key = "footer"
+                        item(
+                key = "footer"
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(700.dp),
+                    contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(700.dp),
-                        contentAlignment = Alignment.Center
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        Column(
-                            horizontalAlignment = Alignment.CenterHorizontally
-                        ) {
-                            Text(
-                                "XMO",
-                                color = c.text,
-                                fontFamily = XmoFont.logo,
-                                fontSize = 18.sp
-                            )
-                
-                            Text(
-                                "lxzrvi  •  copyright © 2026",
-                                color = c.sub,
-                                fontFamily = XmoFont.thin,
-                                fontSize = 9.sp,
-                                modifier = Modifier.padding(top = 3.dp)
-                            )
-                        }
+                        Text(
+                            "XMO",
+                            color = c.text,
+                            fontFamily = XmoFont.logo,
+                            fontSize = 18.sp
+                        )
+
+                        Text(
+                            "lxzrvi  •  copyright © 2026",
+                            color = c.sub,
+                            fontFamily = XmoFont.thin,
+                            fontSize = 9.sp,
+                            modifier = Modifier.padding(top = 3.dp)
+                        )
                     }
                 }
             }
