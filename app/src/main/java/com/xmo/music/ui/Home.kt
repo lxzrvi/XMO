@@ -1,13 +1,9 @@
 package com.xmo.music.ui
 
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -24,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
@@ -58,6 +55,7 @@ fun Home(
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var songArrowTick by remember { mutableIntStateOf(0) }
+    var dockHeightPx by remember { mutableIntStateOf(0) }
 
     val fixed = remember {
         listOf(
@@ -107,16 +105,19 @@ fun Home(
     var addDialog by remember { mutableStateOf(false) }
     var categoryName by remember { mutableStateOf("") }
 
-    // Header smooth exit jab "recent" adha upar chla jaye (firstVisibleItemIndex check)
-    val showProfile by remember {
+    // Continuous ultra-smooth scroll progress interpolation for profile header (No Jumps)
+    val profileCollapseProgress by remember {
         derivedStateOf {
-            val visibleItems = list.layoutInfo.visibleItemsInfo
-            val recentItem = visibleItems.firstOrNull { it.key == "recent" }
+            val visibleInfo = list.layoutInfo.visibleItemsInfo
+            val recentItem = visibleInfo.firstOrNull { it.key == "recent" }
             if (recentItem != null) {
-                // jab tak recent item adhe se kam scroll hua ho tab tak show rakho
-                recentItem.offset > -(recentItem.size / 2)
+                val totalHeight = recentItem.size.toFloat().coerceAtLeast(1f)
+                val currentOffset = -recentItem.offset.toFloat()
+                (1f - (currentOffset / (totalHeight * 0.55f))).coerceIn(0f, 1f)
+            } else if (list.firstVisibleItemIndex > 1) {
+                0f
             } else {
-                list.firstVisibleItemIndex == 0
+                1f
             }
         }
     }
@@ -131,32 +132,41 @@ fun Home(
             modifier = Modifier.fillMaxSize()
         ) {
             stickyHeader(key = "homeDock") {
-                HomeDock(
-                    showProfile = showProfile,
-                    sections = actualOrder.mapNotNull(sectionMap::get),
-                    order = actualOrder,
-                    selected = selected,
-                    c = c,
-                    theme = theme,
-                    setTheme = setTheme,
-                    refresh = refresh,
-                    onSelect = { id ->
-                        selected = id
-                        scope.launch {
-                            if (id == "all") {
-                                list.animateScrollToItem(index = 0)
-                            } else {
-                                val position = actualOrder.indexOf(id)
-                                if (position >= 0) {
-                                    // Dock = index 0, Recent = index 1
-                                    list.animateScrollToItem(index = position + 2)
+                Box(
+                    Modifier.onGloballyPositioned { layoutCoordinates ->
+                        dockHeightPx = layoutCoordinates.size.height
+                    }
+                ) {
+                    HomeDock(
+                        profileProgress = profileCollapseProgress,
+                        sections = actualOrder.mapNotNull(sectionMap::get),
+                        order = actualOrder,
+                        selected = selected,
+                        c = c,
+                        theme = theme,
+                        setTheme = setTheme,
+                        refresh = refresh,
+                        onSelect = { id ->
+                            selected = id
+                            scope.launch {
+                                if (id == "all") {
+                                    list.animateScrollToItem(index = 0)
+                                } else {
+                                    val position = actualOrder.indexOf(id)
+                                    if (position >= 0) {
+                                        // Precise pixel alignment below dynamic sticky dock
+                                        list.animateScrollToItem(
+                                            index = position + 2,
+                                            scrollOffset = 0
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    },
-                    onCommit = { saveOrder(it) },
-                    onAdd = { addDialog = true }
-                )
+                        },
+                        onCommit = { saveOrder(it) },
+                        onAdd = { addDialog = true }
+                    )
+                }
             }
 
             item(key = "recent") {
@@ -301,7 +311,7 @@ fun Home(
 
 @Composable
 private fun HomeDock(
-    showProfile: Boolean,
+    profileProgress: Float,
     sections: List<HomeSection>,
     order: List<String>,
     selected: String,
@@ -318,20 +328,24 @@ private fun HomeDock(
             .fillMaxWidth()
             .background(c.bg.copy(alpha = 0.97f))
             .windowInsetsPadding(WindowInsets.statusBars)
-            .animateContentSize(spring(dampingRatio = 0.86f, stiffness = 520f))
+            .animateContentSize(spring(dampingRatio = 0.85f, stiffness = 400f))
             .padding(top = 3.dp, bottom = 4.dp)
     ) {
-        // Smoothly fade out and vanish when threshold reached
-        AnimatedVisibility(
-            visible = showProfile,
-            enter = fadeIn() + slideInVertically { -it / 2 },
-            exit = fadeOut() + slideOutVertically { -it / 2 }
-        ) {
-            HomeHeader(c = c, theme = theme, setTheme = setTheme, refresh = refresh)
+        // Linear animated profile header container (Fully smooth interpolation)
+        if (profileProgress > 0f) {
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .graphicsLayer {
+                        alpha = profileProgress
+                        translationY = -20dp.toPx() * (1f - profileProgress)
+                    }
+            ) {
+                HomeHeader(c = c, theme = theme, setTheme = setTheme, refresh = refresh)
+            }
+            Spacer(Modifier.height((7 * profileProgress).dp))
         }
-        if (showProfile) {
-            Spacer(Modifier.height(7.dp))
-        }
+
         CategoryBar(
             sections = sections,
             order = order,
@@ -358,7 +372,7 @@ private fun CategoryBar(
     val density = LocalDensity.current
     var working by remember(order) { mutableStateOf(order) }
     var dragged by remember { mutableStateOf<String?>(null) }
-    var dragX by remember { mutableFloatStateOf(0f) }
+    var rawDragOffset by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(order) {
         if (dragged == null) {
@@ -382,32 +396,37 @@ private fun CategoryBar(
 
         working.forEach { id ->
             val section = sections.firstOrNull { it.id == id } ?: return@forEach
-            val activeDrag = dragged == id
+            val isDraggingThis = dragged == id
 
-            val animatedX by animateFloatAsState(
-                targetValue = if (activeDrag) dragX else 0f,
-                animationSpec = spring(dampingRatio = 0.75f, stiffness = 600f),
-                label = "chipDragOffset"
+            // Zero-jitter spring interpolation for active dragged item
+            val animatedTranslationX by animateFloatAsState(
+                targetValue = if (isDraggingThis) rawDragOffset else 0f,
+                animationSpec = spring(
+                    dampingRatio = Spring.DampingRatioNoBouncy,
+                    stiffness = Spring.StiffnessHigh
+                ),
+                label = "smoothDragTranslation"
             )
 
             Box(
                 Modifier
                     .graphicsLayer {
-                        translationX = animatedX
-                        scaleX = if (activeDrag) 1.12f else 1f
-                        scaleY = if (activeDrag) 1.12f else 1f
-                        alpha = if (activeDrag) 0.95f else 1f
+                        translationX = animatedTranslationX
+                        scaleX = if (isDraggingThis) 1.10f else 1f
+                        scaleY = if (isDraggingThis) 1.10f else 1f
+                        shadowElevation = if (isDraggingThis) 12f else 0f
+                        alpha = if (isDraggingThis) 0.95f else 1f
                     }
                     .then(
-                        if (activeDrag) {
+                        if (isDraggingThis) {
                             Modifier
                                 .shadow(
                                     elevation = 8.dp,
                                     shape = RoundedCornerShape(18.dp),
-                                    ambientColor = XmoRed.copy(0.4f),
+                                    ambientColor = XmoRed,
                                     spotColor = XmoRed
                                 )
-                                .background(XmoRed.copy(0.18f), RoundedCornerShape(18.dp))
+                                .background(XmoRed.copy(0.20f), RoundedCornerShape(18.dp))
                                 .border(1.2.dp, XmoRed, RoundedCornerShape(18.dp))
                         } else Modifier
                     )
@@ -415,38 +434,41 @@ private fun CategoryBar(
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
                                 dragged = id
-                                dragX = 0f
+                                rawDragOffset = 0f
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             },
                             onDrag = { change, amount ->
                                 change.consume()
-                                dragX += amount.x
-                                val from = working.indexOf(id)
-                                if (from < 0) return@detectDragGesturesAfterLongPress
-                                val threshold = with(density) { 56.dp.toPx() }
-                                if (dragX > threshold && from < working.lastIndex) {
-                                    val next = working.toMutableList()
-                                    val moving = next.removeAt(from)
-                                    next.add(from + 1, moving)
-                                    working = next
-                                    dragX -= threshold
-                                } else if (dragX < -threshold && from > 0) {
-                                    val next = working.toMutableList()
-                                    val moving = next.removeAt(from)
-                                    next.add(from - 1, moving)
-                                    working = next
-                                    dragX += threshold
+                                rawDragOffset += amount.x
+                                val fromIndex = working.indexOf(id)
+                                if (fromIndex < 0) return@detectDragGesturesAfterLongPress
+
+                                val stepPx = with(density) { 68.dp.toPx() }
+
+                                // Stable swap check prevents jitter feedback loops
+                                if (rawDragOffset > stepPx && fromIndex < working.lastIndex) {
+                                    val nextList = working.toMutableList()
+                                    val item = nextList.removeAt(fromIndex)
+                                    nextList.add(fromIndex + 1, item)
+                                    working = nextList
+                                    rawDragOffset -= stepPx
+                                } else if (rawDragOffset < -stepPx && fromIndex > 0) {
+                                    val nextList = working.toMutableList()
+                                    val item = nextList.removeAt(fromIndex)
+                                    nextList.add(fromIndex - 1, item)
+                                    working = nextList
+                                    rawDragOffset += stepPx
                                 }
                             },
                             onDragEnd = {
-                                val result = working
+                                val finalOrder = working
                                 dragged = null
-                                dragX = 0f
-                                commit(result)
+                                rawDragOffset = 0f
+                                commit(finalOrder)
                             },
                             onDragCancel = {
                                 dragged = null
-                                dragX = 0f
+                                rawDragOffset = 0f
                                 working = order
                             }
                         )
@@ -579,13 +601,13 @@ private fun Songs(
     val scroll = rememberScrollState()
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
-        val availableWidth = this.maxWidth
-        val horizontalEdgePadding = 12.dp
-        val itemGap = 8.dp
-        
-        // Dynamic edge-to-edge balance calculation: 4 columns fit perfectly equal
-        val contentWidth = availableWidth - (horizontalEdgePadding * 2)
-        val cardWidth = (contentWidth - (itemGap * 3)) / 4
+        val totalWidth = this.maxWidth
+        val outerPadding = 12.dp
+        val itemGap = 6.dp
+
+        // Calculated 4-column balanced grid layout eliminating 4th column extra gap completely
+        val gridWidth = totalWidth - (outerPadding * 2)
+        val cardWidth = (gridWidth - (itemGap * 3)) / 4
         val stepPx = with(LocalDensity.current) { (cardWidth + itemGap).roundToPx() }
 
         LaunchedEffect(tick) {
@@ -603,22 +625,21 @@ private fun Songs(
         Row(
             Modifier
                 .fillMaxWidth()
-                .horizontalScroll(scroll),
-            horizontalArrangement = Arrangement.spacedBy(horizontalEdgePadding)
+                .horizontalScroll(scroll)
+                .padding(horizontal = outerPadding),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            Spacer(Modifier.width(0.dp)) // Left padding alignment
-            
             songs.chunked(12).forEachIndexed { page, items ->
                 Column(
                     Modifier
-                        .width(contentWidth)
+                        .width(gridWidth)
                         .padding(vertical = 4.dp),
                     verticalArrangement = Arrangement.spacedBy(itemGap)
                 ) {
                     repeat(3) { row ->
                         Row(
                             Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(itemGap)
                         ) {
                             repeat(4) { column ->
                                 val i = row * 4 + column
@@ -638,7 +659,6 @@ private fun Songs(
                     }
                 }
             }
-            Spacer(Modifier.width(0.dp)) // Right padding alignment
         }
     }
 }
