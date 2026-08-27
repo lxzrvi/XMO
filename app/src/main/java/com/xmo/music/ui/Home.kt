@@ -367,42 +367,32 @@ fun Home(
              * top position underneath sticky dock.
              */
             item(
-                key = "footer"
-            ) {
-                BoxWithConstraints(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(
-                            maxHeight.coerceAtLeast(
-                                620.dp
-                            )
-                        ),
-                    contentAlignment =
-                        Alignment.Center
+                    key = "footer"
                 ) {
-                    Column(
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(700.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            "XMO",
-                            color = c.text,
-                            fontFamily =
-                                XmoFont.logo,
-                            fontSize = 18.sp
-                        )
-
-                        Text(
-                            "lxzrvi  •  copyright © 2026",
-                            color = c.sub,
-                            fontFamily =
-                                XmoFont.thin,
-                            fontSize = 9.sp,
-                            modifier =
-                                Modifier.padding(
-                                    top = 3.dp
-                                )
-                        )
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text(
+                                "XMO",
+                                color = c.text,
+                                fontFamily = XmoFont.logo,
+                                fontSize = 18.sp
+                            )
+                
+                            Text(
+                                "lxzrvi  •  copyright © 2026",
+                                color = c.sub,
+                                fontFamily = XmoFont.thin,
+                                fontSize = 9.sp,
+                                modifier = Modifier.padding(top = 3.dp)
+                            )
+                        }
                     }
                 }
             }
