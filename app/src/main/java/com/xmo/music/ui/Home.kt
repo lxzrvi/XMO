@@ -2,7 +2,12 @@ package com.xmo.music.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -13,10 +18,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -26,6 +33,7 @@ import com.xmo.music.data.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.math.abs
 
 private data class HomeSection(
     val id: String,
@@ -34,7 +42,7 @@ private data class HomeSection(
     val color: Color = XmoRed
 )
 
-private object SongsArrow {
+private object SongArrow {
     var tick by mutableIntStateOf(0)
 }
 
@@ -51,65 +59,79 @@ fun Home(
     saveCategories: (List<UserCategory>) -> Unit
 ) {
     val c = homeColors(theme)
-    val state = rememberLazyListState()
+    val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    val fixed = listOf(
-        HomeSection(
-            "songs",
-            "All Songs",
-            R.drawable.ic_xmo_songs
-        ),
-        HomeSection(
-            "albums",
-            "Albums",
-            R.drawable.ic_xmo_album
-        ),
-        HomeSection(
-            "liked",
-            "Liked Songs",
-            R.drawable.ic_xmo_heart
-        ),
-        HomeSection(
-            "artists",
-            "Artists",
-            R.drawable.ic_xmo_artist
+    val fixed = remember {
+        listOf(
+            HomeSection(
+                "songs",
+                "All Songs",
+                R.drawable.ic_xmo_songs
+            ),
+            HomeSection(
+                "albums",
+                "Albums",
+                R.drawable.ic_xmo_album
+            ),
+            HomeSection(
+                "liked",
+                "Liked Songs",
+                R.drawable.ic_xmo_heart
+            ),
+            HomeSection(
+                "artists",
+                "Artists",
+                R.drawable.ic_xmo_artist
+            )
         )
-    )
+    }
 
-    val customIcons = listOf(
-        R.drawable.ic_xmo_star,
-        R.drawable.ic_xmo_spark,
-        R.drawable.ic_xmo_diamond,
-        R.drawable.ic_xmo_bolt
-    )
+    val customIcons = remember {
+        listOf(
+            R.drawable.ic_xmo_star,
+            R.drawable.ic_xmo_spark,
+            R.drawable.ic_xmo_diamond,
+            R.drawable.ic_xmo_bolt
+        )
+    }
 
-    val customColors = listOf(
-        Color(0xFFFFC107),
-        Color(0xFFAF52DE),
-        Color(0xFF00AEEF),
-        Color(0xFFFF7043)
-    )
+    val customColors = remember {
+        listOf(
+            Color(0xFFFFC107),
+            Color(0xFFAF52DE),
+            Color(0xFF00AEEF),
+            Color(0xFFFF7043)
+        )
+    }
 
     val custom = categories.map {
         val i = it.icon.mod(4)
 
         HomeSection(
-            it.id,
-            it.name,
-            customIcons[i],
-            customColors[i]
+            id = it.id,
+            name = it.name,
+            icon = customIcons[i],
+            color = customColors[i]
         )
     }
 
-    val map =
+    val sectionMap =
         (fixed + custom).associateBy {
             it.id
         }
 
-    val actualOrder =
-        order.filter(map::containsKey) +
-            map.keys.filterNot(order::contains)
+    val resolvedOrder =
+        order.filter(sectionMap::containsKey) +
+            sectionMap.keys.filterNot(order::contains)
+
+    var previewOrder by remember {
+        mutableStateOf(resolvedOrder)
+    }
+
+    LaunchedEffect(resolvedOrder) {
+        previewOrder = resolvedOrder
+    }
 
     var selected by remember {
         mutableStateOf("all")
@@ -123,81 +145,91 @@ fun Home(
         mutableStateOf("")
     }
 
+    /*
+     * As soon as Home leaves absolute top,
+     * profile area collapses while category
+     * strip remains pinned.
+     */
+    val headerVisible by remember {
+        derivedStateOf {
+            list.firstVisibleItemIndex == 0 &&
+                list.firstVisibleItemScrollOffset < 28
+        }
+    }
+
     Box(
         Modifier
             .fillMaxSize()
             .background(c.bg)
     ) {
         LazyColumn(
-            state = state,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding =
-                PaddingValues(bottom = 180.dp)
+            state = list,
+            modifier = Modifier.fillMaxSize()
         ) {
-            item("header") {
-                Box(
-                    Modifier.windowInsetsPadding(
-                        WindowInsets.statusBars
-                    )
-                ) {
-                    HomeHeader(
-                        c = c,
-                        theme = theme,
-                        setTheme = setTheme,
-                        refresh = refresh
-                    )
-                }
-            }
+            stickyHeader(
+                key = "homeDock"
+            ) {
+                HomeDock(
+                    showProfile = headerVisible,
+                    sections = previewOrder
+                        .mapNotNull(sectionMap::get),
+                    order = previewOrder,
+                    selected = selected,
+                    c = c,
+                    theme = theme,
+                    setTheme = setTheme,
+                    refresh = refresh,
 
-            stickyHeader("categories") {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .background(c.bg.copy(.96f))
-                        .windowInsetsPadding(
-                            WindowInsets.statusBars
-                        )
-                ) {
-                    CategoryBar(
-                        sections =
-                            actualOrder.mapNotNull(
-                                map::get
-                            ),
-                        selected = selected,
-                        c = c,
-                        order = actualOrder,
+                    onSelect = { id ->
+                        selected = id
 
-                        onSelect = { id ->
-                            selected = id
+                        scope.launch {
+                            if (id == "all") {
+                                list.animateScrollToItem(
+                                    index = 0
+                                )
+                            } else {
+                                val position =
+                                    previewOrder
+                                        .indexOf(id)
 
-                            scope.launch {
-                                if (id == "all") {
-                                    state.animateScrollToItem(
-                                        index = 0
+                                if (position >= 0) {
+                                    /*
+                                     * 0 dock
+                                     * 1 recent
+                                     * 2+ sections
+                                     *
+                                     * Sticky header remains
+                                     * above this target.
+                                     */
+                                    list.animateScrollToItem(
+                                        index =
+                                            position + 2,
+                                        scrollOffset = -8
                                     )
-                                } else {
-                                    val position =
-                                        actualOrder.indexOf(id)
-
-                                    if (position >= 0) {
-                                        state.animateScrollToItem(
-                                            index = 3 + position
-                                        )
-                                    }
                                 }
                             }
-                        },
-
-                        onOrder = saveOrder,
-
-                        onAdd = {
-                            addDialog = true
                         }
-                    )
-                }
+                    },
+
+                    onPreview = {
+                        previewOrder = it
+                    },
+
+                    onCommit = {
+                        previewOrder = it
+                        saveOrder(it)
+                    },
+
+                    onAdd = {
+                        addDialog = true
+                    }
+                )
             }
 
-            item("recent") {
+            item(
+                key = "recent"
+            ) {
                 Column(
                     Modifier
                         .fillMaxWidth()
@@ -205,12 +237,14 @@ fun Home(
                             start = 12.dp,
                             top = 12.dp,
                             end = 12.dp,
-                            bottom = 14.dp
+                            bottom = 16.dp
                         )
                 ) {
                     SectionTitle(
-                        title = "Recently Played",
-                        subtitle = "0 tracks played",
+                        title =
+                            "Recently Played",
+                        subtitle =
+                            "0 tracks played",
                         icon =
                             R.drawable.ic_xmo_history,
                         c = c
@@ -219,7 +253,7 @@ fun Home(
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(105.dp),
+                            .height(110.dp),
                         contentAlignment =
                             Alignment.Center
                     ) {
@@ -235,30 +269,32 @@ fun Home(
             }
 
             itemsIndexed(
-                items = actualOrder,
+                items = previewOrder,
                 key = { _, id -> id }
             ) { index, id ->
 
-                map[id]?.let { section ->
-                    val subtitle = when (id) {
-                        "songs" ->
-                            "All songs: ${songs.size}"
+                sectionMap[id]?.let {
+                        section ->
 
-                        "albums" ->
-                            "${Library.albums(songs).size} albums"
-
-                        "liked" ->
-                            "0 favorites"
-
-                        else -> ""
-                    }
-
-                    ReorderSection(
+                    SectionItem(
                         section = section,
                         index = index,
-                        order = actualOrder,
+                        order = previewOrder,
                         c = c,
-                        subtitle = subtitle,
+
+                        subtitle = when (id) {
+                            "songs" ->
+                                "All songs: ${songs.size}"
+
+                            "albums" ->
+                                "${Library.albums(songs).size} albums"
+
+                            "liked" ->
+                                "0 favorites"
+
+                            else -> ""
+                        },
+
                         action = when (id) {
                             "albums",
                             "liked" ->
@@ -266,9 +302,18 @@ fun Home(
 
                             else -> null
                         },
-                        saveOrder = saveOrder,
+
                         arrow =
-                            id == "songs"
+                            id == "songs",
+
+                        onPreview = {
+                            previewOrder = it
+                        },
+
+                        onCommit = {
+                            previewOrder = it
+                            saveOrder(it)
+                        }
                     ) {
                         when (id) {
                             "songs" ->
@@ -316,11 +361,22 @@ fun Home(
                 }
             }
 
-            item("footer") {
-                Box(
+            /*
+             * Large final viewport is intentional:
+             * last category can also reach the same
+             * top position underneath sticky dock.
+             */
+            item(
+                key = "footer"
+            ) {
+                BoxWithConstraints(
                     Modifier
                         .fillMaxWidth()
-                        .height(560.dp),
+                        .height(
+                            maxHeight.coerceAtLeast(
+                                620.dp
+                            )
+                        ),
                     contentAlignment =
                         Alignment.Center
                 ) {
@@ -359,7 +415,9 @@ fun Home(
                 addDialog = false
                 categoryName = ""
             },
+
             containerColor = c.surface,
+
             title = {
                 Text(
                     "New category",
@@ -368,6 +426,7 @@ fun Home(
                         XmoFont.bold
                 )
             },
+
             text = {
                 OutlinedTextField(
                     value = categoryName,
@@ -377,18 +436,23 @@ fun Home(
                     },
                     singleLine = true,
                     label = {
-                        Text("Category name")
+                        Text(
+                            "Category name"
+                        )
                     }
                 )
             },
+
             confirmButton = {
                 TextButton(
                     onClick = {
                         val name =
                             categoryName.trim()
 
-                        if (name.isNotEmpty()) {
-                            val newCategory =
+                        if (
+                            name.isNotEmpty()
+                        ) {
+                            val category =
                                 UserCategory(
                                     id =
                                         "cat_${UUID.randomUUID()}",
@@ -399,13 +463,17 @@ fun Home(
 
                             saveCategories(
                                 categories +
-                                    newCategory
+                                    category
                             )
 
-                            saveOrder(
-                                actualOrder +
-                                    newCategory.id
-                            )
+                            val next =
+                                previewOrder +
+                                    category.id
+
+                            previewOrder =
+                                next
+
+                            saveOrder(next)
 
                             categoryName = ""
                             addDialog = false
@@ -418,11 +486,12 @@ fun Home(
                     )
                 }
             },
+
             dismissButton = {
                 TextButton(
                     onClick = {
-                        addDialog = false
                         categoryName = ""
+                        addDialog = false
                     }
                 ) {
                     Text(
@@ -436,23 +505,86 @@ fun Home(
 }
 
 @Composable
-private fun CategoryBar(
+private fun HomeDock(
+    showProfile: Boolean,
     sections: List<HomeSection>,
+    order: List<String>,
     selected: String,
     c: HomeColors,
-    order: List<String>,
+    theme: XmoTheme,
+    setTheme: (XmoTheme) -> Unit,
+    refresh: () -> Unit,
     onSelect: (String) -> Unit,
-    onOrder: (List<String>) -> Unit,
+    onPreview: (List<String>) -> Unit,
+    onCommit: (List<String>) -> Unit,
+    onAdd: () -> Unit
+) {
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .background(c.bg.copy(.97f))
+            .windowInsetsPadding(
+                WindowInsets.statusBars
+            )
+            .animateContentSize(
+                spring(
+                    dampingRatio = .86f,
+                    stiffness = 650f
+                )
+            )
+    ) {
+        AnimatedVisibility(
+            visible = showProfile,
+            enter =
+                fadeIn() +
+                    slideInVertically {
+                        -it / 2
+                    },
+            exit =
+                fadeOut() +
+                    slideOutVertically {
+                        -it
+                    }
+        ) {
+            HomeHeader(
+                c = c,
+                theme = theme,
+                setTheme = setTheme,
+                refresh = refresh
+            )
+        }
+
+        CategoryBar(
+            sections = sections,
+            order = order,
+            selected = selected,
+            c = c,
+            onSelect = onSelect,
+            onPreview = onPreview,
+            onCommit = onCommit,
+            onAdd = onAdd
+        )
+    }
+}
+
+@Composable
+private fun CategoryBar(
+    sections: List<HomeSection>,
+    order: List<String>,
+    selected: String,
+    c: HomeColors,
+    onSelect: (String) -> Unit,
+    onPreview: (List<String>) -> Unit,
+    onCommit: (List<String>) -> Unit,
     onAdd: () -> Unit
 ) {
     val haptic =
         LocalHapticFeedback.current
 
-    var working by remember(order) {
-        mutableStateOf(order)
-    }
+    val density =
+        LocalDensity.current
 
-    var held by remember {
+    var dragged by remember {
         mutableStateOf<String?>(null)
     }
 
@@ -460,205 +592,290 @@ private fun CategoryBar(
         mutableFloatStateOf(0f)
     }
 
+    var dragOrder by remember(order) {
+        mutableStateOf(order)
+    }
+
     LaunchedEffect(order) {
-        if (held == null) {
-            working = order
+        if (dragged == null) {
+            dragOrder = order
         }
     }
 
-    Row(
+    Box(
         Modifier
             .fillMaxWidth()
-            .horizontalScroll(
-                rememberScrollState()
-            )
-            .padding(
-                start = 14.dp,
-                top = 6.dp,
-                end = 14.dp,
-                bottom = 8.dp
-            ),
-        horizontalArrangement =
-            Arrangement.spacedBy(8.dp)
+            .height(48.dp)
     ) {
-        CategoryChip(
-            text = "All",
-            active = selected == "all",
-            c = c,
-            icon = R.drawable.ic_xmo_all
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    start = 14.dp,
+                    end = 14.dp,
+                    bottom = 8.dp
+                ),
+            horizontalArrangement =
+                Arrangement.spacedBy(8.dp)
         ) {
-            onSelect("all")
-        }
-
-        working.forEach { id ->
-            val section =
-                sections.firstOrNull {
-                    it.id == id
-                } ?: return@forEach
-
-            val moving =
-                held == id
-
-            Box(
-                Modifier
-                    .animateContentSize(
-                        animationSpec = spring()
-                    )
-                    .graphicsLayer {
-                        translationX =
-                            if (moving)
-                                dx
-                            else 0f
-
-                        scaleX =
-                            if (moving)
-                                1.06f
-                            else 1f
-
-                        scaleY =
-                            if (moving)
-                                1.06f
-                            else 1f
-                    }
-                    .then(
-                        if (moving) {
-                            Modifier.border(
-                                1.dp,
-                                XmoRed.copy(.62f),
-                                RoundedCornerShape(18.dp)
-                            )
-                        } else Modifier
-                    )
-                    .pointerInput(
-                        id,
-                        working
-                    ) {
-                        detectDragGesturesAfterLongPress(
-                            onDragStart = {
-                                held = id
-                                dx = 0f
-
-                                haptic.performHapticFeedback(
-                                    HapticFeedbackType.LongPress
-                                )
-                            },
-
-                            onDrag = {
-                                    change,
-                                    amount ->
-
-                                change.consume()
-                                dx += amount.x
-
-                                val from =
-                                    working.indexOf(id)
-
-                                if (from < 0) {
-                                    return@detectDragGesturesAfterLongPress
-                                }
-
-                                val threshold =
-                                    55f * density
-
-                                if (
-                                    dx > threshold &&
-                                    from <
-                                    working.lastIndex
-                                ) {
-                                    val next =
-                                        working
-                                            .toMutableList()
-
-                                    val item =
-                                        next.removeAt(
-                                            from
-                                        )
-
-                                    next.add(
-                                        from + 1,
-                                        item
-                                    )
-
-                                    working = next
-                                    dx -= threshold
-                                } else if (
-                                    dx < -threshold &&
-                                    from > 0
-                                ) {
-                                    val next =
-                                        working
-                                            .toMutableList()
-
-                                    val item =
-                                        next.removeAt(
-                                            from
-                                        )
-
-                                    next.add(
-                                        from - 1,
-                                        item
-                                    )
-
-                                    working = next
-                                    dx += threshold
-                                }
-                            },
-
-                            onDragEnd = {
-                                held = null
-                                dx = 0f
-                                onOrder(working)
-                            },
-
-                            onDragCancel = {
-                                held = null
-                                dx = 0f
-                                working = order
-                            }
-                        )
-                    }
+            CategoryChip(
+                text = "All",
+                active =
+                    selected == "all",
+                c = c,
+                icon =
+                    R.drawable.ic_xmo_all
             ) {
-                CategoryChip(
-                    text = section.name,
-                    active =
-                        selected ==
-                            section.id,
-                    c = c,
-                    icon = section.icon,
-                    tint = section.color
+                onSelect("all")
+            }
+
+            dragOrder.forEach { id ->
+                val section =
+                    sections
+                        .firstOrNull {
+                            it.id == id
+                        }
+                        ?: return@forEach
+
+                val moving =
+                    dragged == id
+
+                Box(
+                    Modifier
+                        .graphicsLayer {
+                            translationX =
+                                if (moving)
+                                    dx
+                                else 0f
+
+                            scaleX =
+                                if (moving)
+                                    1.07f
+                                else 1f
+
+                            scaleY =
+                                if (moving)
+                                    1.07f
+                                else 1f
+
+                            alpha =
+                                if (moving)
+                                    .95f
+                                else 1f
+                        }
+                        .then(
+                            if (moving) {
+                                Modifier
+                                    .background(
+                                        XmoRed.copy(.10f),
+                                        RoundedCornerShape(
+                                            18.dp
+                                        )
+                                    )
+                                    .border(
+                                        .8.dp,
+                                        XmoRed.copy(.55f),
+                                        RoundedCornerShape(
+                                            18.dp
+                                        )
+                                    )
+                            } else Modifier
+                        )
+                        .pointerInput(
+                            id,
+                            dragOrder
+                        ) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = {
+                                    dragged = id
+                                    dx = 0f
+
+                                    haptic.performHapticFeedback(
+                                        HapticFeedbackType.LongPress
+                                    )
+                                },
+
+                                onDrag = {
+                                        change,
+                                        amount ->
+
+                                    change.consume()
+
+                                    dx +=
+                                        amount.x
+
+                                    val from =
+                                        dragOrder
+                                            .indexOf(
+                                                id
+                                            )
+
+                                    if (
+                                        from < 0
+                                    ) {
+                                        return@detectDragGesturesAfterLongPress
+                                    }
+
+                                    /*
+                                     * Chip widths vary, so use
+                                     * a conservative crossing
+                                     * threshold. The list itself
+                                     * reorders immediately,
+                                     * making neighbors create
+                                     * the destination slot.
+                                     */
+                                    val threshold =
+                                        with(
+                                            density
+                                        ) {
+                                            52.dp
+                                                .toPx()
+                                        }
+
+                                    if (
+                                        dx >
+                                        threshold &&
+                                        from <
+                                        dragOrder
+                                            .lastIndex
+                                    ) {
+                                        val next =
+                                            dragOrder
+                                                .toMutableList()
+
+                                        val item =
+                                            next
+                                                .removeAt(
+                                                    from
+                                                )
+
+                                        next.add(
+                                            from + 1,
+                                            item
+                                        )
+
+                                        dragOrder =
+                                            next
+
+                                        onPreview(
+                                            next
+                                        )
+
+                                        dx -=
+                                            threshold
+                                    } else if (
+                                        dx <
+                                        -threshold &&
+                                        from > 0
+                                    ) {
+                                        val next =
+                                            dragOrder
+                                                .toMutableList()
+
+                                        val item =
+                                            next
+                                                .removeAt(
+                                                    from
+                                                )
+
+                                        next.add(
+                                            from - 1,
+                                            item
+                                        )
+
+                                        dragOrder =
+                                            next
+
+                                        onPreview(
+                                            next
+                                        )
+
+                                        dx +=
+                                            threshold
+                                    }
+                                },
+
+                                onDragEnd = {
+                                    dragged = null
+                                    dx = 0f
+
+                                    onCommit(
+                                        dragOrder
+                                    )
+                                },
+
+                                onDragCancel = {
+                                    dragged = null
+                                    dx = 0f
+
+                                    dragOrder =
+                                        order
+
+                                    onPreview(
+                                        order
+                                    )
+                                }
+                            )
+                        }
                 ) {
-                    if (held == null) {
-                        onSelect(section.id)
+                    CategoryChip(
+                        text =
+                            section.name,
+                        active =
+                            selected ==
+                                section.id,
+                        c = c,
+                        icon =
+                            section.icon,
+                        tint =
+                            section.color
+                    ) {
+                        if (
+                            dragged ==
+                            null
+                        ) {
+                            onSelect(
+                                section.id
+                            )
+                        }
                     }
                 }
             }
-        }
 
-        CategoryChip(
-            text = "Add",
-            active = false,
-            c = c,
-            icon = R.drawable.ic_xmo_add,
-            tint = XmoRed,
-            onClick = onAdd
-        )
+            CategoryChip(
+                text = "Add",
+                active = false,
+                c = c,
+                icon =
+                    R.drawable.ic_xmo_add,
+                tint = XmoRed,
+                onClick = onAdd
+            )
+        }
     }
 }
 
 @Composable
-private fun ReorderSection(
+private fun SectionItem(
     section: HomeSection,
     index: Int,
     order: List<String>,
     c: HomeColors,
     subtitle: String,
     action: Int?,
-    saveOrder: (List<String>) -> Unit,
     arrow: Boolean,
+    onPreview: (List<String>) -> Unit,
+    onCommit: (List<String>) -> Unit,
     body: @Composable () -> Unit
 ) {
     val haptic =
         LocalHapticFeedback.current
+
+    val density =
+        LocalDensity.current
 
     var lifted by remember {
         mutableStateOf(false)
@@ -668,35 +885,43 @@ private fun ReorderSection(
         mutableFloatStateOf(0f)
     }
 
-    var working by remember(order) {
+    var dragOrder by remember(order) {
         mutableStateOf(order)
     }
 
     LaunchedEffect(order) {
         if (!lifted) {
-            working = order
+            dragOrder = order
         }
     }
 
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(vertical = 10.dp)
-            .animateContentSize()
+            .padding(vertical = 9.dp)
+            .animateContentSize(
+                spring(
+                    dampingRatio = .86f,
+                    stiffness = 600f
+                )
+            )
     ) {
         Row(
-            Modifier.fillMaxWidth(),
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    horizontal = 12.dp
+                ),
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
             /*
-             * Only this title block starts
-             * section dragging.
+             * Only icon + title text block
+             * owns the long-press gesture.
              */
             Row(
                 Modifier
                     .weight(1f)
-                    .padding(start = 12.dp)
                     .graphicsLayer {
                         translationY =
                             if (lifted)
@@ -705,12 +930,12 @@ private fun ReorderSection(
 
                         scaleX =
                             if (lifted)
-                                1.015f
+                                1.02f
                             else 1f
 
                         scaleY =
                             if (lifted)
-                                1.015f
+                                1.02f
                             else 1f
                     }
                     .then(
@@ -723,8 +948,8 @@ private fun ReorderSection(
                                     )
                                 )
                                 .border(
-                                    .8.dp,
-                                    XmoRed.copy(.55f),
+                                    .9.dp,
+                                    XmoRed.copy(.58f),
                                     RoundedCornerShape(
                                         12.dp
                                     )
@@ -733,13 +958,14 @@ private fun ReorderSection(
                     )
                     .pointerInput(
                         section.id,
-                        order
+                        dragOrder
                     ) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
                                 lifted = true
                                 dy = 0f
-                                working = order
+                                dragOrder =
+                                    order
 
                                 haptic.performHapticFeedback(
                                     HapticFeedbackType.LongPress
@@ -751,75 +977,109 @@ private fun ReorderSection(
                                     amount ->
 
                                 change.consume()
-                                dy += amount.y
+
+                                dy +=
+                                    amount.y
 
                                 val from =
-                                    working.indexOf(
-                                        section.id
-                                    )
+                                    dragOrder
+                                        .indexOf(
+                                            section.id
+                                        )
 
-                                if (from < 0) {
+                                if (
+                                    from < 0
+                                ) {
                                     return@detectDragGesturesAfterLongPress
                                 }
 
                                 val threshold =
-                                    72f * density
+                                    with(
+                                        density
+                                    ) {
+                                        72.dp
+                                            .toPx()
+                                    }
 
                                 if (
-                                    dy > threshold &&
+                                    dy >
+                                    threshold &&
                                     from <
-                                    working.lastIndex
+                                    dragOrder
+                                        .lastIndex
                                 ) {
                                     val next =
-                                        working
+                                        dragOrder
                                             .toMutableList()
 
                                     val item =
-                                        next.removeAt(
-                                            from
-                                        )
+                                        next
+                                            .removeAt(
+                                                from
+                                            )
 
                                     next.add(
                                         from + 1,
                                         item
                                     )
 
-                                    working = next
-                                    saveOrder(next)
-                                    dy -= threshold
+                                    dragOrder =
+                                        next
+
+                                    onPreview(
+                                        next
+                                    )
+
+                                    dy -=
+                                        threshold
                                 } else if (
-                                    dy < -threshold &&
+                                    dy <
+                                    -threshold &&
                                     from > 0
                                 ) {
                                     val next =
-                                        working
+                                        dragOrder
                                             .toMutableList()
 
                                     val item =
-                                        next.removeAt(
-                                            from
-                                        )
+                                        next
+                                            .removeAt(
+                                                from
+                                            )
 
                                     next.add(
                                         from - 1,
                                         item
                                     )
 
-                                    working = next
-                                    saveOrder(next)
-                                    dy += threshold
+                                    dragOrder =
+                                        next
+
+                                    onPreview(
+                                        next
+                                    )
+
+                                    dy +=
+                                        threshold
                                 }
                             },
 
                             onDragEnd = {
-                                saveOrder(working)
                                 lifted = false
                                 dy = 0f
+
+                                onCommit(
+                                    dragOrder
+                                )
                             },
 
                             onDragCancel = {
                                 lifted = false
                                 dy = 0f
+
+                                onPreview(
+                                    order
+                                )
                             }
                         )
                     },
@@ -829,15 +1089,17 @@ private fun ReorderSection(
                 XmoIcon(
                     section.icon,
                     XmoRed,
-                    Modifier.size(17.dp)
+                    Modifier.size(
+                        17.dp
+                    )
                 )
 
                 Column(
                     Modifier.padding(
                         start = 8.dp,
-                        top = 9.dp,
+                        top = 8.dp,
                         end = 8.dp,
-                        bottom = 9.dp
+                        bottom = 8.dp
                     )
                 ) {
                     Text(
@@ -862,14 +1124,21 @@ private fun ReorderSection(
                 }
             }
 
+            /*
+             * Actions are outside pointerInput:
+             * long-holding + / arrow never
+             * initiates section reorder.
+             */
             action?.let {
                 Box(
                     Modifier
-                        .padding(end = 10.dp)
+                        .padding(
+                            start = 6.dp
+                        )
                         .size(28.dp)
+                        .clip(CircleShape)
                         .background(
-                            XmoRed.copy(.18f),
-                            CircleShape
+                            XmoRed.copy(.18f)
                         ),
                     contentAlignment =
                         Alignment.Center
@@ -877,7 +1146,9 @@ private fun ReorderSection(
                     XmoIcon(
                         it,
                         XmoRed,
-                        Modifier.size(14.dp)
+                        Modifier.size(
+                            14.dp
+                        )
                     )
                 }
             }
@@ -888,8 +1159,14 @@ private fun ReorderSection(
         }
 
         AnimatedVisibility(
-            visible = !lifted
+            visible = !lifted,
+            enter = fadeIn(),
+            exit = fadeOut()
         ) {
+            /*
+             * Content intentionally full width.
+             * It does NOT inherit title padding.
+             */
             Box(
                 Modifier.fillMaxWidth()
             ) {
@@ -901,13 +1178,16 @@ private fun ReorderSection(
             Box(
                 Modifier
                     .padding(
-                        horizontal = 12.dp
+                        horizontal = 12.dp,
+                        vertical = 4.dp
                     )
                     .fillMaxWidth()
-                    .height(4.dp)
+                    .height(5.dp)
                     .background(
-                        XmoRed.copy(.24f),
-                        RoundedCornerShape(50)
+                        XmoRed.copy(.25f),
+                        RoundedCornerShape(
+                            50
+                        )
                     )
             )
         }
@@ -921,24 +1201,31 @@ private fun SongArrowButton() {
 
     Box(
         Modifier
-            .padding(end = 10.dp)
+            .padding(start = 6.dp)
             .size(28.dp)
+            .clip(CircleShape)
             .background(
-                XmoRed.copy(.18f),
-                CircleShape
+                XmoRed.copy(.18f)
             )
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
-                        var hold = false
+                        var holding =
+                            false
 
                         val job =
                             scope.launch {
                                 delay(250)
-                                hold = true
 
-                                while (hold) {
-                                    SongsArrow.tick++
+                                holding =
+                                    true
+
+                                while (
+                                    holding
+                                ) {
+                                    SongArrow
+                                        .tick++
+
                                     delay(55)
                                 }
                             }
@@ -946,15 +1233,19 @@ private fun SongArrowButton() {
                         val released =
                             tryAwaitRelease()
 
-                        val wasHold = hold
-                        hold = false
+                        val wasHold =
+                            holding
+
+                        holding =
+                            false
+
                         job.cancel()
 
                         if (
                             released &&
                             !wasHold
                         ) {
-                            SongsArrow.tick++
+                            SongArrow.tick++
                         }
                     }
                 )
@@ -997,15 +1288,43 @@ private fun Songs(
         rememberScrollState()
 
     val tick =
-        SongsArrow.tick
+        SongArrow.tick
 
     LaunchedEffect(tick) {
         if (tick > 0) {
-            scroll.animateScrollTo(
-                (scroll.value + 96)
-                    .coerceAtMost(
-                        scroll.maxValue
+            /*
+             * One rendered column.
+             */
+            val column =
+                (
+                    scroll.maxValue /
+                        ((songs.size + 2) / 3)
+                            .coerceAtLeast(1)
                     )
+                    .coerceAtLeast(1)
+
+            scroll.animateScrollTo(
+                (
+                    scroll.value +
+                        column
+                    ).coerceAtMost(
+                    scroll.maxValue
+                )
+            )
+        }
+    }
+
+    /*
+     * Prevent stale half-column offset after
+     * screen recreation/tab recreation.
+     */
+    LaunchedEffect(songs.size) {
+        if (
+            scroll.value >
+            scroll.maxValue
+        ) {
+            scroll.scrollTo(
+                scroll.maxValue
             )
         }
     }
@@ -1013,14 +1332,24 @@ private fun Songs(
     BoxWithConstraints(
         Modifier.fillMaxWidth()
     ) {
-        val pageWidth =
-            maxWidth
+        val edge =
+            8.dp
 
         val gap =
             8.dp
 
+        val usable =
+            maxWidth -
+                edge * 2
+
         val cardWidth =
-            (pageWidth - gap * 3) / 4
+            (
+                usable -
+                    gap * 3
+                ) / 4
+
+        val pageWidth =
+            maxWidth
 
         Row(
             Modifier.horizontalScroll(
@@ -1035,21 +1364,25 @@ private fun Songs(
 
                     Column(
                         Modifier
-                            .width(pageWidth)
+                            .width(
+                                pageWidth
+                            )
                             .padding(
-                                vertical = 4.dp
+                                horizontal =
+                                    edge,
+                                vertical =
+                                    4.dp
                             ),
                         verticalArrangement =
                             Arrangement.spacedBy(
                                 8.dp
                             )
                     ) {
-                        repeat(3) { row ->
+                        repeat(3) {
+                                row ->
+
                             Row(
-                                Modifier
-                                    .width(
-                                        pageWidth
-                                    ),
+                                Modifier.fillMaxWidth(),
                                 horizontalArrangement =
                                     Arrangement.spacedBy(
                                         gap
@@ -1063,9 +1396,10 @@ private fun Songs(
                                             column
 
                                     Box(
-                                        Modifier.width(
-                                            cardWidth
-                                        )
+                                        Modifier
+                                            .width(
+                                                cardWidth
+                                            )
                                     ) {
                                         items
                                             .getOrNull(
@@ -1073,7 +1407,8 @@ private fun Songs(
                                             )
                                             ?.let {
                                                 SongTile(
-                                                    song = it,
+                                                    song =
+                                                        it,
                                                     index =
                                                         page *
                                                             12 +
@@ -1105,6 +1440,10 @@ private fun Albums(
         Empty(
             "No albums found",
             c
+        )
+    } else {
+        Spacer(
+            Modifier.height(6.dp)
         )
     }
 }
@@ -1140,12 +1479,13 @@ private fun Artists(
             .fillMaxWidth()
             .horizontalScroll(
                 rememberScrollState()
+            )
+            .padding(
+                horizontal = 8.dp
             ),
         horizontalArrangement =
             Arrangement.spacedBy(10.dp)
     ) {
-        Spacer(Modifier.width(5.dp))
-
         artists
             .take(15)
             .forEach { artist ->
@@ -1159,7 +1499,9 @@ private fun Artists(
                         Modifier
                             .size(62.dp)
                             .background(
-                                XmoRed.copy(.16f),
+                                XmoRed.copy(
+                                    .16f
+                                ),
                                 CircleShape
                             ),
                         contentAlignment =
@@ -1192,8 +1534,6 @@ private fun Artists(
                     )
                 }
             }
-
-        Spacer(Modifier.width(5.dp))
     }
 }
 
@@ -1211,44 +1551,56 @@ private fun CustomSongs(
         return
     }
 
-    songs
-        .chunked(6)
-        .forEachIndexed {
-                row,
-                items ->
+    Column(
+        Modifier.padding(
+            horizontal = 8.dp
+        ),
+        verticalArrangement =
+            Arrangement.spacedBy(6.dp)
+    ) {
+        songs
+            .chunked(6)
+            .forEachIndexed {
+                    row,
+                    items ->
 
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.spacedBy(5.dp)
-            ) {
-                repeat(6) { column ->
-                    Box(
-                        Modifier.weight(1f)
-                    ) {
-                        items
-                            .getOrNull(column)
-                            ?.let {
-                                SongTile(
-                                    song = it,
-                                    index =
-                                        row * 6 +
-                                            column,
-                                    c = c,
-                                    theme = theme,
-                                    modifier =
-                                        Modifier
-                                            .fillMaxWidth()
+                Row(
+                    Modifier.fillMaxWidth(),
+                    horizontalArrangement =
+                        Arrangement.spacedBy(
+                            5.dp
+                        )
+                ) {
+                    repeat(6) {
+                            column ->
+
+                        Box(
+                            Modifier.weight(1f)
+                        ) {
+                            items
+                                .getOrNull(
+                                    column
                                 )
-                            }
+                                ?.let {
+                                    SongTile(
+                                        song =
+                                            it,
+                                        index =
+                                            row * 6 +
+                                                column,
+                                        c = c,
+                                        theme =
+                                            theme,
+                                        modifier =
+                                            Modifier
+                                                .fillMaxWidth()
+                                    )
+                                }
+                        }
                     }
                 }
             }
-
-            Spacer(
-                Modifier.height(6.dp)
-            )
-        }
+    }
 }
 
 @Composable
