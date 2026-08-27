@@ -5,7 +5,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -21,13 +22,16 @@ fun App() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val permission = if (Build.VERSION.SDK_INT >= 33)
-        Manifest.permission.READ_MEDIA_AUDIO else Manifest.permission.READ_EXTERNAL_STORAGE
+        Manifest.permission.READ_MEDIA_AUDIO
+    else Manifest.permission.READ_EXTERNAL_STORAGE
 
     var tab by remember { mutableIntStateOf(0) }
     var theme by remember { mutableStateOf(XmoTheme.Dark) }
-    var songs by remember { mutableStateOf(emptyList<Song>()) }
+    var songs by remember { mutableStateOf<List<Song>>(emptyList()) }
     var order by remember { mutableStateOf(Store.defaults) }
-    var categories by remember { mutableStateOf(emptyList<UserCategory>()) }
+    var categories by remember {
+        mutableStateOf<List<UserCategory>>(emptyList())
+    }
     var allowed by remember {
         mutableStateOf(
             ContextCompat.checkSelfPermission(context, permission) ==
@@ -37,15 +41,16 @@ fun App() {
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
-    ) { allowed = it }
+    ) { granted: Boolean ->
+        allowed = granted
+    }
 
-    suspend fun load() {
+    LaunchedEffect(allowed) {
         order = Store.order(context)
         categories = Store.categories(context)
         if (allowed) songs = Library.songs(context)
     }
 
-    LaunchedEffect(allowed) { load() }
     LaunchedEffect(Unit) {
         if (!allowed) permissionLauncher.launch(permission)
     }
@@ -53,25 +58,47 @@ fun App() {
     Box(Modifier.fillMaxSize()) {
         when (tab) {
             0 -> Home(
-                songs, allowed, theme, order, categories,
-                setTheme = { theme = it },
+                songs = songs,
+                allowed = allowed,
+                theme = theme,
+                order = order,
+                categories = categories,
+
+                setTheme = { value: XmoTheme ->
+                    theme = value
+                },
+
                 refresh = {
-                    if (!allowed) permissionLauncher.launch(permission)
-                    else scope.launch { songs = Library.songs(context) }
+                    if (!allowed) {
+                        permissionLauncher.launch(permission)
+                    } else {
+                        scope.launch {
+                            songs = Library.songs(context)
+                        }
+                    }
                 },
-                saveOrder = {
-                    order = it
-                    scope.launch { Store.saveOrder(context, it) }
+
+                saveOrder = { value: List<String> ->
+                    order = value
+                    scope.launch {
+                        Store.saveOrder(context, value)
+                    }
                 },
-                saveCategories = {
-                    categories = it
-                    scope.launch { Store.saveCategories(context, it) }
+
+                saveCategories = { value: List<UserCategory> ->
+                    categories = value
+                    scope.launch {
+                        Store.saveCategories(context, value)
+                    }
                 }
             )
+
             1 -> Search()
             else -> Settings()
         }
 
-        NavBar(tab) { tab = it }
+        NavBar(tab) { value: Int ->
+            tab = value
+        }
     }
 }
