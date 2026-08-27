@@ -2,6 +2,7 @@ package com.xmo.music.ui
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -18,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -105,9 +107,17 @@ fun Home(
     var addDialog by remember { mutableStateOf(false) }
     var categoryName by remember { mutableStateOf("") }
 
+    // Header smooth exit jab "recent" adha upar chla jaye (firstVisibleItemIndex check)
     val showProfile by remember {
         derivedStateOf {
-            list.layoutInfo.visibleItemsInfo.any { it.key == "recent" } || list.firstVisibleItemIndex == 0
+            val visibleItems = list.layoutInfo.visibleItemsInfo
+            val recentItem = visibleItems.firstOrNull { it.key == "recent" }
+            if (recentItem != null) {
+                // jab tak recent item adhe se kam scroll hua ho tab tak show rakho
+                recentItem.offset > -(recentItem.size / 2)
+            } else {
+                list.firstVisibleItemIndex == 0
+            }
         }
     }
 
@@ -138,6 +148,7 @@ fun Home(
                             } else {
                                 val position = actualOrder.indexOf(id)
                                 if (position >= 0) {
+                                    // Dock = index 0, Recent = index 1
                                     list.animateScrollToItem(index = position + 2)
                                 }
                             }
@@ -310,10 +321,11 @@ private fun HomeDock(
             .animateContentSize(spring(dampingRatio = 0.86f, stiffness = 520f))
             .padding(top = 3.dp, bottom = 4.dp)
     ) {
+        // Smoothly fade out and vanish when threshold reached
         AnimatedVisibility(
             visible = showProfile,
-            enter = fadeIn() + slideInVertically { -it / 3 },
-            exit = fadeOut() + slideOutVertically { -it }
+            enter = fadeIn() + slideInVertically { -it / 2 },
+            exit = fadeOut() + slideOutVertically { -it / 2 }
         ) {
             HomeHeader(c = c, theme = theme, setTheme = setTheme, refresh = refresh)
         }
@@ -358,7 +370,7 @@ private fun CategoryBar(
         Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 5.dp),
+            .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 6.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         CategoryChip(
@@ -371,19 +383,32 @@ private fun CategoryBar(
         working.forEach { id ->
             val section = sections.firstOrNull { it.id == id } ?: return@forEach
             val activeDrag = dragged == id
+
+            val animatedX by animateFloatAsState(
+                targetValue = if (activeDrag) dragX else 0f,
+                animationSpec = spring(dampingRatio = 0.75f, stiffness = 600f),
+                label = "chipDragOffset"
+            )
+
             Box(
                 Modifier
                     .graphicsLayer {
-                        translationX = if (activeDrag) dragX else 0f
-                        scaleX = if (activeDrag) 1.07f else 1f
-                        scaleY = if (activeDrag) 1.07f else 1f
-                        alpha = if (activeDrag) 0.96f else 1f
+                        translationX = animatedX
+                        scaleX = if (activeDrag) 1.12f else 1f
+                        scaleY = if (activeDrag) 1.12f else 1f
+                        alpha = if (activeDrag) 0.95f else 1f
                     }
                     .then(
                         if (activeDrag) {
                             Modifier
-                                .background(XmoRed.copy(0.10f), RoundedCornerShape(18.dp))
-                                .border(0.8.dp, XmoRed.copy(0.55f), RoundedCornerShape(18.dp))
+                                .shadow(
+                                    elevation = 8.dp,
+                                    shape = RoundedCornerShape(18.dp),
+                                    ambientColor = XmoRed.copy(0.4f),
+                                    spotColor = XmoRed
+                                )
+                                .background(XmoRed.copy(0.18f), RoundedCornerShape(18.dp))
+                                .border(1.2.dp, XmoRed, RoundedCornerShape(18.dp))
                         } else Modifier
                     )
                     .pointerInput(id, working) {
@@ -398,7 +423,7 @@ private fun CategoryBar(
                                 dragX += amount.x
                                 val from = working.indexOf(id)
                                 if (from < 0) return@detectDragGesturesAfterLongPress
-                                val threshold = with(density) { 44.dp.toPx() }
+                                val threshold = with(density) { 56.dp.toPx() }
                                 if (dragX > threshold && from < working.lastIndex) {
                                     val next = working.toMutableList()
                                     val moving = next.removeAt(from)
@@ -555,10 +580,13 @@ private fun Songs(
 
     BoxWithConstraints(Modifier.fillMaxWidth()) {
         val availableWidth = this.maxWidth
-        val edge = 8.dp
-        val gap = 8.dp
-        val cardWidth = (availableWidth - edge * 2 - gap * 3) / 4
-        val stepPx = with(LocalDensity.current) { (cardWidth + gap).roundToPx() }
+        val horizontalEdgePadding = 12.dp
+        val itemGap = 8.dp
+        
+        // Dynamic edge-to-edge balance calculation: 4 columns fit perfectly equal
+        val contentWidth = availableWidth - (horizontalEdgePadding * 2)
+        val cardWidth = (contentWidth - (itemGap * 3)) / 4
+        val stepPx = with(LocalDensity.current) { (cardWidth + itemGap).roundToPx() }
 
         LaunchedEffect(tick) {
             if (tick > 0) {
@@ -575,19 +603,22 @@ private fun Songs(
         Row(
             Modifier
                 .fillMaxWidth()
-                .horizontalScroll(scroll)
+                .horizontalScroll(scroll),
+            horizontalArrangement = Arrangement.spacedBy(horizontalEdgePadding)
         ) {
+            Spacer(Modifier.width(0.dp)) // Left padding alignment
+            
             songs.chunked(12).forEachIndexed { page, items ->
                 Column(
                     Modifier
-                        .width(availableWidth)
-                        .padding(horizontal = edge, vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                        .width(contentWidth)
+                        .padding(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(itemGap)
                 ) {
                     repeat(3) { row ->
                         Row(
                             Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(gap)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
                             repeat(4) { column ->
                                 val i = row * 4 + column
@@ -607,6 +638,7 @@ private fun Songs(
                     }
                 }
             }
+            Spacer(Modifier.width(0.dp)) // Right padding alignment
         }
     }
 }
@@ -636,7 +668,7 @@ private fun Artists(songs: List<Song>, c: HomeColors) {
         Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 8.dp),
+            .padding(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         artists.take(15).forEach { artist ->
@@ -678,7 +710,7 @@ private fun CustomSongs(songs: List<Song>, c: HomeColors, theme: XmoTheme) {
         return
     }
     Column(
-        Modifier.padding(horizontal = 8.dp),
+        Modifier.padding(horizontal = 12.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
         songs.chunked(6).forEachIndexed { row, items ->
