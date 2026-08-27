@@ -34,12 +34,24 @@ fun BoxScope.NavBar(
     theme: XmoTheme,
     select: (Int) -> Unit
 ) {
-    var pos by remember { mutableFloatStateOf(selected.toFloat()) }
-    var down by remember { mutableStateOf(false) }
-    var velocity by remember { mutableFloatStateOf(0f) }
+    var pos by remember {
+        mutableFloatStateOf(
+            selected.toFloat()
+        )
+    }
+
+    var down by remember {
+        mutableStateOf(false)
+    }
+
+    var velocity by remember {
+        mutableFloatStateOf(0f)
+    }
 
     LaunchedEffect(selected) {
-        if (!down) pos = selected.toFloat()
+        if (!down) {
+            pos = selected.toFloat()
+        }
     }
 
     val x by animateFloatAsState(
@@ -62,35 +74,44 @@ fun BoxScope.NavBar(
 
     val parent = when (theme) {
         XmoTheme.Dark ->
-            Color(0x30FF3B3B)
+            Color(0xB5262628)
 
         XmoTheme.Amoled ->
-            Color(0x29FF3B3B)
+            Color(0xC20A0A0A)
 
         XmoTheme.Light ->
-            Color(0x24FF3B3B)
+            Color(0xE8FFFFFF)
     }
 
-    val parentBorder = when (theme) {
-        XmoTheme.Light ->
-            Color(0x38000000)
+    val parentBorder =
+        when (theme) {
+            XmoTheme.Dark ->
+                XmoRed.copy(.30f)
 
-        XmoTheme.Amoled ->
-            Color(0x58FFFFFF)
+            XmoTheme.Amoled ->
+                XmoRed.copy(.34f)
 
-        XmoTheme.Dark ->
-            Color(0x48FFFFFF)
-    }
+            XmoTheme.Light ->
+                XmoRed.copy(.28f)
+        }
 
-    val inactive = when (theme) {
-        XmoTheme.Light -> Color(0x80000000)
-        else -> Color(0x70FFFFFF)
-    }
+    val inactive =
+        when (theme) {
+            XmoTheme.Light ->
+                Color(0x80000000)
 
-    val active = when (theme) {
-        XmoTheme.Light -> Color(0xFF161616)
-        else -> Color.White
-    }
+            else ->
+                Color(0x70FFFFFF)
+        }
+
+    val active =
+        when (theme) {
+            XmoTheme.Light ->
+                Color(0xFF161616)
+
+            else ->
+                Color.White
+        }
 
     val icons = listOf(
         Icons.Rounded.Home,
@@ -100,60 +121,114 @@ fun BoxScope.NavBar(
 
     Box(
         Modifier
-            .align(Alignment.BottomCenter)
+            .align(
+                Alignment.BottomCenter
+            )
             .navigationBarsPadding()
             .padding(bottom = 35.dp)
             .size(BarW, 96.dp)
             .pointerInput(selected) {
                 awaitEachGesture {
-                    val first = awaitFirstDown()
-                    val startX = first.position.x
-                    val start = selected
-                    val slot = size.width / 3f
+                    val first =
+                        awaitFirstDown()
 
-                    var lastX = startX
-                    var total = 0f
-                    var change = first
+                    val startX =
+                        first.position.x
+
+                    val start =
+                        selected
+
+                    val slot =
+                        size.width / 3f
+
+                    var lastX =
+                        startX
+
+                    var total =
+                        0f
+
+                    var change =
+                        first
 
                     down = true
                     velocity = 0f
 
-                    while (change.pressed) {
-                        val event = awaitPointerEvent()
-                        change = event.changes.first()
+                    while (
+                        change.pressed
+                    ) {
+                        val event =
+                            awaitPointerEvent()
 
-                        if (change.pressed) {
-                            val dx = change.position.x - lastX
-                            total = change.position.x - startX
-                            lastX = change.position.x
+                        change =
+                            event.changes.first()
+
+                        if (
+                            change.pressed
+                        ) {
+                            val dx =
+                                change
+                                    .position.x -
+                                    lastX
+
+                            total =
+                                change
+                                    .position.x -
+                                    startX
+
+                            lastX =
+                                change.position.x
 
                             velocity =
-                                velocity * .62f + dx * .38f
+                                velocity * .62f +
+                                    dx * .38f
 
                             pos = (
-                                start + total / slot
-                                ).coerceIn(0f, 2f)
+                                start +
+                                    total / slot
+                                ).coerceIn(
+                                0f,
+                                2f
+                            )
 
-                            if (abs(total) > 2f) {
+                            if (
+                                abs(total) >
+                                2f
+                            ) {
                                 change.consume()
                             }
                         }
                     }
 
                     val target =
-                        if (abs(total) <= 7f) {
-                            (first.position.x / slot)
+                        if (
+                            abs(total) <=
+                            7f
+                        ) {
+                            (
+                                first.position.x /
+                                    slot
+                                )
                                 .toInt()
-                                .coerceIn(0, 2)
+                                .coerceIn(
+                                    0,
+                                    2
+                                )
                         } else {
-                            pos.roundToInt()
-                                .coerceIn(0, 2)
+                            pos
+                                .roundToInt()
+                                .coerceIn(
+                                    0,
+                                    2
+                                )
                         }
 
                     velocity = 0f
-                    pos = target.toFloat()
+                    pos =
+                        target.toFloat()
 
-                    if (target != selected) {
+                    if (
+                        target != selected
+                    ) {
                         select(target)
                     }
 
@@ -163,114 +238,218 @@ fun BoxScope.NavBar(
     ) {
         Box(
             Modifier
-                .align(Alignment.Center)
-                .size(BarW, BarH)
+                .align(
+                    Alignment.Center
+                )
+                .size(
+                    BarW,
+                    BarH
+                )
                 .graphicsLayer {
-                    scaleX = barScale
-                    scaleY = barScale
-                    shape = RoundedCornerShape(33.dp)
+                    scaleX =
+                        barScale
+
+                    scaleY =
+                        barScale
+
+                    shape =
+                        RoundedCornerShape(
+                            33.dp
+                        )
+
                     clip = true
                 }
                 .background(parent)
                 .border(
                     .6.dp,
                     parentBorder,
-                    RoundedCornerShape(33.dp)
+                    RoundedCornerShape(
+                        33.dp
+                    )
                 )
         )
 
-        val selectorW = RestW + 32.dp * grow
-        val selectorH = RestH + 24.dp * grow
-        val radius = 29.dp + 13.dp * grow
+        val selectorW =
+            RestW +
+                32.dp * grow
 
-        val stretch = if (down)
-            (abs(velocity) / 19f)
-                .coerceIn(0f, 1f)
-        else 0f
+        val selectorH =
+            RestH +
+                24.dp * grow
 
-        val selector = when (theme) {
-            XmoTheme.Dark ->
-                XmoRed.copy(.26f)
+        val radius =
+            29.dp +
+                13.dp * grow
 
-            XmoTheme.Amoled ->
-                XmoRed.copy(.29f)
+        val stretch =
+            if (down) {
+                (
+                    abs(velocity) /
+                        19f
+                    ).coerceIn(
+                    0f,
+                    1f
+                )
+            } else 0f
 
-            XmoTheme.Light ->
-                XmoRed.copy(.24f)
-        }
+        val selector =
+            when (theme) {
+                XmoTheme.Dark ->
+                    XmoRed.copy(.26f)
+
+                XmoTheme.Amoled ->
+                    XmoRed.copy(.29f)
+
+                XmoTheme.Light ->
+                    XmoRed.copy(.24f)
+            }
 
         Box(
             Modifier
-                .align(Alignment.CenterStart)
-                .offset(
-                    x = 4.dp +
-                        160.dp * (x / 2f) -
-                        16.dp * grow
+                .align(
+                    Alignment.CenterStart
                 )
-                .size(selectorW, selectorH)
+                .offset(
+                    x =
+                        4.dp +
+                            160.dp *
+                            (x / 2f) -
+                            16.dp *
+                            grow
+                )
+                .size(
+                    selectorW,
+                    selectorH
+                )
                 .graphicsLayer {
                     val skew =
-                        (velocity * .32f)
-                            .coerceIn(-6f, 6f)
+                        (
+                            velocity *
+                                .32f
+                            ).coerceIn(
+                            -6f,
+                            6f
+                        )
 
-                    scaleX = 1f + stretch * .20f
-                    scaleY = 1f - stretch * .09f
+                    scaleX =
+                        1f +
+                            stretch *
+                            .20f
+
+                    scaleY =
+                        1f -
+                            stretch *
+                            .09f
 
                     rotationZ =
-                        (velocity * .09f)
-                            .coerceIn(-1.7f, 1.7f)
+                        (
+                            velocity *
+                                .09f
+                            ).coerceIn(
+                            -1.7f,
+                            1.7f
+                        )
 
-                    cameraDistance = 16f * density
-                    rotationY = skew * .20f
+                    cameraDistance =
+                        16f * density
+
+                    rotationY =
+                        skew * .20f
                 }
                 .graphicsLayer {
-                    shape = RoundedCornerShape(radius)
+                    shape =
+                        RoundedCornerShape(
+                            radius
+                        )
+
                     clip = true
                 }
                 .background(selector)
                 .border(
                     .65.dp,
                     XmoRed.copy(.42f),
-                    RoundedCornerShape(radius)
+                    RoundedCornerShape(
+                        radius
+                    )
                 )
         )
 
         Row(
             Modifier
-                .align(Alignment.Center)
-                .size(BarW, BarH)
-                .padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            icons.forEachIndexed { index, icon ->
-                val chosen = abs(x - index) < .5f
-
-                val scale by animateFloatAsState(
-                    if (chosen && down) 1.10f else 1f,
-                    spring(.75f, 900f),
-                    label = "icon$index"
+                .align(
+                    Alignment.Center
                 )
+                .size(
+                    BarW,
+                    BarH
+                )
+                .padding(
+                    horizontal =
+                        4.dp
+                ),
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            icons.forEachIndexed {
+                    index,
+                    icon ->
+
+                val chosen =
+                    abs(x - index) <
+                        .5f
+
+                val scale by
+                    animateFloatAsState(
+                        if (
+                            chosen &&
+                            down
+                        ) 1.10f
+                        else 1f,
+                        spring(
+                            .75f,
+                            900f
+                        ),
+                        label =
+                            "icon$index"
+                    )
 
                 Box(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight(),
-                    contentAlignment = Alignment.Center
+                    contentAlignment =
+                        Alignment.Center
                 ) {
                     Icon(
                         icon,
                         null,
-                        tint = if (chosen) active else inactive,
-                        modifier = Modifier
-                            .offset(
-                                x = if (index == 2)
-                                    2.dp else 0.dp
-                            )
-                            .size(25.dp)
-                            .graphicsLayer {
-                                scaleX = scale
-                                scaleY = scale
-                            }
+                        tint =
+                            if (chosen)
+                                active
+                            else
+                                inactive,
+                        modifier =
+                            Modifier
+                                .offset(
+                                    x =
+                                        if (
+                                            index ==
+                                            2
+                                        )
+                                            2.dp
+                                        else
+                                            0.dp
+                                )
+                                .size(
+                                    25.dp
+                                )
+                                .graphicsLayer {
+                                    scaleX =
+                                        scale
+
+                                    scaleY =
+                                        scale
+                                }
                     )
                 }
             }
