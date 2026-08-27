@@ -31,7 +31,7 @@ fun Home(
     saveOrder: (List<String>) -> Unit,
     saveCategories: (List<UserCategory>) -> Unit
 ) {
-    val c = theme.colors()
+    val c = homeColors(theme)
     val list = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
