@@ -1,19 +1,14 @@
 package com.xmo.music.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
@@ -31,7 +26,7 @@ data class HomeColors(
     val text: Color,
     val sub: Color,
     val button: Color,
-    val inactive: Color
+    val icon: Color
 )
 
 fun XmoTheme.colors() = when (this) {
@@ -57,84 +52,74 @@ fun HomeHeader(
     refresh: () -> Unit
 ) {
     var menu by remember { mutableStateOf(false) }
+    val subtitles = listOf(
+        "What are you listening today?",
+        "Mood for some chill music?",
+        "Feel the beat & rhythm...",
+        "Turn up the volume!"
+    )
+    var subtitle by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(4500)
+            subtitle = (subtitle + 1) % subtitles.size
+        }
+    }
 
     Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().padding(16.dp, 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            Modifier
-                .size(40.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(XmoRed, Color(0xFF671E28))
-                    )
-                )
+            Modifier.size(40.dp).clip(CircleShape)
+                .background(Brush.linearGradient(listOf(XmoRed, Color(0xFF671E28))))
                 .border(1.dp, Color.White.copy(.15f), CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                "X",
-                color = Color.White,
-                fontFamily = XmoFont.bold,
-                fontSize = 17.sp
-            )
+            Text("X", color = Color.White, fontFamily = XmoFont.bold)
         }
 
-        Column(
-            Modifier
-                .padding(start = 10.dp)
-                .weight(1f)
-        ) {
+        Column(Modifier.padding(start = 10.dp).weight(1f)) {
+            Text("XMO User", color = c.text, fontFamily = XmoFont.user, fontSize = 18.sp)
             Text(
-                "XMO User",
-                color = c.text,
-                fontFamily = XmoFont.user,
-                fontSize = 18.sp,
-                maxLines = 1
-            )
-            Text(
-                "What are you listening today?",
+                subtitles[subtitle],
                 color = c.sub,
                 fontFamily = XmoFont.thin,
                 fontSize = 11.sp
             )
         }
 
-        IconButton(onClick = refresh) {
-            Icon(Icons.Rounded.Refresh, null, tint = c.inactive)
+        IconButton(refresh) {
+            Icon(Icons.Rounded.Refresh, null, tint = c.icon)
         }
 
         Box {
-            IconButton(onClick = { menu = true }) {
-                Icon(Icons.Rounded.Menu, null, tint = c.inactive)
+            IconButton({ menu = true }) {
+                Icon(Icons.Rounded.Menu, null, tint = c.icon)
             }
 
             DropdownMenu(
-                expanded = menu,
-                onDismissRequest = { menu = false },
+                menu,
+                { menu = false },
                 containerColor = c.surface,
                 shape = RoundedCornerShape(12.dp)
             ) {
-                XmoTheme.entries.forEach {
+                XmoTheme.entries.forEach { item ->
                     DropdownMenuItem(
                         text = {
                             Text(
-                                when (it) {
+                                when (item) {
                                     XmoTheme.Dark -> "Dark Theme"
                                     XmoTheme.Light -> "Light Theme"
                                     XmoTheme.Amoled -> "AMOLED"
                                 },
-                                color = if (theme == it) XmoRed else c.text,
-                                fontFamily = XmoFont.medium,
-                                fontSize = 13.sp
+                                color = if (theme == item) XmoRed else c.text,
+                                fontFamily = XmoFont.medium
                             )
                         },
                         onClick = {
-                            setTheme(it)
+                            setTheme(item)
                             menu = false
                         }
                     )
@@ -145,51 +130,34 @@ fun HomeHeader(
 }
 
 @Composable
-fun Categories(c: HomeColors) {
-    var selected by remember { mutableIntStateOf(0) }
-
+fun CategoryChip(
+    text: String,
+    active: Boolean,
+    c: HomeColors,
+    icon: String,
+    onClick: () -> Unit
+) {
     Row(
         Modifier
-            .fillMaxWidth()
-            .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 14.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (active) XmoRed.copy(.18f) else c.button)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 13.dp, vertical = 7.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        listOf(
-            "All" to Icons.Rounded.Dashboard,
-            "All Songs" to Icons.Rounded.MusicNote,
-            "Albums" to Icons.Rounded.Album,
-            "Liked Songs" to Icons.Rounded.Favorite,
-            "Artists" to Icons.Rounded.Person
-        ).forEachIndexed { i, item ->
-            val active = selected == i
-
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(18.dp))
-                    .background(
-                        if (active) XmoRed.copy(.18f)
-                        else c.button
-                    )
-                    .clickable { selected = i }
-                    .padding(horizontal = 14.dp, vertical = 7.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
-            ) {
-                Icon(
-                    item.second,
-                    null,
-                    tint = if (active) XmoRed else c.inactive,
-                    modifier = Modifier.size(14.dp)
-                )
-                Text(
-                    item.first,
-                    color = if (active) XmoRed else c.text,
-                    fontFamily = XmoFont.medium,
-                    fontSize = 12.sp
-                )
-            }
-        }
+        Text(
+            icon,
+            color = if (active) XmoRed else c.icon,
+            fontFamily = XmoFont.bold,
+            fontSize = 11.sp
+        )
+        Text(
+            text,
+            color = if (active) XmoRed else c.text,
+            fontFamily = XmoFont.medium,
+            fontSize = 12.sp
+        )
     }
 }
 
@@ -197,99 +165,76 @@ fun Categories(c: HomeColors) {
 fun SectionTitle(
     title: String,
     subtitle: String,
-    icon: ImageVector,
-    c: HomeColors
+    icon: String,
+    c: HomeColors,
+    action: String? = null,
+    onAction: () -> Unit = {}
 ) {
     Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
+        Modifier.fillMaxWidth().animateContentSize().padding(10.dp, 8.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Icon(
-            icon,
-            null,
-            tint = XmoRed,
-            modifier = Modifier.size(17.dp)
-        )
-        Column(Modifier.padding(start = 7.dp)) {
-            Text(
-                title,
-                color = c.text,
-                fontFamily = XmoFont.bold,
-                fontSize = 17.sp
-            )
-            Text(
-                subtitle,
-                color = c.sub,
-                fontFamily = XmoFont.thin,
-                fontSize = 10.sp
-            )
+        Text(icon, color = XmoRed, fontFamily = XmoFont.bold, fontSize = 15.sp)
+
+        Column(Modifier.padding(start = 8.dp).weight(1f)) {
+            Text(title, color = c.text, fontFamily = XmoFont.bold, fontSize = 17.sp)
+            Text(subtitle, color = c.sub, fontFamily = XmoFont.thin, fontSize = 10.sp)
+        }
+
+        if (action != null) {
+            Box(
+                Modifier.size(28.dp).clip(CircleShape)
+                    .background(XmoRed.copy(.18f))
+                    .clickable(onClick = onAction),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(action, color = XmoRed, fontFamily = XmoFont.bold, fontSize = 15.sp)
+            }
         }
     }
 }
 
 @Composable
 fun SongTile(song: Song, index: Int, c: HomeColors) {
-    val colors = listOf(
-        Color(0xFFFF3B3B), Color(0xFF007AFF),
-        Color(0xFF34C759), Color(0xFFAF52DE),
-        Color(0xFFFF9500), Color(0xFFFF2D55)
+    val palette = listOf(
+        Color(0xFFFF3B3B), Color(0xFF007AFF), Color(0xFF34C759),
+        Color(0xFFAF52DE), Color(0xFFFF9500), Color(0xFFFF2D55)
     )
-    val art = colors[index % colors.size]
+    val art = palette[index % palette.size]
 
     Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(10.dp))
-            .background(
-                Brush.linearGradient(
-                    listOf(art.copy(.42f), c.surface)
-                )
-            )
+        Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp))
+            .background(Brush.linearGradient(listOf(art.copy(.40f), c.surface)))
             .padding(5.dp)
     ) {
-        AsyncImage(
-            model = song.artwork,
-            contentDescription = null,
-            modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
-                .clip(RoundedCornerShape(6.dp)),
-            contentScale = androidx.compose.ui.layout.ContentScale.Crop
-        )
+        Box(
+            Modifier.fillMaxWidth().aspectRatio(1f)
+                .clip(RoundedCornerShape(6.dp))
+                .background(art.copy(.22f))
+        ) {
+            AsyncImage(
+                song.artwork,
+                null,
+                Modifier.fillMaxSize(),
+                contentScale = androidx.compose.ui.layout.ContentScale.Crop
+            )
+        }
 
         Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(top = 4.dp),
+            Modifier.fillMaxWidth().padding(top = 4.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    song.title,
-                    color = c.text,
-                    fontFamily = XmoFont.bold,
-                    fontSize = 10.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    song.title, color = c.text, fontFamily = XmoFont.bold,
+                    fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
                 Text(
-                    song.artist,
-                    color = c.sub,
-                    fontFamily = XmoFont.thin,
-                    fontSize = 8.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    song.artist, color = c.sub, fontFamily = XmoFont.thin,
+                    fontSize = 8.sp, maxLines = 1, overflow = TextOverflow.Ellipsis
                 )
             }
-
-            Icon(
-                Icons.Rounded.MoreVert,
-                null,
-                tint = c.sub,
-                modifier = Modifier.size(13.dp)
-            )
+            Text("⋮", color = c.sub, fontSize = 14.sp)
         }
     }
 }
