@@ -33,7 +33,7 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
     var velocity by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(selected) {
-        if (!down) pos = selected.toFloat()
+        pos = selected.toFloat()
     }
 
     val x by animateFloatAsState(
@@ -115,12 +115,13 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         else -> start
                     }
 
-                    down = false
                     velocity = 0f
                     pos = target.toFloat()
-
+                    
                     if (target != selected)
                         select(target)
+                    
+                    down = false
                 }
             }
     ) {
