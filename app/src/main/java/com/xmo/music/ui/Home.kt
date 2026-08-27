@@ -105,7 +105,6 @@ fun Home(
     var addDialog by remember { mutableStateOf(false) }
     var categoryName by remember { mutableStateOf("") }
 
-    // Continuous ultra-smooth scroll progress interpolation for profile header (No Jumps)
     val profileCollapseProgress by remember {
         derivedStateOf {
             val visibleInfo = list.layoutInfo.visibleItemsInfo
@@ -154,7 +153,6 @@ fun Home(
                                 } else {
                                     val position = actualOrder.indexOf(id)
                                     if (position >= 0) {
-                                        // Precise pixel alignment below dynamic sticky dock
                                         list.animateScrollToItem(
                                             index = position + 2,
                                             scrollOffset = 0
@@ -331,19 +329,18 @@ private fun HomeDock(
             .animateContentSize(spring(dampingRatio = 0.85f, stiffness = 400f))
             .padding(top = 3.dp, bottom = 4.dp)
     ) {
-        // Linear animated profile header container (Fully smooth interpolation)
         if (profileProgress > 0f) {
             Box(
                 Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
                         alpha = profileProgress
-                        translationY = -20dp.toPx() * (1f - profileProgress)
+                        translationY = -20.dp.toPx() * (1f - profileProgress)
                     }
             ) {
                 HomeHeader(c = c, theme = theme, setTheme = setTheme, refresh = refresh)
             }
-            Spacer(Modifier.height((7 * profileProgress).dp))
+            Spacer(Modifier.height(7.dp * profileProgress))
         }
 
         CategoryBar(
@@ -398,7 +395,6 @@ private fun CategoryBar(
             val section = sections.firstOrNull { it.id == id } ?: return@forEach
             val isDraggingThis = dragged == id
 
-            // Zero-jitter spring interpolation for active dragged item
             val animatedTranslationX by animateFloatAsState(
                 targetValue = if (isDraggingThis) rawDragOffset else 0f,
                 animationSpec = spring(
@@ -445,7 +441,6 @@ private fun CategoryBar(
 
                                 val stepPx = with(density) { 68.dp.toPx() }
 
-                                // Stable swap check prevents jitter feedback loops
                                 if (rawDragOffset > stepPx && fromIndex < working.lastIndex) {
                                     val nextList = working.toMutableList()
                                     val item = nextList.removeAt(fromIndex)
@@ -605,7 +600,6 @@ private fun Songs(
         val outerPadding = 12.dp
         val itemGap = 6.dp
 
-        // Calculated 4-column balanced grid layout eliminating 4th column extra gap completely
         val gridWidth = totalWidth - (outerPadding * 2)
         val cardWidth = (gridWidth - (itemGap * 3)) / 4
         val stepPx = with(LocalDensity.current) { (cardWidth + itemGap).roundToPx() }
