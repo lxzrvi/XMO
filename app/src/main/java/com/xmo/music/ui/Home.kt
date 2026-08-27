@@ -22,7 +22,6 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xmo.music.R
@@ -56,6 +55,7 @@ fun Home(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     var songArrowTick by remember { mutableIntStateOf(0) }
+    var measuredDockHeightPx by remember { mutableIntStateOf(0) }
 
     val fixed = remember {
         listOf(
@@ -108,16 +108,19 @@ fun Home(
     var addDialog by remember { mutableStateOf(false) }
     var categoryName by remember { mutableStateOf("") }
 
-    // Smooth scroll interpolation logic for combined header movement
+    // Direct offset interpolation without jumps
     val headerProgress by remember {
         derivedStateOf {
-            val firstVisible = listState.firstVisibleItemIndex
-            val offset = listState.firstVisibleItemScrollOffset
-            if (firstVisible > 0) {
+            val visibleInfo = listState.layoutInfo.visibleItemsInfo
+            val recentItem = visibleInfo.firstOrNull { it.key == "recentSection" }
+            if (recentItem != null) {
+                val totalH = recentItem.size.toFloat().coerceAtLeast(1f)
+                val currentOffset = -recentItem.offset.toFloat()
+                (1f - (currentOffset / (totalH * 0.6f))).coerceIn(0f, 1f)
+            } else if (listState.firstVisibleItemIndex > 0) {
                 0f
             } else {
-                val maxThreshold = 140f
-                (1f - (offset / maxThreshold)).coerceIn(0f, 1f)
+                1f
             }
         }
     }
@@ -132,32 +135,41 @@ fun Home(
             modifier = Modifier.fillMaxSize()
         ) {
             stickyHeader(key = "homeDockSticky") {
-                HomeDock(
-                    headerProgress = headerProgress,
-                    sections = actualOrder.mapNotNull { sectionMap[it] },
-                    order = actualOrder,
-                    selected = selected,
-                    c = c,
-                    theme = theme,
-                    setTheme = setTheme,
-                    refresh = refresh,
-                    onSelect = { id ->
-                        selected = id
-                        scope.launch {
-                            if (id == "all") {
-                                listState.animateScrollToItem(0, 0)
-                            } else {
-                                val sectionIdx = actualOrder.indexOf(id)
-                                if (sectionIdx != -1) {
-                                    // Target list index: 0 is dock, 1 is Recent, sections start at 2
-                                    listState.animateScrollToItem(index = sectionIdx + 2, scrollOffset = 0)
+                Box(
+                    Modifier.onGloballyPositioned { coords ->
+                        measuredDockHeightPx = coords.size.height
+                    }
+                ) {
+                    HomeDock(
+                        headerProgress = headerProgress,
+                        sections = actualOrder.mapNotNull { sectionMap[it] },
+                        order = actualOrder,
+                        selected = selected,
+                        c = c,
+                        theme = theme,
+                        setTheme = setTheme,
+                        refresh = refresh,
+                        onSelect = { id ->
+                            selected = id
+                            scope.launch {
+                                if (id == "all") {
+                                    listState.animateScrollToItem(0, 0)
+                                } else {
+                                    val sectionIdx = actualOrder.indexOf(id)
+                                    if (sectionIdx != -1) {
+                                        // Precise index positioning matching actual LazyColumn list layout
+                                        listState.animateScrollToItem(
+                                            index = sectionIdx + 2,
+                                            scrollOffset = 0
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    },
-                    onCommit = { saveOrder(it) },
-                    onAdd = { addDialog = true }
-                )
+                        },
+                        onCommit = { saveOrder(it) },
+                        onAdd = { addDialog = true }
+                    )
+                }
             }
 
             item(key = "recentSection") {
@@ -311,13 +323,13 @@ private fun HomeDock(
             .windowInsetsPadding(WindowInsets.statusBars)
             .padding(bottom = 6.dp)
     ) {
-        if (headerProgress > 0.01f) {
+        if (headerProgress > 0.001f) {
             Box(
                 Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
                         alpha = headerProgress
-                        translationY = -24.dp.toPx() * (1f - headerProgress)
+                        translationY = -28.dp.toPx() * (1f - headerProgress)
                     }
             ) {
                 HomeHeader(c = c, theme = theme, setTheme = setTheme, refresh = refresh)
@@ -349,11 +361,11 @@ private fun CategoryBar(
     val haptic = LocalHapticFeedback.current
     val density = LocalDensity.current
 
-    var activeOrder by remember(order) { mutableStateOf(order) }
-    var draggingId by remember { mutableStateOf<String?>(null) }
-    var dragOffsetX by remember { mutableFloatStateOf(0f) }
+    var workingList by remember(order) { mutableStateOf(order) }
+    var draggedId by remember { mutableStateOf<String?>(null) }
+    var currentDragX by remember { mutableFloatStateOf(0f) }
 
-    val chipWidthPx = with(density) { 96.dp.toPx() }
+    val slotWidthPx = with(density) { 92.dp.toPx() }
 
     Row(
         Modifier
@@ -369,15 +381,15 @@ private fun CategoryBar(
             icon = R.drawable.ic_xmo_all
         ) { select("all") }
 
-        activeOrder.forEachIndexed { index, id ->
-            val section = sections.firstOrNull { it.id == id } ?: return@forEachIndexed
-            val isBeingDragged = draggingId == id
+        workingList.forEach { id ->
+            val section = sections.firstOrNull { it.id == id } ?: return@forEach
+            val isDragging = draggedId == id
 
             val translationXAnim = remember { Animatable(0f) }
 
-            LaunchedEffect(dragOffsetX, isBeingDragged) {
-                if (isBeingDragged) {
-                    translationXAnim.snapTo(dragOffsetX)
+            LaunchedEffect(currentDragX, isDragging) {
+                if (isDragging) {
+                    translationXAnim.snapTo(currentDragX)
                 } else {
                     translationXAnim.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
                 }
@@ -387,50 +399,51 @@ private fun CategoryBar(
                 Modifier
                     .graphicsLayer {
                         translationX = translationXAnim.value
-                        scaleX = if (isBeingDragged) 1.08f else 1f
-                        scaleY = if (isBeingDragged) 1.08f else 1f
-                        shadowElevation = if (isBeingDragged) 10f else 0f
-                        alpha = if (isBeingDragged) 0.9f else 1f
+                        scaleX = if (isDragging) 1.12f else 1f
+                        scaleY = if (isDragging) 1.12f else 1f
+                        shadowElevation = if (isDragging) 14f else 0f
+                        alpha = if (isDragging) 0.95f else 1f
                     }
-                    .pointerInput(id, activeOrder) {
+                    .pointerInput(id, workingList) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
-                                draggingId = id
-                                dragOffsetX = 0f
+                                draggedId = id
+                                currentDragX = 0f
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             },
                             onDrag = { change, dragAmount ->
                                 change.consume()
-                                dragOffsetX += dragAmount.x
-                                val curIndex = activeOrder.indexOf(id)
+                                currentDragX += dragAmount.x
+                                val curIndex = workingList.indexOf(id)
 
                                 if (curIndex != -1) {
-                                    if (dragOffsetX > chipWidthPx * 0.7f && curIndex < activeOrder.lastIndex) {
-                                        val mutable = activeOrder.toMutableList()
+                                    if (currentDragX > slotWidthPx * 0.65f && curIndex < workingList.lastIndex) {
+                                        val mutable = workingList.toMutableList()
                                         val item = mutable.removeAt(curIndex)
                                         mutable.add(curIndex + 1, item)
-                                        activeOrder = mutable
-                                        dragOffsetX -= chipWidthPx
+                                        workingList = mutable
+                                        currentDragX -= slotWidthPx
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                                    } else if (dragOffsetX < -chipWidthPx * 0.7f && curIndex > 0) {
-                                        val mutable = activeOrder.toMutableList()
+                                    } else if (currentDragX < -slotWidthPx * 0.65f && curIndex > 0) {
+                                        val mutable = workingList.toMutableList()
                                         val item = mutable.removeAt(curIndex)
                                         mutable.add(curIndex - 1, item)
-                                        activeOrder = mutable
-                                        dragOffsetX += chipWidthPx
+                                        workingList = mutable
+                                        currentDragX += slotWidthPx
                                         haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                                     }
                                 }
                             },
                             onDragEnd = {
-                                draggingId = null
-                                dragOffsetX = 0f
-                                commit(activeOrder)
+                                val updated = workingList
+                                draggedId = null
+                                currentDragX = 0f
+                                commit(updated)
                             },
                             onDragCancel = {
-                                draggingId = null
-                                dragOffsetX = 0f
-                                activeOrder = order
+                                draggedId = null
+                                currentDragX = 0f
+                                workingList = order
                             }
                         )
                     }
@@ -442,7 +455,7 @@ private fun CategoryBar(
                     icon = section.icon,
                     tint = section.color
                 ) {
-                    if (draggingId == null) {
+                    if (draggedId == null) {
                         select(id)
                     }
                 }
@@ -567,7 +580,6 @@ private fun Songs(
         val outerPadding = 12.dp
         val itemGap = 6.dp
 
-        // Perfectly balanced 4-column exact mathematical width distribution
         val availableWidth = totalWidth - (outerPadding * 2)
         val cardWidth = (availableWidth - (itemGap * 3)) / 4
         val stepPx = with(LocalDensity.current) { (cardWidth + itemGap).toPx() }
