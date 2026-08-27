@@ -61,24 +61,34 @@ fun BoxScope.NavBar(
     )
 
     val parent = when (theme) {
-        XmoTheme.Dark -> Color(0x2EFFFFFF)
-        XmoTheme.Amoled -> Color(0x26FFFFFF)
-        XmoTheme.Light -> Color(0x16FFFFFF)
+        XmoTheme.Dark ->
+            Color(0x30FF3B3B)
+
+        XmoTheme.Amoled ->
+            Color(0x29FF3B3B)
+
+        XmoTheme.Light ->
+            Color(0x24FF3B3B)
     }
 
     val parentBorder = when (theme) {
-        XmoTheme.Dark -> Color(0x45FFFFFF)
-        XmoTheme.Amoled -> Color(0x55FFFFFF)
-        XmoTheme.Light -> Color(0x26000000)
+        XmoTheme.Light ->
+            Color(0x38000000)
+
+        XmoTheme.Amoled ->
+            Color(0x58FFFFFF)
+
+        XmoTheme.Dark ->
+            Color(0x48FFFFFF)
     }
 
     val inactive = when (theme) {
-        XmoTheme.Light -> Color(0x78000000)
-        else -> Color(0x62FFFFFF)
+        XmoTheme.Light -> Color(0x80000000)
+        else -> Color(0x70FFFFFF)
     }
 
-    val activeIcon = when (theme) {
-        XmoTheme.Light -> Color(0xFF171717)
+    val active = when (theme) {
+        XmoTheme.Light -> Color(0xFF161616)
         else -> Color.White
     }
 
@@ -113,17 +123,12 @@ fun BoxScope.NavBar(
                         change = event.changes.first()
 
                         if (change.pressed) {
-                            val dx =
-                                change.position.x - lastX
-
-                            total =
-                                change.position.x - startX
-
+                            val dx = change.position.x - lastX
+                            total = change.position.x - startX
                             lastX = change.position.x
 
                             velocity =
-                                velocity * .62f +
-                                    dx * .38f
+                                velocity * .62f + dx * .38f
 
                             pos = (
                                 start + total / slot
@@ -163,48 +168,35 @@ fun BoxScope.NavBar(
                 .graphicsLayer {
                     scaleX = barScale
                     scaleY = barScale
-                    shape =
-                        RoundedCornerShape(33.dp)
+                    shape = RoundedCornerShape(33.dp)
                     clip = true
                 }
                 .background(parent)
                 .border(
-                    .5.dp,
+                    .6.dp,
                     parentBorder,
                     RoundedCornerShape(33.dp)
                 )
         )
 
-        val selectorW =
-            RestW + 32.dp * grow
+        val selectorW = RestW + 32.dp * grow
+        val selectorH = RestH + 24.dp * grow
+        val radius = 29.dp + 13.dp * grow
 
-        val selectorH =
-            RestH + 24.dp * grow
+        val stretch = if (down)
+            (abs(velocity) / 19f)
+                .coerceIn(0f, 1f)
+        else 0f
 
-        val radius =
-            29.dp + 13.dp * grow
-
-        val stretch =
-            if (down) {
-                (abs(velocity) / 19f)
-                    .coerceIn(0f, 1f)
-            } else 0f
-
-        val selectorColor = when (theme) {
+        val selector = when (theme) {
             XmoTheme.Dark ->
-                XmoRed.copy(
-                    alpha = .12f + .025f * grow
-                )
+                XmoRed.copy(.26f)
 
             XmoTheme.Amoled ->
-                XmoRed.copy(
-                    alpha = .14f + .025f * grow
-                )
+                XmoRed.copy(.29f)
 
             XmoTheme.Light ->
-                XmoRed.copy(
-                    alpha = .13f + .025f * grow
-                )
+                XmoRed.copy(.24f)
         }
 
         Box(
@@ -215,50 +207,30 @@ fun BoxScope.NavBar(
                         160.dp * (x / 2f) -
                         16.dp * grow
                 )
-                .size(
-                    selectorW,
-                    selectorH
-                )
+                .size(selectorW, selectorH)
                 .graphicsLayer {
                     val skew =
                         (velocity * .32f)
                             .coerceIn(-6f, 6f)
 
-                    scaleX =
-                        1f + stretch * .20f
-
-                    scaleY =
-                        1f - stretch * .09f
+                    scaleX = 1f + stretch * .20f
+                    scaleY = 1f - stretch * .09f
 
                     rotationZ =
                         (velocity * .09f)
-                            .coerceIn(
-                                -1.7f,
-                                1.7f
-                            )
+                            .coerceIn(-1.7f, 1.7f)
 
-                    cameraDistance =
-                        16f * density
-
-                    rotationY =
-                        skew * .20f
+                    cameraDistance = 16f * density
+                    rotationY = skew * .20f
                 }
                 .graphicsLayer {
-                    shape =
-                        RoundedCornerShape(radius)
-
+                    shape = RoundedCornerShape(radius)
                     clip = true
                 }
-                .background(selectorColor)
+                .background(selector)
                 .border(
-                    .55.dp,
-                    when (theme) {
-                        XmoTheme.Light ->
-                            Color(0x28000000)
-
-                        else ->
-                            Color(0x52FFFFFF)
-                    },
+                    .65.dp,
+                    XmoRed.copy(.42f),
                     RoundedCornerShape(radius)
                 )
         )
@@ -268,50 +240,36 @@ fun BoxScope.NavBar(
                 .align(Alignment.Center)
                 .size(BarW, BarH)
                 .padding(horizontal = 4.dp),
-            verticalAlignment =
-                Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            icons.forEachIndexed {
-                    index,
-                    icon ->
+            icons.forEachIndexed { index, icon ->
+                val chosen = abs(x - index) < .5f
 
-                val active =
-                    abs(x - index) < .5f
-
-                val iconScale by
-                    animateFloatAsState(
-                        if (active && down)
-                            1.10f
-                        else 1f,
-                        spring(.75f, 900f),
-                        label = "icon$index"
-                    )
+                val scale by animateFloatAsState(
+                    if (chosen && down) 1.10f else 1f,
+                    spring(.75f, 900f),
+                    label = "icon$index"
+                )
 
                 Box(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight(),
-                    contentAlignment =
-                        Alignment.Center
+                    contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         icon,
                         null,
-                        tint =
-                            if (active)
-                                activeIcon
-                            else inactive,
+                        tint = if (chosen) active else inactive,
                         modifier = Modifier
                             .offset(
-                                x =
-                                    if (index == 2)
-                                        2.dp
-                                    else 0.dp
+                                x = if (index == 2)
+                                    2.dp else 0.dp
                             )
                             .size(25.dp)
                             .graphicsLayer {
-                                scaleX = iconScale
-                                scaleY = iconScale
+                                scaleX = scale
+                                scaleY = scale
                             }
                     )
                 }
