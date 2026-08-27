@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private val BarW = 246.dp
 private val BarH = 64.dp
@@ -100,19 +101,12 @@ fun BoxScope.NavBar(selected: Int, select: (Int) -> Unit) {
                         }
                     }
 
-                    val target = when {
-                        abs(total) <= 7f ->
-                            (first.position.x / slot)
-                                .toInt()
-                                .coerceIn(0, 2)
-
-                        total > slot * .17f ->
-                            (start + 1).coerceAtMost(2)
-
-                        total < -slot * .17f ->
-                            (start - 1).coerceAtLeast(0)
-
-                        else -> start
+                    val target = if (abs(total) <= 7f) {
+                        (first.position.x / slot)
+                            .toInt()
+                            .coerceIn(0, 2)
+                    } else {
+                        pos.roundToInt().coerceIn(0, 2)
                     }
 
                     velocity = 0f
