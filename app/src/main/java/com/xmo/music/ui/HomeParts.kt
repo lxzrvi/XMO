@@ -468,7 +468,8 @@ fun SongTile(
     index: Int,
     c: HomeColors,
     theme: XmoTheme,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {}
 ) {
     val context =
         androidx.compose.ui.platform
@@ -510,6 +511,9 @@ fun SongTile(
                 RoundedCornerShape(
                     10.dp
                 )
+            )
+            .clickable(
+                onClick = onClick
             )
             .background(
                 Brush.linearGradient(
