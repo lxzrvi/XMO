@@ -20,27 +20,11 @@ jobs:
           java-version: '17'
 
       - name: Android kitchen is ready
-        uses: android-actions/setup-android@v4
+        uses: android-actions/setup-android@v3
 
-      - name: Update Android SDK
+      - name: Show Android SDK
         run: |
-          sdkmanager --update
-      
-      - name: Accept Android licenses
-        run: |
-          yes | sdkmanager --licenses >/dev/null || true
-      
-      - name: Show available Android 17 packages
-        run: |
-          sdkmanager --list | grep -i -E "android-37|cinnamon|platforms" | head -100
-      
-      - name: Install Android 17 SDK
-        run: |
-          sdkmanager "platforms;android-37"
-      
-      - name: Verify Android 17
-        run: |
-          ls -la "$ANDROID_SDK_ROOT/platforms"
+          sdkmanager --list | grep -E "platforms;android-3[67]" | head -50
 
       - name: Adding ingredients
         uses: gradle/actions/setup-gradle@v4
