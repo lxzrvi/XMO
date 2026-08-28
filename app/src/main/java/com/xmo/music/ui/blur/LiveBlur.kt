@@ -1,8 +1,10 @@
 package com.xmo.music.ui.blur
 
+import androidx.compose.foundation.background
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import dev.chrisbanes.haze.HazeInput
 import dev.chrisbanes.haze.HazeSampling
@@ -10,62 +12,36 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import dev.chrisbanes.haze.blur.HazeBlurStyle
-import dev.chrisbanes.haze.blur.HazeColorEffect
 import dev.chrisbanes.haze.blur.hazeBlur
 
-enum class BlurStyle {
-    Light,
-    Dark,
-    Amoled
-}
-
-fun XmoTheme.toBlurStyle():
-    BlurStyle {
-
-    return when (this) {
-        XmoTheme.Light ->
-            BlurStyle.Light
-
-        XmoTheme.Dark ->
-            BlurStyle.Dark
-
-        XmoTheme.Amoled ->
-            BlurStyle.Amoled
-    }
-}
-
-/*
- * ONE shared state.
- *
- * App.kt creates this once.
- */
 @Composable
-fun rememberLiveBlurState():
-    HazeState {
+fun rememberLiveBlurState(): HazeState =
+    rememberHazeState()
 
-    return rememberHazeState()
-}
-
-/*
- * Main application content becomes the shared source.
- */
 fun Modifier.liveBlurSource(
     state: HazeState
-): Modifier {
+): Modifier =
+    hazeSource(state)
 
-    return this.hazeSource(
-        state
+fun Modifier.liveBlur(
+    state: HazeState,
+    theme: XmoTheme
+): Modifier =
+    hazeBlur(
+        input = HazeInput.Sources(state),
+        style = HazeBlurStyle {
+            blurRadius(20.dp)
+        },
+        sampling = HazeSampling.Adaptive
     )
-}
+        .background(
+            glassTint(theme)
+        )
 
-/*
- * Cheap tint sits above actual Haze blur.
- */
 fun glassTint(
     theme: XmoTheme
-): Color {
-
-    return when (theme) {
+): Color =
+    when (theme) {
         XmoTheme.Light ->
             Color.White.copy(
                 alpha = .22f
@@ -81,48 +57,31 @@ fun glassTint(
                 alpha = .34f
             )
     }
-}
 
 fun glassBorder(
     theme: XmoTheme
-): Color {
-
-    return when (theme) {
+): Color =
+    when (theme) {
         XmoTheme.Light ->
-            Color.Black.copy(
-                alpha = .10f
-            )
+            Color.Black.copy(.10f)
 
         XmoTheme.Dark ->
-            Color.White.copy(
-                alpha = .13f
-            )
+            Color.White.copy(.13f)
 
         XmoTheme.Amoled ->
-            Color.White.copy(
-                alpha = .18f
-            )
+            Color.White.copy(.18f)
     }
-}
 
 fun glassHighlight(
     theme: XmoTheme
-): Color {
-
-    return when (theme) {
+): Color =
+    when (theme) {
         XmoTheme.Light ->
-            Color.White.copy(
-                alpha = .58f
-            )
+            Color.White.copy(.55f)
 
         XmoTheme.Dark ->
-            Color.White.copy(
-                alpha = .15f
-            )
+            Color.White.copy(.15f)
 
         XmoTheme.Amoled ->
-            Color.White.copy(
-                alpha = .12f
-            )
+            Color.White.copy(.12f)
     }
-}
