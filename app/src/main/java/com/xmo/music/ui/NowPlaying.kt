@@ -23,6 +23,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.graphics.ColorUtils
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
@@ -75,7 +77,7 @@ fun NowPlaying(
             Animatable(0f)
         }
 
-    var screenHeight by remember {
+    var height by remember {
         mutableFloatStateOf(1f)
     }
 
@@ -84,9 +86,9 @@ fun NowPlaying(
     }
 
     /*
-     * Current Song object from real playback queue.
+     * Real queue index.
      */
-    val queueIndex =
+    val index =
         state.currentIndex
             .takeIf {
                 it in queue.indices
@@ -97,23 +99,21 @@ fun NowPlaying(
             }
 
     val currentSong =
-        queue.getOrNull(
-            queueIndex
-        )
+        queue.getOrNull(index)
 
     val previousSong =
         queue.getOrNull(
-            queueIndex - 1
+            index - 1
         )
 
     val nextSong =
         queue.getOrNull(
-            queueIndex + 1
+            index + 1
         )
 
     /*
      * =========================================================
-     * ARTWORK DOMINANT BACKGROUND
+     * DOMINANT COLOR
      * =========================================================
      */
     var dominant by remember {
@@ -126,96 +126,54 @@ fun NowPlaying(
         currentSong?.artwork,
         state.artworkUri
     ) {
-        dominant =
-            if (
-                currentSong !=
-                null
-            ) {
-                Artwork.cached(
-                    currentSong.artwork
-                )
-                    ?: Artwork.color(
-                        context,
-                        currentSong.artwork
-                    )
-            } else {
-                state.artworkUri
+        val uri =
+            currentSong?.artwork
+                ?: state.artworkUri
                     ?.let(
                         Uri::parse
                     )
-                    ?.let {
-                        Artwork.cached(it)
-                            ?: Artwork.color(
-                                context,
-                                it
-                            )
-                    }
-                    ?: Color(
-                        0xFF35353A
-                    )
-            }
+
+        dominant =
+            Artwork.cached(uri)
+                ?: Artwork.color(
+                    context,
+                    uri
+                )
     }
 
     val animatedDominant by
         animateColorAsState(
             targetValue =
                 dominant,
+
             animationSpec =
-                tween(
-                    durationMillis =
-                        430
-                ),
+                tween(420),
+
             label =
-                "playerBackground"
+                "dominant"
         )
 
-    val gradientEnd =
+    /*
+     * Slight red merge gives XMO identity while remaining
+     * artwork-driven.
+     */
+    val hotColor =
+        Color(
+            ColorUtils.blendARGB(
+                animatedDominant.toArgb(),
+                XmoRed.toArgb(),
+                .10f
+            )
+        )
+
+    val deepColor =
         Artwork.end(
             animatedDominant,
             theme
         )
 
-    val backgroundBrush =
-        Brush.verticalGradient(
-            colors =
-                when (theme) {
-                    XmoTheme.Light ->
-                        listOf(
-                            animatedDominant
-                                .copy(
-                                    alpha =
-                                        .35f
-                                ),
-                            gradientEnd,
-                            c.bg
-                        )
-
-                    XmoTheme.Dark ->
-                        listOf(
-                            animatedDominant
-                                .copy(
-                                    alpha =
-                                        .50f
-                                ),
-                            gradientEnd,
-                            c.bg
-                        )
-
-                    XmoTheme.Amoled ->
-                        listOf(
-                            animatedDominant
-                                .copy(
-                                    alpha =
-                                        .38f
-                                ),
-                            gradientEnd,
-                            Color.Black
-                        )
-                }
-        )
-
     /*
-     * Real playback progress polling.
+     * Real playback position.
      */
     LaunchedEffect(
         state.currentSongId,
@@ -225,30 +183,23 @@ fun NowPlaying(
             refreshPosition()
 
             delay(
-                if (
-                    state.isPlaying
-                ) {
-                    250L
-                } else {
-                    500L
-                }
+                if (state.isPlaying)
+                    250
+                else
+                    500
             )
         }
     }
 
-    suspend fun closePlayer() {
+    suspend fun closeWithButton() {
         visible = false
-
         delay(370)
-
         dismiss()
     }
 
-    BackHandler(
-        enabled = visible
-    ) {
+    BackHandler(visible) {
         scope.launch {
-            closePlayer()
+            closeWithButton()
         }
     }
 
@@ -280,7 +231,7 @@ fun NowPlaying(
         val closeProgress =
             (
                 sheetY.value /
-                    screenHeight
+                    height
                 )
                 .coerceIn(
                     0f,
@@ -291,16 +242,20 @@ fun NowPlaying(
             30.dp *
                 closeProgress
 
+        /*
+         * Fully opaque base.
+         *
+         * Gradient layers go ABOVE this.
+         * No transparent player wallpaper.
+         */
         Box(
             Modifier
                 .fillMaxSize()
                 .onSizeChanged {
-                    screenHeight =
+                    height =
                         it.height
                             .toFloat()
-                            .coerceAtLeast(
-                                1f
-                            )
+                            .coerceAtLeast(1f)
                 }
                 .graphicsLayer {
                     translationY =
@@ -308,16 +263,101 @@ fun NowPlaying(
                 }
                 .clip(
                     RoundedCornerShape(
-                        topStart =
-                            radius,
-                        topEnd =
-                            radius
+                        topStart = radius,
+                        topEnd = radius
                     )
                 )
-                .background(
-                    backgroundBrush
-                )
+                .background(c.bg)
         ) {
+            /*
+             * Main deep vertical colour field.
+             */
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(
+                                animatedDominant,
+                                hotColor,
+                                deepColor,
+                                c.bg
+                            )
+                        )
+                    )
+            )
+
+            /*
+             * Scattered/distorted colour fields.
+             *
+             * Native gradients; no blur / Haze.
+             */
+            Canvas(
+                Modifier.fillMaxSize()
+            ) {
+                drawRect(
+                    brush =
+                        Brush.radialGradient(
+                            colors =
+                                listOf(
+                                    hotColor.copy(
+                                        alpha = .72f
+                                    ),
+                                    Color.Transparent
+                                ),
+                            center =
+                                Offset(
+                                    size.width * .12f,
+                                    size.height * .24f
+                                ),
+                            radius =
+                                size.width * .88f
+                        )
+                )
+
+                drawRect(
+                    brush =
+                        Brush.radialGradient(
+                            colors =
+                                listOf(
+                                    animatedDominant
+                                        .copy(
+                                            alpha = .55f
+                                        ),
+                                    Color.Transparent
+                                ),
+                            center =
+                                Offset(
+                                    size.width * .92f,
+                                    size.height * .48f
+                                ),
+                            radius =
+                                size.width * .92f
+                        )
+                )
+
+                drawRect(
+                    brush =
+                        Brush.radialGradient(
+                            colors =
+                                listOf(
+                                    deepColor
+                                        .copy(
+                                            alpha = .80f
+                                        ),
+                                    Color.Transparent
+                                ),
+                            center =
+                                Offset(
+                                    size.width * .24f,
+                                    size.height * .78f
+                                ),
+                            radius =
+                                size.width
+                        )
+                )
+            }
+
             Column(
                 Modifier
                     .fillMaxSize()
@@ -334,16 +374,14 @@ fun NowPlaying(
             ) {
                 /*
                  * =================================================
-                 * HEADER / CLOSE DRAG
+                 * HEADER / DISMISS DRAG
                  * =================================================
                  */
                 Row(
                     Modifier
                         .fillMaxWidth()
                         .height(62.dp)
-                        .pointerInput(
-                            screenHeight
-                        ) {
+                        .pointerInput(height) {
                             detectVerticalDragGestures(
                                 onVerticalDrag = {
                                         change,
@@ -359,7 +397,7 @@ fun NowPlaying(
                                                 )
                                                 .coerceIn(
                                                     0f,
-                                                    screenHeight
+                                                    height
                                                 )
                                         )
                                     }
@@ -369,17 +407,15 @@ fun NowPlaying(
                                     scope.launch {
                                         if (
                                             sheetY.value >
-                                            screenHeight *
-                                                .18f
+                                            height * .18f
                                         ) {
                                             /*
-                                             * Full finger-follow exit.
-                                             *
-                                             * MiniPlayer doesn't appear
-                                             * until dismiss() afterwards.
+                                             * Finger-follow close.
+                                             * Only after it is fully below
+                                             * display is MiniPlayer allowed.
                                              */
                                             sheetY.animateTo(
-                                                screenHeight,
+                                                height,
                                                 tween(250)
                                             )
 
@@ -388,10 +424,8 @@ fun NowPlaying(
                                             sheetY.animateTo(
                                                 0f,
                                                 spring(
-                                                    dampingRatio =
-                                                        .82f,
-                                                    stiffness =
-                                                        400f
+                                                    dampingRatio = .82f,
+                                                    stiffness = 400f
                                                 )
                                             )
                                         }
@@ -413,7 +447,7 @@ fun NowPlaying(
                     IconButton(
                         onClick = {
                             scope.launch {
-                                closePlayer()
+                                closeWithButton()
                             }
                         },
                         modifier =
@@ -433,8 +467,7 @@ fun NowPlaying(
                             Icons.Default
                                 .KeyboardArrowDown,
                             "Close",
-                            tint =
-                                c.text
+                            tint = c.text
                         )
                     }
 
@@ -450,36 +483,27 @@ fun NowPlaying(
                                 .CenterHorizontally
                     ) {
                         Text(
-                            if (
-                                sourceIsCategory
-                            ) {
+                            if (sourceIsCategory)
                                 "PLAYING FROM CATEGORY"
-                            } else {
-                                "PLAYING FROM"
-                            },
-                            color =
-                                c.sub,
+                            else
+                                "PLAYING FROM",
+                            color = c.sub,
                             fontFamily =
                                 XmoFont.medium,
-                            fontSize =
-                                9.sp,
-                            letterSpacing =
-                                1.sp
+                            fontSize = 9.sp,
+                            letterSpacing = 1.sp,
+                            maxLines = 1
                         )
 
                         Text(
                             source,
-                            color =
-                                c.text,
+                            color = c.text,
                             fontFamily =
                                 XmoFont.bold,
-                            fontSize =
-                                13.sp,
-                            maxLines =
-                                1,
+                            fontSize = 13.sp,
+                            maxLines = 1,
                             overflow =
-                                TextOverflow
-                                    .Ellipsis
+                                TextOverflow.Ellipsis
                         )
                     }
 
@@ -499,45 +523,44 @@ fun NowPlaying(
                             Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default
-                                .MoreVert,
+                            Icons.Default.MoreVert,
                             null,
-                            tint =
-                                c.icon
+                            tint = c.icon
                         )
                     }
                 }
 
                 /*
-                 * Cover intentionally lower than previous version.
+                 * Cover lower.
                  */
                 Spacer(
                     Modifier.height(
-                        42.dp
+                        64.dp
                     )
                 )
 
-                /*
-                 * =================================================
-                 * ARTWORK CAROUSEL
-                 * =================================================
-                 */
                 ArtworkCarousel(
+                    currentId =
+                        state.currentSongId,
+
                     current =
-                        currentSong
-                            ?.artwork
+                        currentSong?.artwork
                             ?: state.artworkUri
                                 ?.let(
                                     Uri::parse
                                 ),
 
                     previous =
-                        previousSong
-                            ?.artwork,
+                        previousSong?.artwork,
 
                     next =
-                        nextSong
-                            ?.artwork,
+                        nextSong?.artwork,
+
+                    canPrevious =
+                        previousSong != null,
+
+                    canNext =
+                        nextSong != null,
 
                     border =
                         c.border,
@@ -545,107 +568,172 @@ fun NowPlaying(
                     surface =
                         c.surface,
 
-                    canPrevious =
-                        previousSong !=
-                            null,
+                    previousSong =
+                        previous,
 
-                    canNext =
-                        nextSong !=
-                            null,
-
-                    previousSong = {
-                        previous()
-                    },
-
-                    nextSong = {
-                        next()
-                    }
+                    nextSong =
+                        next
                 )
 
+                /*
+                 * More space between cover and connected box.
+                 */
                 Spacer(
                     Modifier.height(
-                        28.dp
+                        36.dp
                     )
                 )
 
                 /*
                  * =================================================
-                 * PLAYER PANEL
+                 * CONNECTED PLAYER PANEL
                  * =================================================
+                 *
+                 * Top corners + left/right sides.
+                 * No bottom border.
                  */
+                val panelShape =
+                    RoundedCornerShape(
+                        topStart = 28.dp,
+                        topEnd = 28.dp
+                    )
+
                 Column(
                     Modifier
                         .fillMaxWidth()
-                        .clip(
-                            RoundedCornerShape(
-                                topStart =
-                                    28.dp,
-                                topEnd =
-                                    28.dp,
-                                bottomStart =
-                                    10.dp,
-                                bottomEnd =
-                                    10.dp
-                            )
-                        )
+                        .clip(panelShape)
                         .background(
                             c.surface.copy(
-                                alpha =
-                                    .93f
+                                alpha = .94f
                             )
                         )
-                        .border(
-                            .7.dp,
-                            c.border,
-                            RoundedCornerShape(
-                                topStart =
-                                    28.dp,
-                                topEnd =
-                                    28.dp,
-                                bottomStart =
-                                    10.dp,
-                                bottomEnd =
-                                    10.dp
+                        .drawBehind {
+                            val stroke =
+                                .7.dp.toPx()
+
+                            val corner =
+                                28.dp.toPx()
+
+                            /*
+                             * LEFT
+                             */
+                            drawLine(
+                                color =
+                                    c.border,
+
+                                start =
+                                    Offset(
+                                        stroke / 2f,
+                                        corner
+                                    ),
+
+                                end =
+                                    Offset(
+                                        stroke / 2f,
+                                        size.height
+                                    ),
+
+                                strokeWidth =
+                                    stroke
                             )
-                        )
+
+                            /*
+                             * RIGHT
+                             */
+                            drawLine(
+                                color =
+                                    c.border,
+
+                                start =
+                                    Offset(
+                                        size.width -
+                                            stroke / 2f,
+                                        corner
+                                    ),
+
+                                end =
+                                    Offset(
+                                        size.width -
+                                            stroke / 2f,
+                                        size.height
+                                    ),
+
+                                strokeWidth =
+                                    stroke
+                            )
+
+                            /*
+                             * Rounded top path.
+                             */
+                            val path =
+                                Path().apply {
+                                    moveTo(
+                                        0f,
+                                        corner
+                                    )
+
+                                    quadraticTo(
+                                        0f,
+                                        0f,
+                                        corner,
+                                        0f
+                                    )
+
+                                    lineTo(
+                                        size.width -
+                                            corner,
+                                        0f
+                                    )
+
+                                    quadraticTo(
+                                        size.width,
+                                        0f,
+                                        size.width,
+                                        corner
+                                    )
+                                }
+
+                            drawPath(
+                                path =
+                                    path,
+                                color =
+                                    c.border,
+                                style =
+                                    Stroke(
+                                        width =
+                                            stroke
+                                    )
+                            )
+                        }
                         .padding(
-                            20.dp
+                            horizontal = 20.dp,
+                            vertical = 24.dp
                         )
                 ) {
                     Text(
-                        state.title
-                            .ifBlank {
-                                "Unknown song"
-                            },
-                        color =
-                            c.text,
+                        state.title.ifBlank {
+                            "Unknown song"
+                        },
+                        color = c.text,
                         fontFamily =
                             XmoFont.bold,
-                        fontSize =
-                            21.sp,
-                        maxLines =
-                            1,
+                        fontSize = 21.sp,
+                        maxLines = 1,
                         overflow =
-                            TextOverflow
-                                .Ellipsis
+                            TextOverflow.Ellipsis
                     )
 
                     Text(
-                        state.artist
-                            .ifBlank {
-                                "Unknown artist"
-                            },
-                        color =
-                            c.sub,
+                        state.artist.ifBlank {
+                            "Unknown artist"
+                        },
+                        color = c.sub,
                         fontFamily =
                             XmoFont.normal,
-                        fontSize =
-                            13.sp,
-                        maxLines =
-                            1,
+                        fontSize = 13.sp,
+                        maxLines = 1,
                         overflow =
-                            TextOverflow
-                                .Ellipsis
+                            TextOverflow.Ellipsis
                     )
 
                     Spacer(
@@ -656,9 +744,7 @@ fun NowPlaying(
 
                     val duration =
                         state.duration
-                            .coerceAtLeast(
-                                1L
-                            )
+                            .coerceAtLeast(1L)
 
                     Slider(
                         value =
@@ -676,8 +762,7 @@ fun NowPlaying(
                         onValueChange = {
                             seekTo(
                                 (
-                                    duration
-                                        .toDouble() *
+                                    duration.toDouble() *
                                         it
                                     )
                                     .toLong()
@@ -696,34 +781,28 @@ fun NowPlaying(
                     )
 
                     Row(
-                        Modifier
-                            .fillMaxWidth(),
+                        Modifier.fillMaxWidth(),
                         horizontalArrangement =
-                            Arrangement
-                                .SpaceBetween
+                            Arrangement.SpaceBetween
                     ) {
                         Text(
                             playerTime(
                                 state.position
                             ),
-                            color =
-                                c.sub,
+                            color = c.sub,
                             fontFamily =
                                 XmoFont.thin,
-                            fontSize =
-                                10.sp
+                            fontSize = 10.sp
                         )
 
                         Text(
                             playerTime(
                                 state.duration
                             ),
-                            color =
-                                c.sub,
+                            color = c.sub,
                             fontFamily =
                                 XmoFont.thin,
-                            fontSize =
-                                10.sp
+                            fontSize = 10.sp
                         )
                     }
 
@@ -734,14 +813,11 @@ fun NowPlaying(
                     )
 
                     Row(
-                        Modifier
-                            .fillMaxWidth(),
+                        Modifier.fillMaxWidth(),
                         horizontalArrangement =
-                            Arrangement
-                                .SpaceEvenly,
+                            Arrangement.SpaceEvenly,
                         verticalAlignment =
-                            Alignment
-                                .CenterVertically
+                            Alignment.CenterVertically
                     ) {
                         IconButton(
                             onClick =
@@ -750,15 +826,17 @@ fun NowPlaying(
                                 state.hasPrevious
                         ) {
                             PreviousIcon(
-                                if (
-                                    state.hasPrevious
-                                )
-                                    c.text
-                                else
-                                    c.sub,
-                                Modifier.size(
-                                    30.dp
-                                )
+                                color =
+                                    if (
+                                        state.hasPrevious
+                                    )
+                                        c.text
+                                    else
+                                        c.sub,
+                                modifier =
+                                    Modifier.size(
+                                        30.dp
+                                    )
                             )
                         }
 
@@ -768,16 +846,12 @@ fun NowPlaying(
                             modifier =
                                 Modifier
                                     .size(60.dp)
-                                    .clip(
-                                        CircleShape
-                                    )
+                                    .clip(CircleShape)
                                     .background(
                                         XmoRed
                                     )
                         ) {
-                            if (
-                                state.isPlaying
-                            ) {
+                            if (state.isPlaying) {
                                 PlayerPauseIcon(
                                     Color.White,
                                     Modifier.size(
@@ -806,15 +880,17 @@ fun NowPlaying(
                                 state.hasNext
                         ) {
                             NextIcon(
-                                if (
-                                    state.hasNext
-                                )
-                                    c.text
-                                else
-                                    c.sub,
-                                Modifier.size(
-                                    30.dp
-                                )
+                                color =
+                                    if (
+                                        state.hasNext
+                                    )
+                                        c.text
+                                    else
+                                        c.sub,
+                                modifier =
+                                    Modifier.size(
+                                        30.dp
+                                    )
                             )
                         }
                     }
@@ -848,8 +924,7 @@ fun NowPlaying(
                         )
 
                         Row(
-                            Modifier
-                                .fillMaxWidth()
+                            Modifier.fillMaxWidth()
                         ) {
                             Text(
                                 "Album",
@@ -902,29 +977,27 @@ fun NowPlaying(
                     ) {
                         Text(
                             "XMO",
-                            color =
-                                c.text,
+                            color = c.text,
                             fontFamily =
                                 XmoFont.logo,
-                            fontSize =
-                                18.sp
+                            fontSize = 18.sp
                         )
 
                         Text(
                             "lxzrvi  •  copyright © 2026",
-                            color =
-                                c.sub,
+                            color = c.sub,
                             fontFamily =
                                 XmoFont.thin,
-                            fontSize =
-                                9.sp
+                            fontSize = 9.sp
                         )
                     }
 
                     Spacer(
                         Modifier
                             .navigationBarsPadding()
-                            .height(12.dp)
+                            .height(
+                                12.dp
+                            )
                     )
                 }
             }
@@ -932,15 +1005,22 @@ fun NowPlaying(
     }
 }
 
+/*
+ * =============================================================
+ * ARTWORK CAROUSEL
+ * =============================================================
+ */
+
 @Composable
 private fun ArtworkCarousel(
+    currentId: Long?,
     current: Uri?,
     previous: Uri?,
     next: Uri?,
-    border: Color,
-    surface: Color,
     canPrevious: Boolean,
     canNext: Boolean,
+    border: Color,
+    surface: Color,
     previousSong: () -> Unit,
     nextSong: () -> Unit
 ) {
@@ -952,34 +1032,87 @@ private fun ArtworkCarousel(
             Animatable(0f)
         }
 
+    /*
+     * Waiting for REAL MediaController item change.
+     *
+     * -1 = previous
+     * +1 = next
+     * 0 = idle
+     */
+    var pendingDirection by remember {
+        mutableIntStateOf(0)
+    }
+
+    var oldId by remember {
+        mutableStateOf<Long?>(
+            null
+        )
+    }
+
+    /*
+     * Reset only when Media3 confirms song changed.
+     */
+    LaunchedEffect(
+        currentId
+    ) {
+        if (
+            pendingDirection != 0 &&
+            oldId != null &&
+            currentId != oldId
+        ) {
+            drag.snapTo(0f)
+            pendingDirection = 0
+            oldId = null
+        }
+    }
+
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .aspectRatio(1f)
     ) {
         val width =
-            constraints
-                .maxWidth
+            constraints.maxWidth
                 .toFloat()
 
-        val gap =
-            16.dp.value *
-                androidx.compose.ui.platform
-                    .LocalDensity.current
-                    .density
+        val maxDrag =
+            width * .34f
 
-        val step =
-            width +
-                gap
+        fun resisted(
+            value: Float
+        ): Float {
+            val d =
+                abs(value)
 
-        /*
-         * Artwork drag layer.
-         */
+            if (d <= maxDrag) {
+                return value
+            }
+
+            return if (
+                value < 0f
+            ) {
+                -(
+                    maxDrag +
+                        (d - maxDrag) *
+                        .08f
+                    )
+            } else {
+                maxDrag +
+                    (d - maxDrag) *
+                    .08f
+            }
+        }
+
         Box(
             Modifier
                 .fillMaxSize()
+                .clip(
+                    RoundedCornerShape(
+                        24.dp
+                    )
+                )
                 .pointerInput(
-                    current,
+                    currentId,
                     canPrevious,
                     canNext
                 ) {
@@ -988,84 +1121,93 @@ private fun ArtworkCarousel(
                                 change,
                                 amount ->
 
+                            if (
+                                pendingDirection != 0
+                            ) {
+                                return@detectHorizontalDragGestures
+                            }
+
                             change.consume()
 
-                            scope.launch {
-                                val target =
-                                    drag.value +
-                                        amount
+                            val target =
+                                drag.value +
+                                    amount
 
+                            scope.launch {
                                 drag.snapTo(
                                     when {
-                                        target > 0f &&
-                                            !canPrevious ->
-                                            target * .25f
-
                                         target < 0f &&
                                             !canNext ->
-                                            target * .25f
+                                            resisted(
+                                                target *
+                                                    .3f
+                                            )
+
+                                        target > 0f &&
+                                            !canPrevious ->
+                                            resisted(
+                                                target *
+                                                    .3f
+                                            )
 
                                         else ->
-                                            target
+                                            resisted(
+                                                target
+                                            )
                                     }
                                 )
                             }
                         },
 
                         onDragEnd = {
+                            if (
+                                pendingDirection != 0
+                            ) {
+                                return@detectHorizontalDragGestures
+                            }
+
                             scope.launch {
                                 /*
                                  * LEFT -> NEXT
                                  */
                                 if (
                                     drag.value <
-                                    -width *
-                                        .20f &&
+                                    -width * .18f &&
                                     canNext
                                 ) {
+                                    pendingDirection = 1
+                                    oldId = currentId
+
                                     drag.animateTo(
-                                        -step,
-                                        tween(280)
+                                        -width,
+                                        tween(260)
                                     )
 
                                     nextSong()
-
-                                    delay(90)
-
-                                    drag.snapTo(
-                                        0f
-                                    )
 
                                 /*
                                  * RIGHT -> PREVIOUS
                                  */
                                 } else if (
                                     drag.value >
-                                    width *
-                                        .20f &&
+                                    width * .18f &&
                                     canPrevious
                                 ) {
+                                    pendingDirection = -1
+                                    oldId = currentId
+
                                     drag.animateTo(
-                                        step,
-                                        tween(280)
+                                        width,
+                                        tween(260)
                                     )
 
                                     previousSong()
-
-                                    delay(90)
-
-                                    drag.snapTo(
-                                        0f
-                                    )
-
                                 } else {
                                     drag.animateTo(
                                         0f,
                                         spring(
-                                            dampingRatio =
-                                                .8f,
-                                            stiffness =
-                                                420f
+                                            dampingRatio = .8f,
+                                            stiffness = 430f
                                         )
                                     )
                                 }
@@ -1074,100 +1216,80 @@ private fun ArtworkCarousel(
 
                         onDragCancel = {
                             scope.launch {
-                                drag.animateTo(
-                                    0f
-                                )
+                                if (
+                                    pendingDirection == 0
+                                ) {
+                                    drag.animateTo(
+                                        0f
+                                    )
+                                }
                             }
                         }
                     )
                 }
         ) {
-            /*
-             * Previous card
-             */
             if (
-                previous !=
-                null
+                previous != null
             ) {
-                PlayerArtwork(
-                    uri =
-                        previous,
-                    border =
-                        border,
-                    surface =
-                        surface,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                translationX =
-                                    drag.value -
-                                        step
-                            }
-                )
-            }
-
-            /*
-             * Current
-             */
-            PlayerArtwork(
-                uri =
-                    current,
-                border =
+                PlayerCover(
+                    previous,
                     border,
-                surface =
                     surface,
-                modifier =
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
                             translationX =
-                                drag.value
-
-                            val p =
-                                (
-                                    abs(
-                                        drag.value
-                                    ) /
-                                        width
-                                    )
-                                    .coerceIn(
-                                        0f,
-                                        1f
-                                    )
-
-                            scaleX =
-                                1f -
-                                    p *
-                                    .06f
-
-                            scaleY =
-                                scaleX
+                                drag.value -
+                                    width
                         }
+                )
+            }
+
+            PlayerCover(
+                current,
+                border,
+                surface,
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX =
+                            drag.value
+
+                        val p =
+                            (
+                                abs(
+                                    drag.value
+                                ) /
+                                    width
+                                )
+                                .coerceIn(
+                                    0f,
+                                    1f
+                                )
+
+                        scaleX =
+                            1f -
+                                p * .045f
+
+                        scaleY =
+                            scaleX
+                    }
             )
 
-            /*
-             * Next
-             */
             if (
-                next !=
-                null
+                next != null
             ) {
-                PlayerArtwork(
-                    uri =
-                        next,
-                    border =
-                        border,
-                    surface =
-                        surface,
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .graphicsLayer {
-                                translationX =
-                                    drag.value +
-                                        step
-                            }
+                PlayerCover(
+                    next,
+                    border,
+                    surface,
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX =
+                                drag.value +
+                                    width
+                        }
                 )
             }
         }
@@ -1175,12 +1297,11 @@ private fun ArtworkCarousel(
 }
 
 @Composable
-private fun PlayerArtwork(
+private fun PlayerCover(
     uri: Uri?,
     border: Color,
     surface: Color,
-    modifier: Modifier =
-        Modifier
+    modifier: Modifier
 ) {
     Box(
         modifier
@@ -1201,8 +1322,7 @@ private fun PlayerArtwork(
             )
     ) {
         AsyncImage(
-            model =
-                uri,
+            model = uri,
             contentDescription =
                 null,
             modifier =
@@ -1211,28 +1331,29 @@ private fun PlayerArtwork(
                 ContentScale.Crop
         )
 
-        if (
-            uri == null
-        ) {
+        if (uri == null) {
             Box(
-                Modifier
-                    .fillMaxSize(),
+                Modifier.fillMaxSize(),
                 contentAlignment =
                     Alignment.Center
             ) {
                 Text(
                     "XMO",
-                    color =
-                        XmoRed,
+                    color = XmoRed,
                     fontFamily =
                         XmoFont.logo,
-                    fontSize =
-                        32.sp
+                    fontSize = 32.sp
                 )
             }
         }
     }
 }
+
+/*
+ * =============================================================
+ * LIGHTWEIGHT PLAYER ICONS
+ * =============================================================
+ */
 
 @Composable
 private fun PreviousIcon(
@@ -1245,42 +1366,42 @@ private fun PreviousIcon(
         val bar = w * .1f
 
         drawRoundRect(
-            color,
-            Offset(
-                w * .2f,
-                h * .2f
-            ),
-            Size(
-                bar,
-                h * .6f
-            ),
-            CornerRadius(
-                bar / 2
-            )
+            color = color,
+            topLeft =
+                Offset(
+                    w * .2f,
+                    h * .2f
+                ),
+            size =
+                Size(
+                    bar,
+                    h * .6f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    bar / 2f
+                )
         )
 
-        val path =
+        val p =
             Path().apply {
                 moveTo(
                     w * .73f,
                     h * .17f
                 )
-
                 lineTo(
                     w * .32f,
                     h * .5f
                 )
-
                 lineTo(
                     w * .73f,
                     h * .83f
                 )
-
                 close()
             }
 
         drawPath(
-            path,
+            p,
             color
         )
     }
@@ -1296,44 +1417,44 @@ private fun NextIcon(
         val h = size.height
         val bar = w * .1f
 
-        val path =
+        val p =
             Path().apply {
                 moveTo(
                     w * .27f,
                     h * .17f
                 )
-
                 lineTo(
                     w * .68f,
                     h * .5f
                 )
-
                 lineTo(
                     w * .27f,
                     h * .83f
                 )
-
                 close()
             }
 
         drawPath(
-            path,
+            p,
             color
         )
 
         drawRoundRect(
-            color,
-            Offset(
-                w * .7f,
-                h * .2f
-            ),
-            Size(
-                bar,
-                h * .6f
-            ),
-            CornerRadius(
-                bar / 2
-            )
+            color = color,
+            topLeft =
+                Offset(
+                    w * .7f,
+                    h * .2f
+                ),
+            size =
+                Size(
+                    bar,
+                    h * .6f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    bar / 2f
+                )
         )
     }
 }
@@ -1356,32 +1477,36 @@ private fun PlayerPauseIcon(
             (
                 size.height -
                     bh
-                ) / 2
+                ) / 2f
 
         drawRoundRect(
-            color,
-            Offset(
-                size.width *
-                    .27f,
-                top
-            ),
-            Size(
-                bw,
-                bh
-            )
+            color = color,
+            topLeft =
+                Offset(
+                    size.width *
+                        .27f,
+                    top
+                ),
+            size =
+                Size(
+                    bw,
+                    bh
+                )
         )
 
         drawRoundRect(
-            color,
-            Offset(
-                size.width *
-                    .55f,
-                top
-            ),
-            Size(
-                bw,
-                bh
-            )
+            color = color,
+            topLeft =
+                Offset(
+                    size.width *
+                        .55f,
+                    top
+                ),
+            size =
+                Size(
+                    bw,
+                    bh
+                )
         )
     }
 }
@@ -1391,17 +1516,14 @@ private fun playerTime(
 ): String {
     val total =
         ms.coerceAtLeast(
-            0
-        ) / 1000
+            0L
+        ) / 1000L
 
-    val min =
-        total / 60
-
-    val sec =
-        total % 60
-
-    return "$min:${
-        sec.toString()
+    return "${
+        total / 60L
+    }:${
+        (total % 60L)
+            .toString()
             .padStart(
                 2,
                 '0'
