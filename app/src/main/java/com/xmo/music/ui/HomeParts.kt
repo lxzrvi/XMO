@@ -7,14 +7,40 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.*
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -24,9 +50,17 @@ import coil3.compose.AsyncImage
 import com.xmo.music.R
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
+import com.xmo.music.data.XmoProfile
 import kotlinx.coroutines.delay
 
-val XmoRed = Color(0xFFFF3B3B)
+val XmoRed =
+    Color(0xFFFF3B3B)
+
+/*
+ * =============================================================
+ * HOME THEME COLORS
+ * =============================================================
+ */
 
 data class HomeColors(
     val bg: Color,
@@ -38,51 +72,136 @@ data class HomeColors(
     val border: Color
 )
 
-fun homeColors(theme: XmoTheme) = when (theme) {
-    XmoTheme.Dark -> HomeColors(
-        Color(0xFF121212),
-        Color(0xFF181818),
-        Color.White,
-        Color.White.copy(.65f),
-        Color.White.copy(.09f),
-        Color(0xFFB8B8B8),
-        Color.White.copy(.11f)
-    )
+fun homeColors(
+    theme: XmoTheme
+): HomeColors {
+    return when (theme) {
 
-    XmoTheme.Light -> HomeColors(
-        Color(0xFFF4F6F9),
-        Color.White,
-        Color(0xFF121417),
-        Color(0xA6121417),
-        Color.Black.copy(.055f),
-        Color(0xFF55575B),
-        Color.Black.copy(.12f)
-    )
+        XmoTheme.Dark ->
+            HomeColors(
+                bg =
+                    Color(0xFF121212),
 
-    XmoTheme.Amoled -> HomeColors(
-        Color.Black,
-        Color(0xFF0B0B0B),
-        Color.White,
-        Color.White.copy(.60f),
-        Color.White.copy(.075f),
-        Color(0xFF999999),
-        Color.White.copy(.19f)
-    )
+                surface =
+                    Color(0xFF181818),
+
+                text =
+                    Color.White,
+
+                sub =
+                    Color.White.copy(
+                        alpha = .65f
+                    ),
+
+                button =
+                    Color.White.copy(
+                        alpha = .09f
+                    ),
+
+                icon =
+                    Color(0xFFB8B8B8),
+
+                border =
+                    Color.White.copy(
+                        alpha = .11f
+                    )
+            )
+
+        XmoTheme.Light ->
+            HomeColors(
+                bg =
+                    Color(0xFFF4F6F9),
+
+                surface =
+                    Color.White,
+
+                text =
+                    Color(0xFF121417),
+
+                sub =
+                    Color(0xA6121417),
+
+                button =
+                    Color.Black.copy(
+                        alpha = .055f
+                    ),
+
+                icon =
+                    Color(0xFF55575B),
+
+                border =
+                    Color.Black.copy(
+                        alpha = .12f
+                    )
+            )
+
+        XmoTheme.Amoled ->
+            HomeColors(
+                bg =
+                    Color.Black,
+
+                surface =
+                    Color(0xFF0B0B0B),
+
+                text =
+                    Color.White,
+
+                sub =
+                    Color.White.copy(
+                        alpha = .60f
+                    ),
+
+                button =
+                    Color.White.copy(
+                        alpha = .075f
+                    ),
+
+                icon =
+                    Color(0xFF999999),
+
+                border =
+                    Color.White.copy(
+                        alpha = .19f
+                    )
+            )
+    }
 }
+
+/*
+ * =============================================================
+ * XMO DRAWABLE ICON
+ * =============================================================
+ */
 
 @Composable
 fun XmoIcon(
     @DrawableRes icon: Int,
     tint: Color,
-    modifier: Modifier = Modifier
+    modifier: Modifier =
+        Modifier
 ) {
     Icon(
-        painter = painterResource(icon),
-        contentDescription = null,
-        tint = tint,
-        modifier = modifier
+        painter =
+            painterResource(
+                icon
+            ),
+
+        contentDescription =
+            null,
+
+        tint =
+            tint,
+
+        modifier =
+            modifier
     )
 }
+
+/*
+ * =============================================================
+ * HOME HEADER
+ * =============================================================
+ */
 
 @Composable
 fun HomeHeader(
@@ -91,27 +210,53 @@ fun HomeHeader(
     setTheme: (XmoTheme) -> Unit,
     refresh: () -> Unit
 ) {
-    val subtitles = listOf(
-        "What are you listening today?",
-        "Mood for some chill music?",
-        "Feel the beat & rhythm...",
-        "Turn up the volume!"
-    )
+    /*
+     * Profile is supplied once from App.kt through
+     * CompositionLocalProvider.
+     *
+     * Home.kt does not need extra profile plumbing.
+     */
+    val profile =
+        LocalXmoProfile.current
 
-    var subtitle by remember {
-        mutableIntStateOf(0)
-    }
+    val subtitles =
+        remember {
+            listOf(
+                "What are you listening today?",
+                "Mood for some chill music?",
+                "Feel the beat & rhythm...",
+                "Turn up the volume!"
+            )
+        }
 
-    var menu by remember {
-        mutableStateOf(false)
-    }
+    var subtitle by
+        remember {
+            mutableIntStateOf(
+                0
+            )
+        }
 
+    var menu by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    /*
+     * Rotating Home subtitle.
+     */
     LaunchedEffect(Unit) {
         while (true) {
-            delay(4500)
+            delay(
+                4500
+            )
 
             subtitle =
-                (subtitle + 1) %
+                (
+                    subtitle +
+                        1
+                    ) %
                     subtitles.size
         }
     }
@@ -125,79 +270,105 @@ fun HomeHeader(
                 end = 12.dp,
                 bottom = 4.dp
             ),
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
-                .size(38.dp)
-                .clip(CircleShape)
-                .background(
-                    Brush.linearGradient(
-                        listOf(
-                            XmoRed,
-                            Color(0xFF641E27)
-                        )
-                    )
-                )
-                .border(
-                    .6.dp,
-                    c.border,
-                    CircleShape
-                ),
-            contentAlignment =
-                Alignment.Center
-        ) {
-            Text(
-                "X",
-                color = Color.White,
-                fontFamily =
-                    XmoFont.logo,
-                fontSize = 15.sp
-            )
-        }
+        /*
+         * Real persisted profile.
+         */
+        HomeProfileAvatar(
+            profile =
+                profile,
 
+            c = c
+        )
+
+        /*
+         * Username / subtitle.
+         */
         Column(
             Modifier
-                .padding(start = 10.dp)
-                .weight(1f)
+                .padding(
+                    start = 10.dp
+                )
+                .weight(
+                    1f
+                )
         ) {
             Text(
-                "XMO User",
-                color = c.text,
+                text =
+                    profile.name
+                        .ifBlank {
+                            "XMO User"
+                        },
+
+                color =
+                    c.text,
+
                 fontFamily =
                     XmoFont.user,
+
                 fontWeight =
                     FontWeight.Bold,
-                fontSize = 18.sp,
-                maxLines = 1
+
+                fontSize =
+                    18.sp,
+
+                maxLines =
+                    1,
+
+                overflow =
+                    TextOverflow.Ellipsis
             )
 
             AnimatedContent(
-                targetState = subtitle,
+                targetState =
+                    subtitle,
+
                 transitionSpec = {
                     fadeIn(
-                        tween(220)
+                        tween(
+                            220
+                        )
                     ) togetherWith
                         fadeOut(
-                            tween(180)
+                            tween(
+                                180
+                            )
                         )
                 },
-                label = "subtitle"
+
+                label =
+                    "subtitle"
             ) { index ->
+
                 Text(
-                    subtitles[index],
-                    color = c.sub,
+                    text =
+                        subtitles[index],
+
+                    color =
+                        c.sub,
+
                     fontFamily =
                         XmoFont.thin,
-                    fontSize = 11.sp,
-                    maxLines = 1
+
+                    fontSize =
+                        11.sp,
+
+                    maxLines =
+                        1,
+
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
             }
         }
 
         /*
-         * Refresh + hamburger are now one capsule.
+         * -----------------------------------------------------
+         * REFRESH + MENU CAPSULE
+         * -----------------------------------------------------
          */
         Box {
             Row(
@@ -207,7 +378,9 @@ fun HomeHeader(
                             24.dp
                         )
                     )
-                    .background(c.button)
+                    .background(
+                        c.button
+                    )
                     .border(
                         .6.dp,
                         c.border,
@@ -216,32 +389,48 @@ fun HomeHeader(
                         )
                     )
                     .padding(
-                        horizontal = 3.dp
+                        horizontal =
+                            3.dp
                     ),
+
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = refresh,
+                    onClick =
+                        refresh,
+
                     modifier =
                         Modifier.size(
                             38.dp
                         )
                 ) {
                     XmoIcon(
-                        R.drawable
-                            .ic_xmo_refresh,
-                        c.icon,
-                        Modifier.size(
-                            18.dp
-                        )
+                        icon =
+                            R.drawable
+                                .ic_xmo_refresh,
+
+                        tint =
+                            c.icon,
+
+                        modifier =
+                            Modifier.size(
+                                18.dp
+                            )
                     )
                 }
 
+                /*
+                 * Divider.
+                 */
                 Box(
                     Modifier
-                        .width(.6.dp)
-                        .height(18.dp)
+                        .width(
+                            .6.dp
+                        )
+                        .height(
+                            18.dp
+                        )
                         .background(
                             c.border
                         )
@@ -249,71 +438,97 @@ fun HomeHeader(
 
                 IconButton(
                     onClick = {
-                        menu = true
+                        menu =
+                            true
                     },
+
                     modifier =
                         Modifier.size(
                             38.dp
                         )
                 ) {
                     XmoIcon(
-                        R.drawable
-                            .ic_xmo_menu,
-                        c.icon,
-                        Modifier.size(
-                            19.dp
-                        )
+                        icon =
+                            R.drawable
+                                .ic_xmo_menu,
+
+                        tint =
+                            c.icon,
+
+                        modifier =
+                            Modifier.size(
+                                19.dp
+                            )
                     )
                 }
             }
 
+            /*
+             * Actual global XMO theme selector.
+             */
             DropdownMenu(
-                expanded = menu,
+                expanded =
+                    menu,
+
                 onDismissRequest = {
-                    menu = false
+                    menu =
+                        false
                 },
+
                 containerColor =
                     c.surface,
+
                 shape =
                     RoundedCornerShape(
                         12.dp
                     )
             ) {
                 XmoTheme.entries
-                    .forEach { item ->
+                    .forEach {
+                            item ->
 
                         DropdownMenuItem(
                             text = {
                                 Text(
-                                    when (item) {
-                                        XmoTheme.Dark ->
-                                            "Dark Theme"
+                                    text =
+                                        when (
+                                            item
+                                        ) {
+                                            XmoTheme.Dark ->
+                                                "Dark Theme"
 
-                                        XmoTheme.Light ->
-                                            "Light Theme"
+                                            XmoTheme.Light ->
+                                                "Light Theme"
 
-                                        XmoTheme.Amoled ->
-                                            "AMOLED"
-                                    },
+                                            XmoTheme.Amoled ->
+                                                "AMOLED"
+                                        },
+
                                     color =
                                         if (
                                             theme ==
                                             item
-                                        )
+                                        ) {
                                             XmoRed
-                                        else
-                                            c.text,
+                                        } else {
+                                            c.text
+                                        },
+
                                     fontFamily =
                                         XmoFont.medium,
+
                                     fontSize =
                                         13.sp
                                 )
                             },
+
                             onClick = {
                                 setTheme(
                                     item
                                 )
-                                menu = false
+
+                                menu =
+                                    false
                             }
                         )
                     }
@@ -321,6 +536,164 @@ fun HomeHeader(
         }
     }
 }
+
+/*
+ * =============================================================
+ * PROFILE AVATAR
+ * =============================================================
+ */
+
+@Composable
+private fun HomeProfileAvatar(
+    profile: XmoProfile,
+    c: HomeColors
+) {
+    /*
+     * Local photo selected through Android Photo Picker.
+     */
+    val customUri =
+        remember(
+            profile.avatarUri
+        ) {
+            profile.avatarUri
+                ?.let(
+                    android.net.Uri::parse
+                )
+        }
+
+    val fallbackIcon =
+        remember(
+            profile.avatarIndex
+        ) {
+            when (
+                profile.avatarIndex
+            ) {
+                /*
+                 * Setup carousel index mapping.
+                 */
+                1 ->
+                    R.drawable
+                        .ic_xmo_songs
+
+                2 ->
+                    R.drawable
+                        .ic_xmo_album
+
+                3 ->
+                    R.drawable
+                        .ic_xmo_artist
+
+                4 ->
+                    R.drawable
+                        .ic_xmo_bolt
+
+                5 ->
+                    R.drawable
+                        .ic_xmo_spark
+
+                else ->
+                    null
+            }
+        }
+
+    Box(
+        Modifier
+            .size(
+                38.dp
+            )
+            .clip(
+                CircleShape
+            )
+            .background(
+                Brush.linearGradient(
+                    listOf(
+                        XmoRed,
+                        Color(
+                            0xFF641E27
+                        )
+                    )
+                )
+            )
+            .border(
+                .6.dp,
+                c.border,
+                CircleShape
+            ),
+
+        contentAlignment =
+            Alignment.Center
+    ) {
+        when {
+            /*
+             * Real local user image.
+             */
+            customUri != null -> {
+                AsyncImage(
+                    model =
+                        customUri,
+
+                    contentDescription =
+                        "Profile",
+
+                    modifier =
+                        Modifier
+                            .fillMaxSize(),
+
+                    contentScale =
+                        ContentScale.Crop
+                )
+            }
+
+            /*
+             * Built-in XMO profile icon.
+             */
+            fallbackIcon != null -> {
+                XmoIcon(
+                    icon =
+                        fallbackIcon,
+
+                    tint =
+                        Color.White,
+
+                    modifier =
+                        Modifier.size(
+                            19.dp
+                        )
+                )
+            }
+
+            /*
+             * Default:
+             * first username letter.
+             */
+            else -> {
+                Text(
+                    text =
+                        profile.name
+                            .trim()
+                            .firstOrNull()
+                            ?.uppercase()
+                            ?: "X",
+
+                    color =
+                        Color.White,
+
+                    fontFamily =
+                        XmoFont.logo,
+
+                    fontSize =
+                        15.sp
+                )
+            }
+        }
+    }
+}
+
+/*
+ * =============================================================
+ * CATEGORY CHIP
+ * =============================================================
+ */
 
 @Composable
 fun CategoryChip(
@@ -340,46 +713,82 @@ fun CategoryChip(
                 )
             )
             .background(
-                if (active)
-                    XmoRed.copy(.18f)
-                else
+                if (active) {
+                    XmoRed.copy(
+                        alpha = .18f
+                    )
+                } else {
                     c.button
+                }
             )
             .clickable(
-                onClick = onClick
+                onClick =
+                    onClick
             )
             .padding(
-                horizontal = 13.dp,
-                vertical = 7.dp
+                horizontal =
+                    13.dp,
+
+                vertical =
+                    7.dp
             ),
+
         verticalAlignment =
             Alignment.CenterVertically,
+
         horizontalArrangement =
-            Arrangement.spacedBy(6.dp)
+            Arrangement.spacedBy(
+                6.dp
+            )
     ) {
         XmoIcon(
-            icon,
-            if (active)
-                XmoRed
-            else
-                tint,
-            Modifier.size(14.dp)
+            icon =
+                icon,
+
+            tint =
+                if (active) {
+                    XmoRed
+                } else {
+                    tint
+                },
+
+            modifier =
+                Modifier.size(
+                    14.dp
+                )
         )
 
         Text(
-            text,
+            text =
+                text,
+
             color =
-                if (active)
+                if (active) {
                     XmoRed
-                else
-                    c.text,
+                } else {
+                    c.text
+                },
+
             fontFamily =
                 XmoFont.medium,
-            fontSize = 12.sp,
-            maxLines = 1
+
+            fontSize =
+                12.sp,
+
+            maxLines =
+                1,
+
+            overflow =
+                TextOverflow.Ellipsis
         )
     }
 }
+
+/*
+ * =============================================================
+ * SECTION TITLE
+ * =============================================================
+ */
 
 @Composable
 fun SectionTitle(
@@ -396,71 +805,134 @@ fun SectionTitle(
             .fillMaxWidth()
             .animateContentSize()
             .padding(
-                horizontal = 10.dp,
-                vertical = 8.dp
+                horizontal =
+                    10.dp,
+
+                vertical =
+                    8.dp
             ),
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
         XmoIcon(
-            icon,
-            XmoRed,
-            Modifier.size(17.dp)
+            icon =
+                icon,
+
+            tint =
+                XmoRed,
+
+            modifier =
+                Modifier.size(
+                    17.dp
+                )
         )
 
         Column(
             Modifier
-                .padding(start = 8.dp)
-                .weight(1f)
+                .padding(
+                    start = 8.dp
+                )
+                .weight(
+                    1f
+                )
         ) {
             Text(
-                title,
-                color = c.text,
+                text =
+                    title,
+
+                color =
+                    c.text,
+
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 17.sp
+
+                fontSize =
+                    17.sp,
+
+                maxLines =
+                    1,
+
+                overflow =
+                    TextOverflow.Ellipsis
             )
 
             if (
                 subtitle.isNotBlank()
             ) {
                 Text(
-                    subtitle,
-                    color = c.sub,
+                    text =
+                        subtitle,
+
+                    color =
+                        c.sub,
+
                     fontFamily =
                         XmoFont.thin,
-                    fontSize = 10.sp
+
+                    fontSize =
+                        10.sp,
+
+                    maxLines =
+                        1,
+
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
             }
         }
 
         action?.let {
+                actionIcon ->
+
             Box(
                 Modifier
-                    .size(28.dp)
-                    .clip(CircleShape)
+                    .size(
+                        28.dp
+                    )
+                    .clip(
+                        CircleShape
+                    )
                     .background(
                         XmoRed.copy(
-                            .18f
+                            alpha = .18f
                         )
                     )
-                    .clickable {
-                        onAction()
-                    },
+                    .clickable(
+                        onClick =
+                            onAction
+                    ),
+
                 contentAlignment =
                     Alignment.Center
             ) {
                 XmoIcon(
-                    it,
-                    XmoRed,
-                    Modifier.size(
-                        14.dp
-                    )
+                    icon =
+                        actionIcon,
+
+                    tint =
+                        XmoRed,
+
+                    modifier =
+                        Modifier.size(
+                            14.dp
+                        )
                 )
             }
         }
     }
 }
+
+/*
+ * =============================================================
+ * SONG TILE
+ * =============================================================
+ *
+ * Shared by Home All Songs and custom-category layouts.
+ *
+ * onClick is the real playback entry point.
+ * =============================================================
+ */
 
 @Composable
 fun SongTile(
@@ -475,25 +947,48 @@ fun SongTile(
         androidx.compose.ui.platform
             .LocalContext.current
 
-    var dominant by remember(
-        song.artwork
-    ) {
-        mutableStateOf(
-            Color(0xFF35353A)
-        )
-    }
+    /*
+     * Use synchronous memory cache first.
+     *
+     * This helps:
+     * - tab switching
+     * - Home re-entry
+     * - scrolling back to old tiles
+     */
+    var dominant by
+        remember(
+            song.artwork
+        ) {
+            mutableStateOf(
+                Artwork.cached(
+                    song.artwork
+                )
+                    ?: Color(
+                        0xFF35353A
+                    )
+            )
+        }
 
+    /*
+     * Only perform extraction if cache does not already contain it.
+     */
     LaunchedEffect(
         song.artwork
     ) {
-        dominant =
-            Artwork.color(
-                context,
+        val cached =
+            Artwork.cached(
                 song.artwork
             )
+
+        dominant =
+            cached
+                ?: Artwork.color(
+                    context,
+                    song.artwork
+                )
     }
 
-    val alpha =
+    val artworkAlpha =
         when (theme) {
             XmoTheme.Light ->
                 .35f
@@ -512,15 +1007,21 @@ fun SongTile(
                     10.dp
                 )
             )
+            /*
+             * Actual playback callback supplied by Home.
+             */
             .clickable(
-                onClick = onClick
+                onClick =
+                    onClick
             )
             .background(
                 Brush.linearGradient(
                     listOf(
                         dominant.copy(
-                            alpha
+                            alpha =
+                                artworkAlpha
                         ),
+
                         Artwork.end(
                             dominant,
                             theme
@@ -529,18 +1030,30 @@ fun SongTile(
                 )
             )
             .border(
-                .55.dp,
-                c.border,
-                RoundedCornerShape(
-                    10.dp
-                )
+                width =
+                    .55.dp,
+
+                color =
+                    c.border,
+
+                shape =
+                    RoundedCornerShape(
+                        10.dp
+                    )
             )
-            .padding(5.dp)
+            .padding(
+                5.dp
+            )
     ) {
+        /*
+         * Artwork.
+         */
         Box(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .aspectRatio(
+                    1f
+                )
                 .clip(
                     RoundedCornerShape(
                         6.dp
@@ -548,65 +1061,138 @@ fun SongTile(
                 )
                 .background(
                     dominant.copy(
-                        .15f
+                        alpha =
+                            .15f
                     )
                 )
         ) {
             AsyncImage(
                 model =
                     song.artwork,
+
                 contentDescription =
-                    null,
+                    song.title,
+
                 modifier =
                     Modifier
                         .fillMaxSize(),
+
                 contentScale =
-                    androidx.compose.ui
-                        .layout
-                        .ContentScale.Crop
+                    ContentScale.Crop
             )
+
+            /*
+             * No fake network image fallback.
+             *
+             * When local art is null, gradient card remains visible.
+             */
+            if (
+                song.artwork ==
+                null
+            ) {
+                Box(
+                    Modifier.fillMaxSize(),
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+                    Text(
+                        text =
+                            song.title
+                                .firstOrNull()
+                                ?.uppercase()
+                                ?: "X",
+
+                        color =
+                            c.text.copy(
+                                alpha =
+                                    .60f
+                            ),
+
+                        fontFamily =
+                            XmoFont.bold,
+
+                        fontSize =
+                            17.sp
+                    )
+                }
+            }
         }
 
+        /*
+         * Title / Artist / More.
+         */
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp),
+                .padding(
+                    top = 4.dp
+                ),
+
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
             Column(
-                Modifier.weight(1f)
+                Modifier.weight(
+                    1f
+                )
             ) {
                 Text(
-                    song.title,
-                    color = c.text,
+                    text =
+                        song.title,
+
+                    color =
+                        c.text,
+
                     fontFamily =
                         XmoFont.bold,
-                    fontSize = 10.sp,
-                    maxLines = 1,
+
+                    fontSize =
+                        10.sp,
+
+                    maxLines =
+                        1,
+
                     overflow =
-                        TextOverflow
-                            .Ellipsis
+                        TextOverflow.Ellipsis
                 )
 
                 Text(
-                    song.artist,
-                    color = c.sub,
+                    text =
+                        song.artist,
+
+                    color =
+                        c.sub,
+
                     fontFamily =
                         XmoFont.thin,
-                    fontSize = 8.sp,
-                    maxLines = 1,
+
+                    fontSize =
+                        8.sp,
+
+                    maxLines =
+                        1,
+
                     overflow =
-                        TextOverflow
-                            .Ellipsis
+                        TextOverflow.Ellipsis
                 )
             }
 
+            /*
+             * Song Options backend is still pending.
+             * Keep visual more indicator; no fake action.
+             */
             XmoIcon(
-                R.drawable
-                    .ic_xmo_more,
-                c.sub,
-                Modifier.size(14.dp)
+                icon =
+                    R.drawable
+                        .ic_xmo_more,
+
+                tint =
+                    c.sub,
+
+                modifier =
+                    Modifier.size(
+                        14.dp
+                    )
             )
         }
     }
