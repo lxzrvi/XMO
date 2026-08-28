@@ -1,7 +1,5 @@
 package com.xmo.music.ui
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -15,12 +13,11 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -34,11 +31,9 @@ import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -88,39 +83,34 @@ import com.xmo.music.ui.blur.glassBorder
 import com.xmo.music.ui.blur.liveBlur
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.abs
-import androidx.compose.foundation.layout.Column
-import kotlinx.coroutines.isActive
 
-private data class HSection(
+private data class HomeSectionModel(
     val id: String,
-    val name: String,
+    val title: String,
     val icon: Int,
     val tint: Color? = null
 )
 
-private sealed interface HomeOverlay {
-    data object Menu : HomeOverlay
-    data object Scanner : HomeOverlay
+private sealed interface HomeLayer {
+    data object Menu : HomeLayer
+    data object Scanner : HomeLayer
 
-    data class Songs(
+    data class SongList(
         val title: String,
-        val songs: List<Song>,
         val source: String,
-        val category: Boolean
-    ) : HomeOverlay
-
-    data class AlbumSongs(
-        val album: Album
-    ) : HomeOverlay
+        val category: Boolean,
+        val songs: List<Song>
+    ) : HomeLayer
 }
 
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(
+    ExperimentalFoundationApi::class
+)
 @Composable
 fun Home(
     songs: List<Song>,
@@ -157,11 +147,37 @@ fun Home(
     val accent =
         LocalXmoAccent.current
 
-    val state =
-        rememberLazyListState()
-
     val scope =
         rememberCoroutineScope()
+
+    val listState =
+        rememberLazyListState()
+
+    val fixedSections =
+        remember {
+            listOf(
+                HomeSectionModel(
+                    id = "songs",
+                    title = "All Songs",
+                    icon = R.drawable.ic_xmo_songs
+                ),
+                HomeSectionModel(
+                    id = "albums",
+                    title = "Albums",
+                    icon = R.drawable.ic_xmo_album
+                ),
+                HomeSectionModel(
+                    id = "liked",
+                    title = "Liked Songs",
+                    icon = R.drawable.ic_xmo_heart
+                ),
+                HomeSectionModel(
+                    id = "artists",
+                    title = "Artists",
+                    icon = R.drawable.ic_xmo_artist
+                )
+            )
+        }
 
     val customIcons =
         remember {
@@ -173,7 +189,7 @@ fun Home(
             )
         }
 
-    val customTints =
+    val customColors =
         remember {
             listOf(
                 Color(0xFFFFC107),
@@ -183,81 +199,50 @@ fun Home(
             )
         }
 
-    val base =
-        remember {
-            listOf(
-                HSection(
-                    "songs",
-                    "All Songs",
-                    R.drawable.ic_xmo_songs
-                ),
-                HSection(
-                    "albums",
-                    "Albums",
-                    R.drawable.ic_xmo_album
-                ),
-                HSection(
-                    "liked",
-                    "Liked Songs",
-                    R.drawable.ic_xmo_heart
-                ),
-                HSection(
-                    "artists",
-                    "Artists",
-                    R.drawable.ic_xmo_artist
-                )
-            )
-        }
-
-    val custom =
+    val customSections =
         remember(
             categories
         ) {
             categories.map {
-                val i =
+                val index =
                     Math.floorMod(
                         it.icon,
                         customIcons.size
                     )
 
-                HSection(
-                    id =
-                        it.id,
-
-                    name =
-                        it.name,
-
-                    icon =
-                        customIcons[i],
-
-                    tint =
-                        customTints[i]
+                HomeSectionModel(
+                    id = it.id,
+                    title = it.name,
+                    icon = customIcons[index],
+                    tint = customColors[index]
                 )
             }
         }
 
     val sectionMap =
         remember(
-            base,
-            custom
+            fixedSections,
+            customSections
         ) {
             (
-                base +
-                    custom
+                fixedSections +
+                    customSections
                 )
                 .associateBy {
                     it.id
                 }
         }
 
-    val resolved =
+    val resolvedOrder =
         remember(
             order,
             sectionMap
         ) {
             (
                 order.filter {
-                    it in sectionMap
+                    sectionMap.containsKey(
+                        it
+                    )
                 } +
                     sectionMap.keys.filterNot {
                         it in order
@@ -269,19 +254,19 @@ fun Home(
     var currentOrder by
         remember {
             mutableStateOf(
-                resolved
+                resolvedOrder
             )
         }
 
     LaunchedEffect(
-        resolved
+        resolvedOrder
     ) {
         if (
             currentOrder !=
-            resolved
+            resolvedOrder
         ) {
             currentOrder =
-                resolved
+                resolvedOrder
         }
     }
 
@@ -319,21 +304,23 @@ fun Home(
             songs,
             recentPlays
         ) {
-            val byId =
+            val map =
                 songs.associateBy {
                     it.id
                 }
 
             recentPlays
                 .mapNotNull {
-                    byId[
+                    map[
                         it.songId
                     ]
                 }
-                .take(12)
+                .take(
+                    12
+                )
         }
 
-    var selected by
+    var selectedCategory by
         remember {
             mutableStateOf(
                 "all"
@@ -347,14 +334,14 @@ fun Home(
             )
         }
 
-    var addDialog by
+    var addCategory by
         remember {
             mutableStateOf(
                 false
             )
         }
 
-    var categoryName by
+    var newCategoryName by
         remember {
             mutableStateOf("")
         }
@@ -366,21 +353,21 @@ fun Home(
             )
         }
 
-    var overlay by
+    var layer by
         remember {
-            mutableStateOf<HomeOverlay?>(
+            mutableStateOf<HomeLayer?>(
                 null
             )
         }
 
-    suspend fun openSection(
+    suspend fun navigateToSection(
         id: String
     ) {
         if (
             id ==
             "all"
         ) {
-            state.animateScrollToItem(
+            listState.animateScrollToItem(
                 0
             )
 
@@ -388,48 +375,47 @@ fun Home(
         }
 
         val position =
-            currentOrder
-                .indexOf(
-                    id
-                )
+            currentOrder.indexOf(
+                id
+            )
 
         if (
-            position < 0
+            position <
+            0
         ) {
             return
         }
 
-        val index =
+        val itemIndex =
             position +
                 3
 
-        state.animateScrollToItem(
-            index =
-                index,
-
-            scrollOffset =
-                -dockHeight
+        listState.animateScrollToItem(
+            index = itemIndex,
+            scrollOffset = -dockHeight
         )
 
         withFrameNanos { }
 
-        state.layoutInfo
+        listState.layoutInfo
             .visibleItemsInfo
             .firstOrNull {
                 it.index ==
-                    index
+                    itemIndex
             }
             ?.let {
-                val error =
+                val correction =
                     it.offset -
                         dockHeight
 
                 if (
-                    abs(error) >
+                    abs(
+                        correction
+                    ) >
                     1
                 ) {
-                    state.scrollBy(
-                        error.toFloat()
+                    listState.scrollBy(
+                        correction.toFloat()
                     )
                 }
             }
@@ -444,7 +430,7 @@ fun Home(
     ) {
         LazyColumn(
             state =
-                state,
+                listState,
 
             modifier =
                 Modifier
@@ -456,7 +442,7 @@ fun Home(
             contentPadding =
                 PaddingValues(
                     bottom =
-                        175.dp
+                        190.dp
                 )
         ) {
             item(
@@ -480,7 +466,7 @@ fun Home(
                             theme
                         )
                         .border(
-                            .55.dp,
+                            .6.dp,
                             glassBorder(
                                 theme
                             ),
@@ -500,13 +486,13 @@ fun Home(
                             hazeState,
 
                         refresh = {
-                            overlay =
-                                HomeOverlay.Scanner
+                            layer =
+                                HomeLayer.Scanner
                         },
 
                         openMenu = {
-                            overlay =
-                                HomeOverlay.Menu
+                            layer =
+                                HomeLayer.Menu
                         },
 
                         openProfile =
@@ -517,7 +503,7 @@ fun Home(
 
             stickyHeader(
                 key =
-                    "categories"
+                    "category_dock"
             ) {
                 Box(
                     Modifier
@@ -536,7 +522,7 @@ fun Home(
                             theme
                         )
                         .border(
-                            .55.dp,
+                            .6.dp,
                             glassBorder(
                                 theme
                             ),
@@ -549,7 +535,7 @@ fun Home(
                                 it.height
                         }
                 ) {
-                    CategoryDragRow(
+                    HomeCategoryRow(
                         sections =
                             sectionMap,
 
@@ -557,33 +543,38 @@ fun Home(
                             currentOrder,
 
                         selected =
-                            selected,
+                            selectedCategory,
 
                         c =
                             c,
 
                         select = {
-                            selected =
+                            selectedCategory =
                                 it
 
                             scope.launch {
-                                openSection(
+                                navigateToSection(
                                     it
                                 )
                             }
                         },
 
                         commit = {
-                            currentOrder =
-                                it
+                            if (
+                                it !=
+                                currentOrder
+                            ) {
+                                currentOrder =
+                                    it
 
-                            saveOrder(
-                                it
-                            )
+                                saveOrder(
+                                    it
+                                )
+                            }
                         },
 
                         add = {
-                            addDialog =
+                            addCategory =
                                 true
                         }
                     )
@@ -599,7 +590,7 @@ fun Home(
                         .fillMaxWidth()
                         .padding(
                             top = 8.dp,
-                            bottom = 14.dp
+                            bottom = 16.dp
                         )
                 ) {
                     SectionTitle(
@@ -625,20 +616,17 @@ fun Home(
                     if (
                         recentSongs.isEmpty()
                     ) {
-                        EmptyHome(
+                        HomeEmpty(
                             "Nothing played yet",
                             c
                         )
                     } else {
-                        RecentCarousel(
+                        HomeRecentRow(
                             songs =
                                 recentSongs,
 
                             c =
                                 c,
-
-                            theme =
-                                theme,
 
                             play = {
                                 onPlaySong(
@@ -667,153 +655,348 @@ fun Home(
                 }
             ) { id ->
 
-                sectionMap[id]
-                    ?.let { section ->
+                val section =
+                    sectionMap[
+                        id
+                    ]
 
-                        val category =
-                            categories
-                                .firstOrNull {
-                                    it.id ==
-                                        section.id
-                                }
+                if (
+                    section !=
+                    null
+                ) {
+                    val customCategory =
+                        categories
+                            .firstOrNull {
+                                it.id ==
+                                    id
+                            }
 
-                        val categorySongs =
+                    val categorySongs =
+                        remember(
+                            customCategory,
+                            songs
+                        ) {
                             if (
-                                category !=
+                                customCategory ==
                                 null
                             ) {
+                                emptyList()
+                            } else {
                                 songs.filter {
                                     it.id in
-                                        category.songIds
+                                        customCategory.songIds
                                 }
-                            } else {
-                                emptyList()
+                            }
+                        }
+
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                vertical =
+                                    9.dp
+                            )
+                    ) {
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(
+                                    horizontal =
+                                        12.dp
+                                ),
+
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+                            SectionTitle(
+                                title =
+                                    section.title,
+
+                                subtitle =
+                                    when (
+                                        id
+                                    ) {
+                                        "songs" ->
+                                            "${songs.size} songs"
+
+                                        "albums" ->
+                                            "${albums.size} albums"
+
+                                        "liked" ->
+                                            "${likedSongs.size} favorites"
+
+                                        "artists" ->
+                                            "${artists.size} artists"
+
+                                        else ->
+                                            "${categorySongs.size} songs"
+                                    },
+
+                                icon =
+                                    section.icon,
+
+                                c =
+                                    c,
+
+                                modifier =
+                                    Modifier.weight(
+                                        1f
+                                    )
+                            )
+
+                            if (
+                                id !=
+                                "artists"
+                            ) {
+                                HomeCircleAction(
+                                    icon =
+                                        R.drawable.ic_xmo_add
+                                ) {
+                                    val target =
+                                        when (
+                                            id
+                                        ) {
+                                            "songs" ->
+                                                HomeLayer.SongList(
+                                                    "All Songs",
+                                                    "All Songs",
+                                                    false,
+                                                    songs
+                                                )
+
+                                            "albums" ->
+                                                HomeLayer.SongList(
+                                                    "Library",
+                                                    "All Songs",
+                                                    false,
+                                                    songs
+                                                )
+
+                                            "liked" ->
+                                                HomeLayer.SongList(
+                                                    "Liked Songs",
+                                                    "Liked Songs",
+                                                    false,
+                                                    likedSongs
+                                                )
+
+                                            else ->
+                                                HomeLayer.SongList(
+                                                    section.title,
+                                                    section.title,
+                                                    true,
+                                                    categorySongs
+                                                )
+                                        }
+
+                                    layer =
+                                        target
+                                }
+                            }
+                        }
+
+                        when (
+                            id
+                        ) {
+                            "songs" -> {
+                                HomeAllSongs(
+                                    songs =
+                                        songs,
+
+                                    allowed =
+                                        allowed,
+
+                                    c =
+                                        c,
+
+                                    theme =
+                                        theme,
+
+                                    play = {
+                                        onPlaySong(
+                                            it,
+                                            "All Songs",
+                                            false,
+                                            songs
+                                        )
+                                    },
+
+                                    options = {
+                                        optionsSong =
+                                            it
+                                    }
+                                )
                             }
 
-                        HomeSection(
-                            section =
-                                section,
+                            "albums" -> {
+                                HomeAlbums(
+                                    albums =
+                                        albums,
 
-                            songs =
-                                songs,
+                                    c =
+                                        c,
 
-                            albums =
-                                albums,
+                                    open = { album ->
+                                        layer =
+                                            HomeLayer.SongList(
+                                                title =
+                                                    album.name,
 
-                            artistsCount =
-                                artists.size,
+                                                source =
+                                                    album.name,
 
-                            likedSongs =
-                                likedSongs,
+                                                category =
+                                                    false,
 
-                            categorySongs =
-                                categorySongs,
-
-                            allowed =
-                                allowed,
-
-                            c =
-                                c,
-
-                            theme =
-                                theme,
-
-                            onPlaySong =
-                                onPlaySong,
-
-                            options = {
-                                optionsSong =
-                                    it
-                            },
-
-                            openList = {
-                                overlay =
-                                    it
+                                                songs =
+                                                    album.songs
+                                            )
+                                    }
+                                )
                             }
-                        )
+
+                            "liked" -> {
+                                HomeCompactSongs(
+                                    songs =
+                                        likedSongs,
+
+                                    empty =
+                                        "No liked songs yet",
+
+                                    c =
+                                        c,
+
+                                    play = {
+                                        onPlaySong(
+                                            it,
+                                            "Liked Songs",
+                                            false,
+                                            likedSongs
+                                        )
+                                    },
+
+                                    options = {
+                                        optionsSong =
+                                            it
+                                    }
+                                )
+                            }
+
+                            "artists" -> {
+                                HomeArtists(
+                                    songs =
+                                        songs,
+
+                                    c =
+                                        c
+                                )
+                            }
+
+                            else -> {
+                                HomeCompactSongs(
+                                    songs =
+                                        categorySongs,
+
+                                    empty =
+                                        "No songs in this category",
+
+                                    c =
+                                        c,
+
+                                    play = {
+                                        onPlaySong(
+                                            it,
+                                            section.title,
+                                            true,
+                                            categorySongs
+                                        )
+                                    },
+
+                                    options = {
+                                        optionsSong =
+                                            it
+                                    }
+                                )
+                            }
+                        }
                     }
+                }
             }
 
             item(
                 key =
-                    "branding"
+                    "footer"
             ) {
-                Box(
+                Column(
                     Modifier
                         .fillMaxWidth()
                         .height(
                             360.dp
                         ),
 
-                    contentAlignment =
-                        Alignment.Center
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally,
+
+                    verticalArrangement =
+                        Arrangement.Center
                 ) {
-                    Column(
-                        horizontalAlignment =
-                            Alignment.CenterHorizontally
-                    ) {
-                        Text(
-                            "XMO",
+                    Text(
+                        "XMO",
 
-                            color =
-                                c.text,
+                        color =
+                            c.text,
 
-                            fontFamily =
-                                XmoFont.logo,
+                        fontFamily =
+                            XmoFont.logo,
 
-                            fontSize =
-                                19.sp
-                        )
+                        fontSize =
+                            19.sp
+                    )
 
-                        Text(
-                            "lxzrvi • copyright © 2026",
+                    Text(
+                        "lxzrvi • copyright © 2026",
 
-                            color =
-                                c.sub,
+                        color =
+                            c.sub,
 
-                            fontFamily =
-                                XmoFont.thin,
+                        fontFamily =
+                            XmoFont.thin,
 
-                            fontSize =
-                                9.sp
-                        )
-                    }
+                        fontSize =
+                            9.sp
+                    )
                 }
             }
         }
     }
 
-    /*
-     * =========================================================
-     * ADD CATEGORY
-     * =========================================================
-     */
-
     if (
-        addDialog
+        addCategory
     ) {
-        XmoDialogSurface(
-            c =
-                c,
-
+        HomeDialog(
             title =
                 "New category",
 
+            c =
+                c,
+
             dismiss = {
-                addDialog =
+                addCategory =
                     false
 
-                categoryName =
+                newCategoryName =
                     ""
             }
         ) {
             BasicTextField(
                 value =
-                    categoryName,
+                    newCategoryName,
 
                 onValueChange = {
-                    categoryName =
-                        it.take(24)
+                    newCategoryName =
+                        it.take(
+                            24
+                        )
                 },
 
                 singleLine =
@@ -846,7 +1029,7 @@ fun Home(
                             c.button
                         )
                         .border(
-                            .8.dp,
+                            .7.dp,
                             c.border,
                             RoundedCornerShape(
                                 15.dp
@@ -858,8 +1041,6 @@ fun Home(
                         ),
 
                 decorationBox = {
-                        field ->
-
                     Box(
                         Modifier.fillMaxSize(),
 
@@ -867,7 +1048,7 @@ fun Home(
                             Alignment.CenterStart
                     ) {
                         if (
-                            categoryName.isBlank()
+                            newCategoryName.isBlank()
                         ) {
                             Text(
                                 "Category name",
@@ -883,130 +1064,86 @@ fun Home(
                             )
                         }
 
-                        field()
+                        it()
                     }
                 }
             )
 
             Spacer(
                 Modifier.height(
-                    15.dp
+                    14.dp
                 )
             )
 
-            Row(
-                Modifier.fillMaxWidth(),
+            HomeDialogAction(
+                text =
+                    "Add Category",
 
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    )
+                enabled =
+                    newCategoryName
+                        .trim()
+                        .isNotEmpty()
             ) {
-                DialogButton(
-                    text =
-                        "Cancel",
+                val name =
+                    newCategoryName
+                        .trim()
 
-                    color =
-                        c.button,
-
-                    textColor =
-                        c.text,
-
-                    modifier =
-                        Modifier.weight(1f)
+                if (
+                    name.isNotEmpty()
                 ) {
-                    addDialog =
-                        false
+                    val category =
+                        UserCategory(
+                            id =
+                                "cat_${UUID.randomUUID()}",
 
-                    categoryName =
+                            name =
+                                name,
+
+                            icon =
+                                categories.size %
+                                    4
+                        )
+
+                    val nextOrder =
+                        currentOrder +
+                            category.id
+
+                    currentOrder =
+                        nextOrder
+
+                    saveCategories(
+                        categories +
+                            category
+                    )
+
+                    saveOrder(
+                        nextOrder
+                    )
+
+                    newCategoryName =
                         ""
-                }
 
-                DialogButton(
-                    text =
-                        "Add",
-
-                    color =
-                        accent,
-
-                    textColor =
-                        Color.White,
-
-                    modifier =
-                        Modifier.weight(1f),
-
-                    enabled =
-                        categoryName
-                            .trim()
-                            .isNotEmpty()
-                ) {
-                    val name =
-                        categoryName
-                            .trim()
-
-                    if (
-                        name.isNotEmpty()
-                    ) {
-                        val category =
-                            UserCategory(
-                                id =
-                                    "cat_${UUID.randomUUID()}",
-
-                                name =
-                                    name,
-
-                                icon =
-                                    categories.size %
-                                        4
-                            )
-
-                        val nextOrder =
-                            currentOrder +
-                                category.id
-
-                        currentOrder =
-                            nextOrder
-
-                        saveCategories(
-                            categories +
-                                category
-                        )
-
-                        saveOrder(
-                            nextOrder
-                        )
-
-                        categoryName =
-                            ""
-
-                        addDialog =
-                            false
-                    }
+                    addCategory =
+                        false
                 }
             }
         }
     }
 
-    /*
-     * =========================================================
-     * SONG OPTIONS
-     * =========================================================
-     */
-
-    optionsSong?.let {
-        SongOptionsSheet(
+    optionsSong?.let { song ->
+        HomeSongOptions(
             song =
-                it,
+                song,
 
-            c =
-                c,
+            liked =
+                song.id in
+                    likedSongIds,
 
             categories =
                 categories,
 
-            liked =
-                it.id in
-                    likedSongIds,
+            c =
+                c,
 
             dismiss = {
                 optionsSong =
@@ -1015,7 +1152,7 @@ fun Home(
 
             toggleLike = {
                 toggleLike(
-                    it
+                    song
                 )
             },
 
@@ -1024,7 +1161,7 @@ fun Home(
                     added ->
 
                 setSongInCategory(
-                    it,
+                    song,
                     categoryId,
                     added
                 )
@@ -1032,143 +1169,82 @@ fun Home(
         )
     }
 
-    /*
-     * =========================================================
-     * OVERLAYS
-     * =========================================================
-     */
-
-    overlay?.let {
+    layer?.let {
         when (
             it
         ) {
-            HomeOverlay.Menu -> {
-                HomeMenu(
+            HomeLayer.Menu -> {
+                HomeMenuDialog(
                     c =
                         c,
 
-                    close = {
-                        overlay =
+                    dismiss = {
+                        layer =
                             null
                     },
 
-                    scan = {
-                        overlay =
-                            HomeOverlay.Scanner
+                    allSongs = {
+                        layer =
+                            HomeLayer.SongList(
+                                "All Songs",
+                                "All Songs",
+                                false,
+                                songs
+                            )
                     },
 
                     liked = {
-                        overlay =
-                            HomeOverlay.Songs(
-                                title =
-                                    "Liked Songs",
-
-                                songs =
-                                    likedSongs,
-
-                                source =
-                                    "Liked Songs",
-
-                                category =
-                                    false
+                        layer =
+                            HomeLayer.SongList(
+                                "Liked Songs",
+                                "Liked Songs",
+                                false,
+                                likedSongs
                             )
                     },
 
-                    all = {
-                        overlay =
-                            HomeOverlay.Songs(
-                                title =
-                                    "All Songs",
-
-                                songs =
-                                    songs,
-
-                                source =
-                                    "All Songs",
-
-                                category =
-                                    false
-                            )
+                    scanner = {
+                        layer =
+                            HomeLayer.Scanner
                     }
                 )
             }
 
-            HomeOverlay.Scanner -> {
-                ScanDialog(
+            HomeLayer.Scanner -> {
+                HomeScannerDialog(
                     c =
                         c,
 
                     scanning =
                         scanning,
 
-                    count =
+                    songCount =
                         songs.size,
 
-                    close = {
+                    scan =
+                        refresh,
+
+                    dismiss = {
                         if (
                             !scanning
                         ) {
-                            overlay =
+                            layer =
                                 null
                         }
-                    },
-
-                    scan =
-                        refresh
-                )
-            }
-
-            is HomeOverlay.Songs -> {
-                HomeSongListOverlay(
-                    title =
-                        it.title,
-
-                    songs =
-                        it.songs,
-
-                    source =
-                        it.source,
-
-                    sourceIsCategory =
-                        it.category,
-
-                    c =
-                        c,
-
-                    close = {
-                        overlay =
-                            null
-                    },
-
-                    play =
-                        onPlaySong,
-
-                    options = {
-                        optionsSong =
-                            it
                     }
                 )
             }
 
-            is HomeOverlay.AlbumSongs -> {
-                HomeSongListOverlay(
-                    title =
-                        it.album.name,
-
-                    songs =
-                        it.album.songs,
-
-                    source =
-                        it.album.name,
-
-                    sourceIsCategory =
-                        false,
+            is HomeLayer.SongList -> {
+                HomeFullSongList(
+                    model =
+                        it,
 
                     c =
                         c,
 
                     close = {
-                        overlay =
+                        layer =
                             null
                     },
 
@@ -1187,13 +1263,13 @@ fun Home(
 
 /*
  * =============================================================
- * CATEGORY DRAG
+ * CATEGORY REORDER
  * =============================================================
  */
 
 @Composable
-private fun CategoryDragRow(
-    sections: Map<String, HSection>,
+private fun HomeCategoryRow(
+    sections: Map<String, HomeSectionModel>,
     order: List<String>,
     selected: String,
     c: HomeColors,
@@ -1217,7 +1293,7 @@ private fun CategoryDragRow(
         with(
             density
         ) {
-            64.dp.toPx()
+            66.dp.toPx()
         }
 
     var preview by
@@ -1229,7 +1305,7 @@ private fun CategoryDragRow(
             )
         }
 
-    var draggedId by
+    var draggingId by
         remember {
             mutableStateOf<String?>(
                 null
@@ -1250,7 +1326,7 @@ private fun CategoryDragRow(
             )
         }
 
-    var autoScroll by
+    var autoJob by
         remember {
             mutableStateOf<Job?>(
                 null
@@ -1261,7 +1337,7 @@ private fun CategoryDragRow(
         order
     ) {
         if (
-            draggedId ==
+            draggingId ==
             null
         ) {
             preview =
@@ -1269,24 +1345,24 @@ private fun CategoryDragRow(
         }
     }
 
-    fun itemInfo(
+    fun info(
         id: String
     ): LazyListItemInfo? =
         state.layoutInfo
             .visibleItemsInfo
             .firstOrNull {
                 it.key ==
-                    "cat_$id"
+                    "category_$id"
             }
 
-    fun stopAutoScroll() {
-        autoScroll?.cancel()
+    fun stopAuto() {
+        autoJob?.cancel()
 
-        autoScroll =
+        autoJob =
             null
     }
 
-    fun moveFromFinger(
+    fun updateDestination(
         id: String
     ) {
         val from =
@@ -1295,71 +1371,63 @@ private fun CategoryDragRow(
             )
 
         if (
-            from < 0
+            from <
+            0
         ) {
             return
         }
 
-        val visible =
-            preview
-                .mapIndexedNotNull {
-                        index,
-                        candidate ->
-
-                    if (
-                        candidate ==
-                        id
-                    ) {
-                        null
-                    } else {
-                        itemInfo(
-                            candidate
-                        )?.let {
-                            index to
-                                (
-                                    it.offset +
-                                        it.size /
-                                            2f
-                                    )
-                        }
-                    }
-                }
-
         var destination =
             from
 
-        visible.forEach {
-                (
-                    index,
-                    center
-                ) ->
+        preview.forEachIndexed {
+                index,
+                candidate ->
 
-                if (
-                    index <
-                    from &&
-                    fingerX <
-                    center
-                ) {
-                    destination =
-                        minOf(
-                            destination,
-                            index
-                        )
-                }
-
-                if (
-                    index >
-                    from &&
-                    fingerX >
-                    center
-                ) {
-                    destination =
-                        maxOf(
-                            destination,
-                            index
-                        )
-                }
+            if (
+                candidate ==
+                id
+            ) {
+                return@forEachIndexed
             }
+
+            val item =
+                info(
+                    candidate
+                )
+                    ?: return@forEachIndexed
+
+            val center =
+                item.offset +
+                    item.size /
+                    2f
+
+            if (
+                index <
+                from &&
+                fingerX <
+                center
+            ) {
+                destination =
+                    minOf(
+                        destination,
+                        index
+                    )
+            }
+
+            if (
+                index >
+                from &&
+                fingerX >
+                center
+            ) {
+                destination =
+                    maxOf(
+                        destination,
+                        index
+                    )
+            }
+        }
 
         if (
             destination ==
@@ -1399,12 +1467,12 @@ private fun CategoryDragRow(
             state =
                 state,
 
+            userScrollEnabled =
+                draggingId ==
+                    null,
+
             modifier =
                 Modifier.fillMaxSize(),
-
-            userScrollEnabled =
-                draggedId ==
-                    null,
 
             contentPadding =
                 PaddingValues(
@@ -1419,7 +1487,7 @@ private fun CategoryDragRow(
         ) {
             item(
                 key =
-                    "__all__"
+                    "all"
             ) {
                 CategoryChip(
                     text =
@@ -1436,7 +1504,7 @@ private fun CategoryDragRow(
                         R.drawable.ic_xmo_all
                 ) {
                     if (
-                        draggedId ==
+                        draggingId ==
                         null
                     ) {
                         select(
@@ -1451,16 +1519,18 @@ private fun CategoryDragRow(
                     preview,
 
                 key = {
-                    "cat_$it"
+                    "category_$it"
                 }
             ) { id ->
 
                 val section =
-                    sections[id]
+                    sections[
+                        id
+                    ]
                         ?: return@items
 
                 val dragging =
-                    draggedId ==
+                    draggingId ==
                         id
 
                 Box(
@@ -1479,22 +1549,23 @@ private fun CategoryDragRow(
                             id
                         ) {
                             detectDragGesturesAfterLongPress(
-                                onDragStart = {
-                                    val info =
-                                        itemInfo(
+                                onDragStart = { local ->
+
+                                    val item =
+                                        info(
                                             id
                                         )
                                             ?: return@detectDragGesturesAfterLongPress
 
-                                    draggedId =
+                                    draggingId =
                                         id
 
                                     fingerX =
-                                        info.offset +
-                                            it.x
+                                        item.offset +
+                                            local.x
 
                                     grabX =
-                                        it.x
+                                        local.x
 
                                     haptic.performHapticFeedback(
                                         HapticFeedbackType.LongPress
@@ -1510,7 +1581,7 @@ private fun CategoryDragRow(
                                     fingerX +=
                                         amount.x
 
-                                    moveFromFinger(
+                                    updateDestination(
                                         id
                                     )
 
@@ -1524,87 +1595,47 @@ private fun CategoryDragRow(
                                             .viewportEndOffset
                                             .toFloat()
 
-                                    val leftDistance =
-                                        (
-                                            fingerX -
-                                                start
-                                            )
-                                            .coerceAtLeast(
-                                                0f
-                                            )
-
-                                    val rightDistance =
-                                        (
-                                            end -
-                                                fingerX
-                                            )
-                                            .coerceAtLeast(
-                                                0f
-                                            )
-
-                                    val left =
-                                        leftDistance <
+                                    val nearLeft =
+                                        fingerX <
+                                            start +
                                             edge &&
                                             state.canScrollBackward
 
-                                    val right =
-                                        rightDistance <
+                                    val nearRight =
+                                        fingerX >
+                                            end -
                                             edge &&
                                             state.canScrollForward
 
                                     if (
-                                        left ||
-                                        right
+                                        nearLeft ||
+                                        nearRight
                                     ) {
-                                        val distance =
-                                            if (
-                                                left
-                                            ) {
-                                                leftDistance
-                                            } else {
-                                                rightDistance
-                                            }
-
-                                        val strength =
-                                            (
-                                                1f -
-                                                    distance /
-                                                    edge
-                                                )
-                                                .coerceIn(
-                                                    .15f,
-                                                    1f
-                                                )
+                                        stopAuto()
 
                                         val direction =
                                             if (
-                                                left
+                                                nearLeft
                                             ) {
                                                 -1f
                                             } else {
                                                 1f
                                             }
 
-                                        stopAutoScroll()
-
-                                        autoScroll =
+                                        autoJob =
                                             scope.launch {
                                                 while (
                                                     isActive &&
-                                                    draggedId ==
+                                                    draggingId ==
                                                     id
                                                 ) {
                                                     val consumed =
                                                         state.scrollBy(
                                                             direction *
-                                                                (
-                                                                    5f +
-                                                                        20f *
-                                                                        strength
-                                                                    )
+                                                                16f
                                                         )
 
-                                                    moveFromFinger(
+                                                    updateDestination(
                                                         id
                                                     )
 
@@ -1623,17 +1654,17 @@ private fun CategoryDragRow(
                                                 }
                                             }
                                     } else {
-                                        stopAutoScroll()
+                                        stopAuto()
                                     }
                                 },
 
                                 onDragEnd = {
-                                    stopAutoScroll()
+                                    stopAuto()
 
                                     val result =
                                         preview.toList()
 
-                                    draggedId =
+                                    draggingId =
                                         null
 
                                     fingerX =
@@ -1648,26 +1679,26 @@ private fun CategoryDragRow(
                                 },
 
                                 onDragCancel = {
-                                    stopAutoScroll()
+                                    stopAuto()
 
-                                    draggedId =
+                                    draggingId =
                                         null
+
+                                    preview =
+                                        order
 
                                     fingerX =
                                         0f
 
                                     grabX =
                                         0f
-
-                                    preview =
-                                        order
                                 }
                             )
                         }
                 ) {
                     CategoryChip(
                         text =
-                            section.name,
+                            section.title,
 
                         active =
                             selected ==
@@ -1684,7 +1715,7 @@ private fun CategoryDragRow(
                                 ?: c.icon
                     ) {
                         if (
-                            draggedId ==
+                            draggingId ==
                             null
                         ) {
                             select(
@@ -1697,7 +1728,7 @@ private fun CategoryDragRow(
 
             item(
                 key =
-                    "__add__"
+                    "add"
             ) {
                 CategoryChip(
                     text =
@@ -1713,46 +1744,25 @@ private fun CategoryDragRow(
                         R.drawable.ic_xmo_add,
 
                     tint =
-                        LocalXmoAccent.current
-                ) {
-                    if (
-                        draggedId ==
-                        null
-                    ) {
-                        add()
-                    }
-                }
+                        LocalXmoAccent.current,
+
+                    onClick =
+                        add
+                )
             }
         }
 
-        draggedId?.let { id ->
-
+        draggingId?.let { id ->
             val section =
-                sections[id]
+                sections[
+                    id
+                ]
                     ?: return@let
-
-            val scale by
-                animateFloatAsState(
-                    targetValue =
-                        1.07f,
-
-                    animationSpec =
-                        spring(
-                            dampingRatio =
-                                .72f,
-
-                            stiffness =
-                                500f
-                        ),
-
-                    label =
-                        "categoryLift"
-                )
 
             Box(
                 Modifier
                     .zIndex(
-                        100f
+                        50f
                     )
                     .graphicsLayer {
                         translationX =
@@ -1760,18 +1770,18 @@ private fun CategoryDragRow(
                                 grabX
 
                         scaleX =
-                            scale
+                            1.07f
 
                         scaleY =
-                            scale
+                            1.07f
 
                         shadowElevation =
-                            12f
+                            10f
                     }
             ) {
                 CategoryChip(
                     text =
-                        section.name,
+                        section.title,
 
                     active =
                         true,
@@ -1793,309 +1803,22 @@ private fun CategoryDragRow(
 
 /*
  * =============================================================
- * HOME SECTIONS
+ * RECENTLY PLAYED
  * =============================================================
  */
 
 @Composable
-private fun HomeSection(
-    section: HSection,
-    songs: List<Song>,
-    albums: List<Album>,
-    artistsCount: Int,
-    likedSongs: List<Song>,
-    categorySongs: List<Song>,
-    allowed: Boolean,
-    c: HomeColors,
-    theme: XmoTheme,
-    onPlaySong: (
-        Song,
-        String,
-        Boolean,
-        List<Song>
-    ) -> Unit,
-    options: (Song) -> Unit,
-    openList: (HomeOverlay) -> Unit
-) {
-    val arrow =
-        if (
-            section.id ==
-            "songs"
-        ) {
-            remember {
-                SongArrowController()
-            }
-        } else {
-            null
-        }
-
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(
-                vertical =
-                    10.dp
-            )
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal =
-                        12.dp
-                ),
-
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
-            SectionTitle(
-                title =
-                    section.name,
-
-                subtitle =
-                    when (
-                        section.id
-                    ) {
-                        "songs" ->
-                            "${songs.size} songs"
-
-                        "albums" ->
-                            "${albums.size} albums"
-
-                        "liked" ->
-                            "${likedSongs.size} favorites"
-
-                        "artists" ->
-                            "$artistsCount artists"
-
-                        else ->
-                            "${categorySongs.size} songs"
-                    },
-
-                icon =
-                    section.icon,
-
-                c =
-                    c,
-
-                modifier =
-                    Modifier.weight(
-                        1f
-                    )
-            )
-
-            if (
-                section.id !=
-                "artists"
-            ) {
-                HomeRoundAction(
-                    icon =
-                        R.drawable.ic_xmo_add
-                ) {
-                    when (
-                        section.id
-                    ) {
-                        "songs" ->
-                            openList(
-                                HomeOverlay.Songs(
-                                    "All Songs",
-                                    songs,
-                                    "All Songs",
-                                    false
-                                )
-                            )
-
-                        "albums" -> {
-                            /*
-                             * Album cards below open individual
-                             * albums. The plus opens the library
-                             * songs list; MediaStore albums are
-                             * never mutated.
-                             */
-                            openList(
-                                HomeOverlay.Songs(
-                                    "Library",
-                                    songs,
-                                    "All Songs",
-                                    false
-                                )
-                            )
-                        }
-
-                        "liked" ->
-                            openList(
-                                HomeOverlay.Songs(
-                                    "Liked Songs",
-                                    likedSongs,
-                                    "Liked Songs",
-                                    false
-                                )
-                            )
-
-                        else ->
-                            openList(
-                                HomeOverlay.Songs(
-                                    section.name,
-                                    categorySongs,
-                                    section.name,
-                                    true
-                                )
-                            )
-                    }
-                }
-            }
-
-            arrow?.let {
-                SongArrowButton(
-                    it
-                )
-            }
-        }
-
-        Spacer(
-            Modifier.height(
-                5.dp
-            )
-        )
-
-        when (
-            section.id
-        ) {
-            "songs" -> {
-                SongsGrid(
-                    songs =
-                        songs,
-
-                    allowed =
-                        allowed,
-
-                    c =
-                        c,
-
-                    theme =
-                        theme,
-
-                    arrow =
-                        arrow!!,
-
-                    play = {
-                        onPlaySong(
-                            it,
-                            "All Songs",
-                            false,
-                            songs
-                        )
-                    },
-
-                    options =
-                        options
-                )
-            }
-
-            "albums" -> {
-                AlbumsBody(
-                    albums =
-                        albums,
-
-                    c =
-                        c,
-
-                    open =
-                        openList
-                )
-            }
-
-            "liked" -> {
-                CompactSongRows(
-                    songs =
-                        likedSongs,
-
-                    emptyText =
-                        "No liked songs yet",
-
-                    c =
-                        c,
-
-                    play = {
-                        onPlaySong(
-                            it,
-                            "Liked Songs",
-                            false,
-                            likedSongs
-                        )
-                    },
-
-                    options =
-                        options
-                )
-            }
-
-            "artists" -> {
-                ArtistBody(
-                    songs =
-                        songs,
-
-                    c =
-                        c
-                )
-            }
-
-            else -> {
-                CompactSongRows(
-                    songs =
-                        categorySongs,
-
-                    emptyText =
-                        "No songs in this category",
-
-                    c =
-                        c,
-
-                    play = {
-                        onPlaySong(
-                            it,
-                            section.name,
-                            true,
-                            categorySongs
-                        )
-                    },
-
-                    options =
-                        options
-                )
-            }
-        }
-    }
-}
-
-/*
- * =============================================================
- * RECENTS
- * =============================================================
- */
-
-@Composable
-private fun RecentCarousel(
+private fun HomeRecentRow(
     songs: List<Song>,
     c: HomeColors,
-    theme: XmoTheme,
     play: (Song) -> Unit,
     options: (Song) -> Unit
 ) {
-    val accent =
-        LocalXmoAccent.current
-
-    val list =
-        rememberLazyListState()
-
     LazyRow(
-        state =
-            list,
-
         contentPadding =
             PaddingValues(
                 horizontal =
-                    22.dp
+                    20.dp
             ),
 
         horizontalArrangement =
@@ -2112,10 +1835,10 @@ private fun RecentCarousel(
             }
         ) { song ->
 
-            BoxWithConstraints(
+            Box(
                 Modifier
                     .width(
-                        282.dp
+                        284.dp
                     )
                     .height(
                         112.dp
@@ -2139,14 +1862,7 @@ private fun RecentCarousel(
                         }
                     )
                     .background(
-                        Brush.horizontalGradient(
-                            listOf(
-                                c.surface,
-                                accent.copy(
-                                    alpha = .13f
-                                )
-                            )
-                        )
+                        c.surface
                     )
                     .border(
                         .7.dp,
@@ -2155,28 +1871,16 @@ private fun RecentCarousel(
                             18.dp
                         )
                     )
-                    .padding(
-                        7.dp
-                    )
             ) {
                 AsyncImage(
                     model =
                         song.artwork,
 
                     contentDescription =
-                        null,
+                        song.title,
 
                     modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .clip(
-                                RoundedCornerShape(
-                                    13.dp
-                                )
-                            )
-                            .background(
-                                c.button
-                            ),
+                        Modifier.fillMaxSize(),
 
                     contentScale =
                         ContentScale.Crop
@@ -2191,7 +1895,7 @@ private fun RecentCarousel(
                                     Color.Transparent,
                                     Color.Transparent,
                                     Color.Black.copy(
-                                        alpha = .78f
+                                        alpha = .82f
                                     )
                                 )
                             )
@@ -2199,8 +1903,7 @@ private fun RecentCarousel(
                 )
 
                 Text(
-                    text =
-                        song.title,
+                    song.title,
 
                     color =
                         Color.White,
@@ -2222,11 +1925,11 @@ private fun RecentCarousel(
                             .align(
                                 Alignment.BottomStart
                             )
-                            .padding(
-                                9.dp
-                            )
                             .fillMaxWidth(
                                 .76f
+                            )
+                            .padding(
+                                12.dp
                             )
                 )
 
@@ -2236,25 +1939,18 @@ private fun RecentCarousel(
                             Alignment.TopEnd
                         )
                         .padding(
-                            8.dp
+                            10.dp
                         )
                         .size(
-                            32.dp
+                            33.dp
                         )
                         .clip(
                             CircleShape
                         )
                         .background(
                             Color.Black.copy(
-                                alpha = .45f
+                                alpha = .46f
                             )
-                        )
-                        .border(
-                            .6.dp,
-                            Color.White.copy(
-                                alpha = .20f
-                            ),
-                            CircleShape
                         ),
 
                     contentAlignment =
@@ -2283,142 +1979,52 @@ private fun RecentCarousel(
 
 /*
  * =============================================================
- * ALL SONGS GRID
+ * ALL SONGS
  * =============================================================
  */
 
 @Stable
-private class SongArrowController {
-    var tap by
+private class HomeSongScroller {
+    var click by
         mutableIntStateOf(
             0
         )
         private set
 
-    var fast by
+    var hold by
         mutableStateOf(
             false
         )
         private set
 
-    fun click() {
-        tap++
+    fun tap() {
+        click++
     }
 
-    fun start() {
-        fast =
+    fun begin() {
+        hold =
             true
     }
 
     fun stop() {
-        fast =
+        hold =
             false
     }
 }
 
 @Composable
-private fun SongArrowButton(
-    controller: SongArrowController
-) {
-    val scope =
-        rememberCoroutineScope()
-
-    val accent =
-        LocalXmoAccent.current
-
-    Box(
-        Modifier
-            .padding(
-                start =
-                    7.dp
-            )
-            .size(
-                30.dp
-            )
-            .clip(
-                CircleShape
-            )
-            .background(
-                accent.copy(
-                    alpha = .16f
-                )
-            )
-            .border(
-                .6.dp,
-                accent.copy(
-                    alpha = .28f
-                ),
-                CircleShape
-            )
-            .pointerInput(
-                controller
-            ) {
-                detectTapGestures(
-                    onPress = {
-                        var held =
-                            false
-
-                        val job =
-                            scope.launch {
-                                delay(
-                                    250L
-                                )
-
-                                held =
-                                    true
-
-                                controller.start()
-                            }
-
-                        val released =
-                            tryAwaitRelease()
-
-                        job.cancel()
-
-                        controller.stop()
-
-                        if (
-                            released &&
-                            !held
-                        ) {
-                            controller.click()
-                        }
-                    }
-                )
-            },
-
-        contentAlignment =
-            Alignment.Center
-    ) {
-        XmoIcon(
-            icon =
-                R.drawable.ic_xmo_arrow,
-
-            tint =
-                accent,
-
-            modifier =
-                Modifier.size(
-                    14.dp
-                )
-        )
-    }
-}
-
-@Composable
-private fun SongsGrid(
+private fun HomeAllSongs(
     songs: List<Song>,
     allowed: Boolean,
     c: HomeColors,
     theme: XmoTheme,
-    arrow: SongArrowController,
     play: (Song) -> Unit,
     options: (Song) -> Unit
 ) {
     if (
         !allowed
     ) {
-        EmptyHome(
+        HomeEmpty(
             "Music access required",
             c
         )
@@ -2429,7 +2035,7 @@ private fun SongsGrid(
     if (
         songs.isEmpty()
     ) {
-        EmptyHome(
+        HomeEmpty(
             "No local music found",
             c
         )
@@ -2437,8 +2043,16 @@ private fun SongsGrid(
         return
     }
 
+    val arrow =
+        remember {
+            HomeSongScroller()
+        }
+
     val grid =
         rememberLazyGridState()
+
+    val scope =
+        rememberCoroutineScope()
 
     val slots =
         (
@@ -2451,59 +2065,54 @@ private fun SongsGrid(
             12
 
     LaunchedEffect(
-        arrow.tap
+        arrow.click
     ) {
         if (
-            arrow.tap <=
+            arrow.click >
             0
         ) {
-            return@LaunchedEffect
-        }
-
-        val currentColumn =
-            grid.firstVisibleItemIndex /
-                3
-
-        val lastColumn =
-            slots /
-                3 -
-                1
-
-        val next =
-            (
-                currentColumn +
-                    1
-                )
-                .coerceAtMost(
-                    lastColumn
-                )
-
-        if (
-            next >
-            currentColumn
-        ) {
-            grid.animateScrollToItem(
-                next *
+            val column =
+                grid.firstVisibleItemIndex /
                     3
-            )
+
+            val maxColumn =
+                slots /
+                    3 -
+                    1
+
+            val target =
+                (
+                    column +
+                        1
+                    )
+                    .coerceAtMost(
+                        maxColumn
+                    )
+
+            if (
+                target >
+                column
+            ) {
+                grid.animateScrollToItem(
+                    target *
+                        3
+                )
+            }
         }
     }
 
     LaunchedEffect(
-        arrow.fast
+        arrow.hold
     ) {
         while (
-            arrow.fast &&
+            arrow.hold &&
             isActive
         ) {
-            val consumed =
-                grid.scrollBy(
-                    19f
-                )
-
             if (
                 abs(
-                    consumed
+                    grid.scrollBy(
+                        19f
+                    )
                 ) <
                 .1f
             ) {
@@ -2517,7 +2126,19 @@ private fun SongsGrid(
     }
 
     BoxWithConstraints(
-        Modifier.fillMaxWidth()
+        Modifier
+            .fillMaxWidth()
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        c.bg,
+                        c.surface.copy(
+                            alpha = .52f
+                        ),
+                        c.bg
+                    )
+                )
+            )
     ) {
         val edge =
             8.dp
@@ -2525,7 +2146,7 @@ private fun SongsGrid(
         val gap =
             8.dp
 
-        val card =
+        val cardWidth =
             (
                 maxWidth -
                     edge *
@@ -2535,154 +2156,215 @@ private fun SongsGrid(
                 ) /
                 4
 
-        val height =
+        val gridHeight =
             (
-                card +
+                cardWidth +
                     37.dp
                 ) *
                 3 +
                 gap *
                 2
 
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(
-                            c.bg,
-                            c.surface.copy(
-                                alpha = .68f
-                            ),
-                            c.bg
-                        )
-                    )
+        LazyHorizontalGrid(
+            rows =
+                GridCells.Fixed(
+                    3
+                ),
+
+            state =
+                grid,
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(
+                        gridHeight
+                    ),
+
+            contentPadding =
+                PaddingValues(
+                    horizontal =
+                        edge
+                ),
+
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    gap
+                ),
+
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    gap
                 )
         ) {
-            LazyHorizontalGrid(
-                rows =
-                    GridCells.Fixed(
+            items(
+                count =
+                    slots,
+
+                key = {
+                    "all_song_slot_$it"
+                }
+            ) { slot ->
+
+                val page =
+                    slot /
+                        12
+
+                val local =
+                    slot %
+                        12
+
+                val row =
+                    local %
                         3
-                    ),
 
-                state =
-                    grid,
+                val column =
+                    local /
+                        3
 
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(
-                            height
-                        ),
+                val sourceIndex =
+                    page *
+                        12 +
+                        row *
+                        4 +
+                        column
 
-                contentPadding =
-                    PaddingValues(
-                        horizontal =
-                            edge
-                    ),
-
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        gap
-                    ),
-
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        gap
+                Box(
+                    Modifier.width(
+                        cardWidth
                     )
-            ) {
-                items(
-                    count =
-                        slots,
+                ) {
+                    songs.getOrNull(
+                        sourceIndex
+                    )?.let { song ->
 
-                    key = {
-                        "slot_$it"
-                    }
-                ) { slot ->
+                        SongTile(
+                            song =
+                                song,
 
-                    val page =
-                        slot /
-                            12
+                            index =
+                                sourceIndex,
 
-                    val local =
-                        slot %
-                            12
+                            c =
+                                c,
 
-                    val row =
-                        local %
-                            3
+                            theme =
+                                theme,
 
-                    val column =
-                        local /
-                            3
+                            modifier =
+                                Modifier.width(
+                                    cardWidth
+                                ),
 
-                    val source =
-                        page *
-                            12 +
-                            row *
-                            4 +
-                            column
+                            onClick = {
+                                play(
+                                    song
+                                )
+                            },
 
-                    Box(
-                        Modifier.width(
-                            card
+                            onOptions = {
+                                options(
+                                    song
+                                )
+                            }
                         )
-                    ) {
-                        songs.getOrNull(
-                            source
-                        )?.let { song ->
-
-                            SongTile(
-                                song =
-                                    song,
-
-                                index =
-                                    source,
-
-                                c =
-                                    c,
-
-                                theme =
-                                    theme,
-
-                                modifier =
-                                    Modifier.width(
-                                        card
-                                    ),
-
-                                onClick = {
-                                    play(
-                                        song
-                                    )
-                                },
-
-                                onOptions =
-                                    options
-                            )
-                        }
                     }
                 }
             }
+        }
+
+        Box(
+            Modifier
+                .align(
+                    Alignment.CenterEnd
+                )
+                .padding(
+                    end =
+                        9.dp
+                )
+                .size(
+                    31.dp
+                )
+                .clip(
+                    CircleShape
+                )
+                .background(
+                    LocalXmoAccent.current.copy(
+                        alpha = .20f
+                    )
+                )
+                .pointerInput(
+                    arrow
+                ) {
+                    detectTapGestures(
+                        onPress = {
+                            var held =
+                                false
+
+                            val job =
+                                scope.launch {
+                                    delay(
+                                        250L
+                                    )
+
+                                    held =
+                                        true
+
+                                    arrow.begin()
+                                }
+
+                            val released =
+                                tryAwaitRelease()
+
+                            job.cancel()
+
+                            arrow.stop()
+
+                            if (
+                                released &&
+                                !held
+                            ) {
+                                arrow.tap()
+                            }
+                        }
+                    )
+                },
+
+            contentAlignment =
+                Alignment.Center
+        ) {
+            XmoIcon(
+                icon =
+                    R.drawable.ic_xmo_arrow,
+
+                tint =
+                    LocalXmoAccent.current,
+
+                modifier =
+                    Modifier.size(
+                        14.dp
+                    )
+            )
         }
     }
 }
 
 /*
  * =============================================================
- * ALBUMS / ARTISTS / COMPACT SONGS
+ * ALBUM / ARTIST
  * =============================================================
  */
 
 @Composable
-private fun AlbumsBody(
+private fun HomeAlbums(
     albums: List<Album>,
     c: HomeColors,
-    open: (HomeOverlay) -> Unit
+    open: (Album) -> Unit
 ) {
     if (
         albums.isEmpty()
     ) {
-        EmptyHome(
+        HomeEmpty(
             "No albums found",
             c
         )
@@ -2692,7 +2374,6 @@ private fun AlbumsBody(
 
     Row(
         Modifier
-            .fillMaxWidth()
             .horizontalScroll(
                 rememberScrollState()
             )
@@ -2707,7 +2388,9 @@ private fun AlbumsBody(
             )
     ) {
         albums
-            .take(20)
+            .take(
+                20
+            )
             .forEach { album ->
 
                 Column(
@@ -2722,9 +2405,7 @@ private fun AlbumsBody(
                         )
                         .clickable {
                             open(
-                                HomeOverlay.AlbumSongs(
-                                    album
-                                )
+                                album
                             )
                         }
                         .padding(
@@ -2736,7 +2417,7 @@ private fun AlbumsBody(
                             album.artwork,
 
                         contentDescription =
-                            null,
+                            album.name,
 
                         modifier =
                             Modifier
@@ -2776,7 +2457,8 @@ private fun AlbumsBody(
 
                         modifier =
                             Modifier.padding(
-                                top = 5.dp
+                                top =
+                                    5.dp
                             )
                     )
 
@@ -2804,7 +2486,7 @@ private fun AlbumsBody(
 }
 
 @Composable
-private fun ArtistBody(
+private fun HomeArtists(
     songs: List<Song>,
     c: HomeColors
 ) {
@@ -2820,7 +2502,7 @@ private fun ArtistBody(
     if (
         artists.isEmpty()
     ) {
-        EmptyHome(
+        HomeEmpty(
             "No artists found",
             c
         )
@@ -2830,7 +2512,6 @@ private fun ArtistBody(
 
     Row(
         Modifier
-            .fillMaxWidth()
             .horizontalScroll(
                 rememberScrollState()
             )
@@ -2845,7 +2526,9 @@ private fun ArtistBody(
             )
     ) {
         artists
-            .take(15)
+            .take(
+                15
+            )
             .forEach { artist ->
 
                 Column(
@@ -2856,30 +2539,58 @@ private fun ArtistBody(
                     horizontalAlignment =
                         Alignment.CenterHorizontally
                 ) {
-                    AsyncImage(
-                        model =
-                            artist.artwork,
-
-                        contentDescription =
-                            null,
-
-                        modifier =
-                            Modifier
-                                .size(
-                                    66.dp
+                    Box(
+                        Modifier
+                            .size(
+                                66.dp
+                            )
+                            .clip(
+                                CircleShape
+                            )
+                            .background(
+                                LocalXmoAccent.current.copy(
+                                    alpha = .14f
                                 )
-                                .clip(
-                                    CircleShape
-                                )
-                                .background(
-                                    LocalXmoAccent.current.copy(
-                                        alpha = .13f
-                                    )
-                                ),
+                            ),
 
-                        contentScale =
-                            ContentScale.Crop
-                    )
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+                        if (
+                            artist.artwork !=
+                            null
+                        ) {
+                            AsyncImage(
+                                model =
+                                    artist.artwork,
+
+                                contentDescription =
+                                    artist.name,
+
+                                modifier =
+                                    Modifier.fillMaxSize(),
+
+                                contentScale =
+                                    ContentScale.Crop
+                            )
+                        } else {
+                            Text(
+                                artist.name
+                                    .firstOrNull()
+                                    ?.uppercase()
+                                    ?: "?",
+
+                                color =
+                                    LocalXmoAccent.current,
+
+                                fontFamily =
+                                    XmoFont.bold,
+
+                                fontSize =
+                                    18.sp
+                            )
+                        }
+                    }
 
                     Text(
                         artist.name,
@@ -2910,10 +2621,16 @@ private fun ArtistBody(
     }
 }
 
+/*
+ * =============================================================
+ * COMPACT SONGS
+ * =============================================================
+ */
+
 @Composable
-private fun CompactSongRows(
+private fun HomeCompactSongs(
     songs: List<Song>,
-    emptyText: String,
+    empty: String,
     c: HomeColors,
     play: (Song) -> Unit,
     options: (Song) -> Unit
@@ -2921,8 +2638,8 @@ private fun CompactSongRows(
     if (
         songs.isEmpty()
     ) {
-        EmptyHome(
-            emptyText,
+        HomeEmpty(
+            empty,
             c
         )
 
@@ -2941,10 +2658,12 @@ private fun CompactSongRows(
             )
     ) {
         songs
-            .take(8)
+            .take(
+                8
+            )
             .forEach { song ->
 
-                CompactSongRow(
+                HomeSongRow(
                     song =
                         song,
 
@@ -2968,7 +2687,7 @@ private fun CompactSongRows(
 }
 
 @Composable
-private fun CompactSongRow(
+private fun HomeSongRow(
     song: Song,
     c: HomeColors,
     play: () -> Unit,
@@ -3088,9 +2807,6 @@ private fun CompactSongRow(
                 .size(
                     36.dp
                 )
-                .clip(
-                    CircleShape
-                )
                 .clickable(
                     onClick =
                         options
@@ -3125,11 +2841,11 @@ private fun CompactSongRow(
     androidx.compose.material3.ExperimentalMaterial3Api::class
 )
 @Composable
-private fun SongOptionsSheet(
+private fun HomeSongOptions(
     song: Song,
-    c: HomeColors,
-    categories: List<UserCategory>,
     liked: Boolean,
+    categories: List<UserCategory>,
+    c: HomeColors,
     dismiss: () -> Unit,
     toggleLike: () -> Unit,
     setCategory: (
@@ -3137,9 +2853,6 @@ private fun SongOptionsSheet(
         Boolean
     ) -> Unit
 ) {
-    val accent =
-        LocalXmoAccent.current
-
     ModalBottomSheet(
         onDismissRequest =
             dismiss,
@@ -3148,40 +2861,13 @@ private fun SongOptionsSheet(
             c.surface,
 
         contentColor =
-            c.text,
-
-        dragHandle = {
-            Box(
-                Modifier
-                    .padding(
-                        top = 10.dp,
-                        bottom = 8.dp
-                    )
-                    .width(
-                        42.dp
-                    )
-                    .height(
-                        4.dp
-                    )
-                    .clip(
-                        RoundedCornerShape(
-                            2.dp
-                        )
-                    )
-                    .background(
-                        c.sub.copy(
-                            alpha = .45f
-                        )
-                    )
-            )
-        }
+            c.text
     ) {
         Row(
             Modifier
                 .fillMaxWidth()
                 .padding(
-                    horizontal = 18.dp,
-                    vertical = 8.dp
+                    18.dp
                 ),
 
             verticalAlignment =
@@ -3262,7 +2948,7 @@ private fun SongOptionsSheet(
             }
         }
 
-        OptionRow(
+        HomeOption(
             title =
                 if (
                     liked
@@ -3272,14 +2958,11 @@ private fun SongOptionsSheet(
                     "Add to Liked Songs"
                 },
 
-            subtitle =
-                "Keep this song in your favorites",
+            active =
+                liked,
 
             icon =
                 R.drawable.ic_xmo_heart,
-
-            active =
-                liked,
 
             c =
                 c,
@@ -3295,7 +2978,7 @@ private fun SongOptionsSheet(
                 "CATEGORIES",
 
                 color =
-                    accent,
+                    LocalXmoAccent.current,
 
                 fontFamily =
                     XmoFont.bold,
@@ -3309,35 +2992,25 @@ private fun SongOptionsSheet(
                 modifier =
                     Modifier.padding(
                         start = 22.dp,
-                        top = 15.dp,
+                        top = 14.dp,
                         bottom = 5.dp
                     )
             )
 
             categories.forEach { category ->
-
                 val added =
                     song.id in
                         category.songIds
 
-                OptionRow(
+                HomeOption(
                     title =
                         category.name,
 
-                    subtitle =
-                        if (
-                            added
-                        ) {
-                            "Added"
-                        } else {
-                            "Add song"
-                        },
+                    active =
+                        added,
 
                     icon =
                         R.drawable.ic_xmo_add,
-
-                    active =
-                        added,
 
                     c =
                         c
@@ -3352,24 +3025,20 @@ private fun SongOptionsSheet(
 
         Spacer(
             Modifier.height(
-                28.dp
+                32.dp
             )
         )
     }
 }
 
 @Composable
-private fun OptionRow(
+private fun HomeOption(
     title: String,
-    subtitle: String,
-    icon: Int,
     active: Boolean,
+    icon: Int,
     c: HomeColors,
     click: () -> Unit
 ) {
-    val accent =
-        LocalXmoAccent.current
-
     Row(
         Modifier
             .fillMaxWidth()
@@ -3385,87 +3054,49 @@ private fun OptionRow(
         verticalAlignment =
             Alignment.CenterVertically
     ) {
-        Box(
-            Modifier
-                .size(
-                    38.dp
+        XmoIcon(
+            icon =
+                icon,
+
+            tint =
+                if (
+                    active
+                ) {
+                    LocalXmoAccent.current
+                } else {
+                    c.icon
+                },
+
+            modifier =
+                Modifier.size(
+                    18.dp
                 )
-                .clip(
-                    RoundedCornerShape(
-                        12.dp
-                    )
-                )
-                .background(
-                    if (
-                        active
-                    ) {
-                        accent.copy(
-                            alpha = .14f
-                        )
-                    } else {
-                        c.button
-                    }
-                ),
+        )
 
-            contentAlignment =
-                Alignment.Center
-        ) {
-            XmoIcon(
-                icon =
-                    icon,
+        Text(
+            title,
 
-                tint =
-                    if (
-                        active
-                    ) {
-                        accent
-                    } else {
-                        c.icon
-                    },
+            color =
+                if (
+                    active
+                ) {
+                    LocalXmoAccent.current
+                } else {
+                    c.text
+                },
 
-                modifier =
-                    Modifier.size(
-                        17.dp
-                    )
-            )
-        }
+            fontFamily =
+                XmoFont.medium,
 
-        Column(
-            Modifier
-                .weight(
-                    1f
-                )
-                .padding(
+            fontSize =
+                12.sp,
+
+            modifier =
+                Modifier.padding(
                     start =
-                        12.dp
+                        14.dp
                 )
-        ) {
-            Text(
-                title,
-
-                color =
-                    c.text,
-
-                fontFamily =
-                    XmoFont.medium,
-
-                fontSize =
-                    12.sp
-            )
-
-            Text(
-                subtitle,
-
-                color =
-                    c.sub,
-
-                fontFamily =
-                    XmoFont.thin,
-
-                fontSize =
-                    9.sp
-            )
-        }
+        )
     }
 }
 
@@ -3476,11 +3107,8 @@ private fun OptionRow(
  */
 
 @Composable
-private fun HomeSongListOverlay(
-    title: String,
-    songs: List<Song>,
-    source: String,
-    sourceIsCategory: Boolean,
+private fun HomeFullSongList(
+    model: HomeLayer.SongList,
     c: HomeColors,
     close: () -> Unit,
     play: (
@@ -3494,91 +3122,144 @@ private fun HomeSongListOverlay(
     Box(
         Modifier
             .fillMaxSize()
+            .zIndex(
+                500f
+            )
             .background(
                 c.bg
             )
             .windowInsetsPadding(
                 WindowInsets.statusBars
             )
-            .zIndex(
-                500f
-            )
     ) {
         Column(
             Modifier.fillMaxSize()
         ) {
-            OverlayHeader(
-                title =
-                    title,
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .height(
+                        66.dp
+                    )
+                    .padding(
+                        horizontal =
+                            14.dp
+                    ),
 
-                subtitle =
-                    "${songs.size} songs",
-
-                c =
-                    c,
-
-                close =
-                    close
-            )
-
-            if (
-                songs.isEmpty()
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
-                EmptyHome(
-                    "No songs here",
-                    c
-                )
-            } else {
-                LazyColumn(
-                    contentPadding =
-                        PaddingValues(
-                            start = 12.dp,
-                            end = 12.dp,
-                            bottom = 180.dp
+                Box(
+                    Modifier
+                        .size(
+                            38.dp
+                        )
+                        .clip(
+                            CircleShape
+                        )
+                        .background(
+                            c.button
+                        )
+                        .clickable(
+                            onClick =
+                                close
                         ),
 
-                    verticalArrangement =
-                        Arrangement.spacedBy(
-                            6.dp
-                        )
+                    contentAlignment =
+                        Alignment.Center
                 ) {
-                    itemsIndexed(
-                        items =
-                            songs,
+                    Text(
+                        "‹",
 
-                        key = {
-                                _,
-                                song ->
+                        color =
+                            c.text,
 
-                            song.id
-                        }
-                    ) {
-                            _,
-                            song ->
+                        fontFamily =
+                            XmoFont.medium,
 
-                        CompactSongRow(
-                            song =
-                                song,
+                        fontSize =
+                            28.sp
+                    )
+                }
 
-                            c =
-                                c,
+                Column(
+                    Modifier.padding(
+                        start =
+                            12.dp
+                    )
+                ) {
+                    Text(
+                        model.title,
 
-                            play = {
-                                play(
-                                    song,
-                                    source,
-                                    sourceIsCategory,
-                                    songs
-                                )
-                            },
+                        color =
+                            c.text,
 
-                            options = {
-                                options(
-                                    song
-                                )
-                            }
-                        )
+                        fontFamily =
+                            XmoFont.bold,
+
+                        fontSize =
+                            18.sp
+                    )
+
+                    Text(
+                        "${model.songs.size} songs",
+
+                        color =
+                            c.sub,
+
+                        fontFamily =
+                            XmoFont.thin,
+
+                        fontSize =
+                            9.sp
+                    )
+                }
+            }
+
+            LazyColumn(
+                contentPadding =
+                    PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        bottom = 190.dp
+                    ),
+
+                verticalArrangement =
+                    Arrangement.spacedBy(
+                        6.dp
+                    )
+            ) {
+                items(
+                    items =
+                        model.songs,
+
+                    key = {
+                        it.id
                     }
+                ) { song ->
+
+                    HomeSongRow(
+                        song =
+                            song,
+
+                        c =
+                            c,
+
+                        play = {
+                            play(
+                                song,
+                                model.source,
+                                model.category,
+                                model.songs
+                            )
+                        },
+
+                        options = {
+                            options(
+                                song
+                            )
+                        }
+                    )
                 }
             }
         }
@@ -3587,172 +3268,60 @@ private fun HomeSongListOverlay(
 
 /*
  * =============================================================
- * HAMBURGER MENU
+ * MENU / SCANNER
  * =============================================================
  */
 
 @Composable
-private fun HomeMenu(
+private fun HomeMenuDialog(
     c: HomeColors,
-    close: () -> Unit,
-    scan: () -> Unit,
+    dismiss: () -> Unit,
+    allSongs: () -> Unit,
     liked: () -> Unit,
-    all: () -> Unit
+    scanner: () -> Unit
 ) {
-    XmoDialogSurface(
-        c =
-            c,
-
+    HomeDialog(
         title =
             "XMO",
 
+        c =
+            c,
+
         dismiss =
-            close
+            dismiss
     ) {
-        MenuAction(
+        HomeMenuItem(
             "All Songs",
-            "Browse the complete local library",
             R.drawable.ic_xmo_songs,
             c,
-            all
+            allSongs
         )
 
-        MenuAction(
+        HomeMenuItem(
             "Liked Songs",
-            "Open your favorites",
             R.drawable.ic_xmo_heart,
             c,
             liked
         )
 
-        MenuAction(
+        HomeMenuItem(
             "Scan Music",
-            "Refresh the MediaStore library",
             R.drawable.ic_xmo_refresh,
             c,
-            scan
+            scanner
         )
     }
 }
 
 @Composable
-private fun MenuAction(
-    title: String,
-    subtitle: String,
-    icon: Int,
-    c: HomeColors,
-    click: () -> Unit
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(
-                RoundedCornerShape(
-                    13.dp
-                )
-            )
-            .clickable(
-                onClick =
-                    click
-            )
-            .padding(
-                vertical = 10.dp,
-                horizontal = 6.dp
-            ),
-
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-        XmoIcon(
-            icon =
-                icon,
-
-            tint =
-                LocalXmoAccent.current,
-
-            modifier =
-                Modifier.size(
-                    19.dp
-                )
-        )
-
-        Column(
-            Modifier.padding(
-                start =
-                    12.dp
-            )
-        ) {
-            Text(
-                title,
-
-                color =
-                    c.text,
-
-                fontFamily =
-                    XmoFont.medium,
-
-                fontSize =
-                    12.sp
-            )
-
-            Text(
-                subtitle,
-
-                color =
-                    c.sub,
-
-                fontFamily =
-                    XmoFont.thin,
-
-                fontSize =
-                    9.sp
-            )
-        }
-    }
-}
-
-/*
- * =============================================================
- * SCANNER
- * =============================================================
- */
-
-@Composable
-private fun ScanDialog(
+private fun HomeScannerDialog(
     c: HomeColors,
     scanning: Boolean,
-    count: Int,
-    close: () -> Unit,
-    scan: () -> Unit
+    songCount: Int,
+    scan: () -> Unit,
+    dismiss: () -> Unit
 ) {
-    val rotation by
-        animateFloatAsState(
-            targetValue =
-                if (
-                    scanning
-                ) {
-                    360f
-                } else {
-                    0f
-                },
-
-            animationSpec =
-                spring(
-                    dampingRatio =
-                        .7f,
-
-                    stiffness =
-                        100f
-                ),
-
-            label =
-                "scan"
-        )
-
-    XmoDialogSurface(
-        c =
-            c,
-
+    HomeDialog(
         title =
             if (
                 scanning
@@ -3762,14 +3331,17 @@ private fun ScanDialog(
                 "Scan local music"
             },
 
+        c =
+            c,
+
         dismiss =
-            close
+            dismiss
     ) {
         Box(
             Modifier
                 .fillMaxWidth()
                 .height(
-                    88.dp
+                    80.dp
                 ),
 
             contentAlignment =
@@ -3783,14 +3355,9 @@ private fun ScanDialog(
                     LocalXmoAccent.current,
 
                 modifier =
-                    Modifier
-                        .size(
-                            34.dp
-                        )
-                        .graphicsLayer {
-                            rotationZ =
-                                rotation
-                        }
+                    Modifier.size(
+                        32.dp
+                    )
             )
         }
 
@@ -3798,9 +3365,9 @@ private fun ScanDialog(
             if (
                 scanning
             ) {
-                "Reading Android MediaStore and refreshing local metadata."
+                "Reading Android MediaStore and local audio metadata…"
             } else {
-                "$count songs currently available. Scan again to detect library changes."
+                "$songCount songs currently available."
             },
 
             color =
@@ -3819,7 +3386,7 @@ private fun ScanDialog(
             )
         )
 
-        DialogButton(
+        HomeDialogAction(
             text =
                 if (
                     scanning
@@ -3828,15 +3395,6 @@ private fun ScanDialog(
                 } else {
                     "Scan Now"
                 },
-
-            color =
-                LocalXmoAccent.current,
-
-            textColor =
-                Color.White,
-
-            modifier =
-                Modifier.fillMaxWidth(),
 
             enabled =
                 !scanning,
@@ -3847,172 +3405,79 @@ private fun ScanDialog(
     }
 }
 
-/*
- * =============================================================
- * COMMON UI
- * =============================================================
- */
-
 @Composable
-private fun HomeRoundAction(
+private fun HomeMenuItem(
+    title: String,
     icon: Int,
+    c: HomeColors,
     click: () -> Unit
 ) {
-    val accent =
-        LocalXmoAccent.current
-
-    Box(
+    Row(
         Modifier
-            .padding(
-                start =
-                    6.dp
-            )
-            .size(
-                30.dp
-            )
+            .fillMaxWidth()
             .clip(
-                CircleShape
-            )
-            .background(
-                accent.copy(
-                    alpha = .16f
+                RoundedCornerShape(
+                    13.dp
                 )
-            )
-            .border(
-                .6.dp,
-                accent.copy(
-                    alpha = .28f
-                ),
-                CircleShape
             )
             .clickable(
                 onClick =
                     click
+            )
+            .padding(
+                12.dp
             ),
 
-        contentAlignment =
-            Alignment.Center
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
         XmoIcon(
             icon =
                 icon,
 
             tint =
-                accent,
+                LocalXmoAccent.current,
 
             modifier =
                 Modifier.size(
-                    14.dp
+                    18.dp
+                )
+        )
+
+        Text(
+            title,
+
+            color =
+                c.text,
+
+            fontFamily =
+                XmoFont.medium,
+
+            fontSize =
+                12.sp,
+
+            modifier =
+                Modifier.padding(
+                    start =
+                        13.dp
                 )
         )
     }
 }
 
-@Composable
-private fun OverlayHeader(
-    title: String,
-    subtitle: String,
-    c: HomeColors,
-    close: () -> Unit
-) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .height(
-                66.dp
-            )
-            .padding(
-                horizontal =
-                    14.dp
-            ),
-
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-        Box(
-            Modifier
-                .size(
-                    38.dp
-                )
-                .clip(
-                    CircleShape
-                )
-                .background(
-                    c.button
-                )
-                .clickable(
-                    onClick =
-                        close
-                ),
-
-            contentAlignment =
-                Alignment.Center
-        ) {
-            Icon(
-                imageVector =
-                    Icons.Default.Close,
-
-                contentDescription =
-                    "Back",
-
-                tint =
-                    c.text,
-
-                modifier =
-                    Modifier.size(
-                        18.dp
-                    )
-            )
-        }
-
-        Column(
-            Modifier.padding(
-                start =
-                    12.dp
-            )
-        ) {
-            Text(
-                title,
-
-                color =
-                    c.text,
-
-                fontFamily =
-                    XmoFont.bold,
-
-                fontSize =
-                    18.sp,
-
-                maxLines =
-                    1,
-
-                overflow =
-                    TextOverflow.Ellipsis
-            )
-
-            Text(
-                subtitle,
-
-                color =
-                    c.sub,
-
-                fontFamily =
-                    XmoFont.thin,
-
-                fontSize =
-                    9.sp
-            )
-        }
-    }
-}
+/*
+ * =============================================================
+ * DIALOG
+ * =============================================================
+ */
 
 @Composable
-private fun XmoDialogSurface(
-    c: HomeColors,
+private fun HomeDialog(
     title: String,
+    c: HomeColors,
     dismiss: () -> Unit,
     content:
-        @Composable Column.() -> Unit
+        @Composable ColumnScope.() -> Unit
 ) {
     Box(
         Modifier
@@ -4055,9 +3520,7 @@ private fun XmoDialogSurface(
                         24.dp
                     )
                 )
-                .clickable(
-                    onClick = {}
-                )
+                .clickable {}
                 .padding(
                     18.dp
                 )
@@ -4067,7 +3530,7 @@ private fun XmoDialogSurface(
                     .fillMaxWidth()
                     .padding(
                         bottom =
-                            15.dp
+                            14.dp
                     ),
 
                 verticalAlignment =
@@ -4134,16 +3597,14 @@ private fun XmoDialogSurface(
 }
 
 @Composable
-private fun DialogButton(
+private fun HomeDialogAction(
     text: String,
-    color: Color,
-    textColor: Color,
-    modifier: Modifier,
     enabled: Boolean = true,
     click: () -> Unit
 ) {
     Box(
-        modifier
+        Modifier
+            .fillMaxWidth()
             .height(
                 45.dp
             )
@@ -4153,15 +3614,16 @@ private fun DialogButton(
                 )
             )
             .background(
-                if (
-                    enabled
-                ) {
-                    color
-                } else {
-                    color.copy(
-                        alpha = .25f
-                    )
-                }
+                LocalXmoAccent.current.copy(
+                    alpha =
+                        if (
+                            enabled
+                        ) {
+                            1f
+                        } else {
+                            .25f
+                        }
+                )
             )
             .clickable(
                 enabled =
@@ -4178,15 +3640,16 @@ private fun DialogButton(
             text,
 
             color =
-                if (
-                    enabled
-                ) {
-                    textColor
-                } else {
-                    textColor.copy(
-                        alpha = .45f
-                    )
-                },
+                Color.White.copy(
+                    alpha =
+                        if (
+                            enabled
+                        ) {
+                            1f
+                        } else {
+                            .45f
+                        }
+                ),
 
             fontFamily =
                 XmoFont.medium,
@@ -4198,7 +3661,55 @@ private fun DialogButton(
 }
 
 @Composable
-private fun EmptyHome(
+private fun HomeCircleAction(
+    icon: Int,
+    click: () -> Unit
+) {
+    Box(
+        Modifier
+            .size(
+                30.dp
+            )
+            .clip(
+                CircleShape
+            )
+            .background(
+                LocalXmoAccent.current.copy(
+                    alpha = .16f
+                )
+            )
+            .border(
+                .6.dp,
+                LocalXmoAccent.current.copy(
+                    alpha = .32f
+                ),
+                CircleShape
+            )
+            .clickable(
+                onClick =
+                    click
+            ),
+
+        contentAlignment =
+            Alignment.Center
+    ) {
+        XmoIcon(
+            icon =
+                icon,
+
+            tint =
+                LocalXmoAccent.current,
+
+            modifier =
+                Modifier.size(
+                    14.dp
+                )
+        )
+    }
+}
+
+@Composable
+private fun HomeEmpty(
     text: String,
     c: HomeColors
 ) {
