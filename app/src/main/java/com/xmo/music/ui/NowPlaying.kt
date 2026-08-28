@@ -29,9 +29,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
@@ -61,7 +61,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.input.pointer.pointerInput
@@ -77,6 +76,9 @@ import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
 import com.xmo.music.player.PlaybackState
+import com.xmo.music.ui.blur.liveBlur
+import com.xmo.music.ui.blur.liveBlurSource
+import com.xmo.music.ui.blur.rememberLiveBlurState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -89,10 +91,6 @@ fun NowPlaying(
     sourceIsCategory: Boolean,
     queue: List<Song>,
 
-    /*
-     * Called after entrance finishes.
-     * App then removes MiniPlayer from background.
-     */
     onOpened: () -> Unit,
 
     refreshPosition: () -> Unit,
@@ -101,53 +99,44 @@ fun NowPlaying(
     next: () -> Unit,
     seekTo: (Long) -> Unit,
 
-    /*
-     * Called only after player has fully exited.
-     */
     dismiss: () -> Unit
 ) {
-    val c =
-        homeColors(theme)
+    val c = homeColors(theme)
 
-    val context =
-        LocalContext.current
+    val context = LocalContext.current
 
-    val scope =
-        rememberCoroutineScope()
+    val scope = rememberCoroutineScope()
+
+    /*
+     * ONE Haze state for the complete Now Playing screen.
+     */
+    val hazeState = rememberLiveBlurState()
 
     var visible by remember {
         mutableStateOf(false)
     }
 
-    /*
-     * Separate drag displacement after initial entrance.
-     */
-    val sheetY =
-        remember {
-            Animatable(0f)
-        }
+    val sheetY = remember {
+        Animatable(0f)
+    }
 
     var screenHeight by remember {
         mutableFloatStateOf(1f)
     }
 
     /*
-     * Initial bottom entrance.
+     * Entrance.
      */
     LaunchedEffect(Unit) {
         visible = true
 
-        /*
-         * Match entrance duration before background MiniPlayer
-         * is removed. By then sheet fully covers it.
-         */
         delay(430L)
 
         onOpened()
     }
 
     /*
-     * Current queue items.
+     * Queue.
      */
     val index =
         state.currentIndex
@@ -155,28 +144,24 @@ fun NowPlaying(
                 it in queue.indices
             }
             ?: queue.indexOfFirst {
-                it.id ==
-                    state.currentSongId
+                it.id == state.currentSongId
             }
 
     val currentSong =
         queue.getOrNull(index)
 
     val previousSong =
-        queue.getOrNull(
-            index - 1
-        )
+        queue.getOrNull(index - 1)
 
     val nextSong =
-        queue.getOrNull(
-            index + 1
-        )
+        queue.getOrNull(index + 1)
 
     /*
      * =========================================================
-     * ARTWORK DOMINANT COLOR
+     * DOMINANT ARTWORK COLOR
      * =========================================================
      */
+
     var dominant by remember {
         mutableStateOf(
             Color(0xFF35353A)
@@ -189,8 +174,7 @@ fun NowPlaying(
     ) {
         val uri =
             currentSong?.artwork
-                ?: state.artworkUri
-                    ?.let(Uri::parse)
+                ?: state.artworkUri?.let(Uri::parse)
 
         dominant =
             Artwork.cached(uri)
@@ -200,15 +184,11 @@ fun NowPlaying(
                 )
     }
 
-    val animatedDominant by
-        animateColorAsState(
-            targetValue =
-                dominant,
-            animationSpec =
-                tween(420),
-            label =
-                "nowPlayingDominant"
-        )
+    val animatedDominant by animateColorAsState(
+        targetValue = dominant,
+        animationSpec = tween(420),
+        label = "nowPlayingDominant"
+    )
 
     val hot =
         Color(
@@ -226,8 +206,11 @@ fun NowPlaying(
         )
 
     /*
-     * Real playback progress from MediaController.
+     * =========================================================
+     * PLAYBACK POSITION
+     * =========================================================
      */
+
     LaunchedEffect(
         state.currentSongId,
         state.isPlaying
@@ -244,10 +227,13 @@ fun NowPlaying(
         }
     }
 
+    /*
+     * =========================================================
+     * CLOSE
+     * =========================================================
+     */
+
     suspend fun buttonClose() {
-        /*
-         * MiniPlayer is still absent during this exit.
-         */
         visible = false
 
         delay(370L)
@@ -284,27 +270,25 @@ fun NowPlaying(
         modifier =
             Modifier.fillMaxSize()
     ) {
+
         val closeProgress =
             (
                 sheetY.value /
                     screenHeight
-                )
-                .coerceIn(
-                    0f,
-                    1f
-                )
+            ).coerceIn(
+                0f,
+                1f
+            )
 
         val topRadius =
-            30.dp *
-                closeProgress
+            30.dp * closeProgress
 
         /*
-         * Gesture is applied at root so downward drag can begin
-         * from almost anywhere.
-         *
-         * Artwork has its own horizontal detector and Slider owns
-         * horizontal seek, but vertical drags can still reach root.
+         * =====================================================
+         * ROOT
+         * =====================================================
          */
+
         Box(
             Modifier
                 .fillMaxSize()
@@ -312,9 +296,7 @@ fun NowPlaying(
                     screenHeight =
                         it.height
                             .toFloat()
-                            .coerceAtLeast(
-                                1f
-                            )
+                            .coerceAtLeast(1f)
                 }
                 .graphicsLayer {
                     translationY =
@@ -322,27 +304,22 @@ fun NowPlaying(
                 }
                 .clip(
                     RoundedCornerShape(
-                        topStart =
-                            topRadius,
-                        topEnd =
-                            topRadius
+                        topStart = topRadius,
+                        topEnd = topRadius
                     )
                 )
                 .background(c.bg)
-                .pointerInput(
-                    screenHeight
-                ) {
+                .pointerInput(screenHeight) {
+
                     detectVerticalDragGestures(
+
                         onVerticalDrag = {
                                 change,
                                 amount ->
 
-                            /*
-                             * Only downward sheet movement.
-                             */
                             if (
                                 amount > 0f ||
-                                sheetY.value > 0f
+                                    sheetY.value > 0f
                             ) {
                                 change.consume()
 
@@ -351,8 +328,7 @@ fun NowPlaying(
                                         (
                                             sheetY.value +
                                                 amount
-                                            )
-                                            .coerceIn(
+                                            ).coerceIn(
                                                 0f,
                                                 screenHeight
                                             )
@@ -363,23 +339,21 @@ fun NowPlaying(
 
                         onDragEnd = {
                             scope.launch {
+
                                 if (
                                     sheetY.value >
-                                    screenHeight * .14f
+                                        screenHeight * .14f
                                 ) {
-                                    /*
-                                     * Finish completely below display.
-                                     */
+
                                     sheetY.animateTo(
                                         screenHeight,
                                         tween(250)
                                     )
 
-                                    /*
-                                     * ONLY NOW App can show MiniPlayer.
-                                     */
                                     dismiss()
+
                                 } else {
+
                                     sheetY.animateTo(
                                         0f,
                                         spring(
@@ -405,11 +379,15 @@ fun NowPlaying(
                     )
                 }
         ) {
+
             /*
              * =================================================
-             * FULL OPAQUE ARTWORK COLOR FIELD
+             * ARTWORK COLOR FIELD
              * =================================================
+             *
+             * This remains the Haze source.
              */
+
             Box(
                 Modifier
                     .fillMaxSize()
@@ -424,15 +402,19 @@ fun NowPlaying(
                                 )
                         )
                     )
+                    .liveBlurSource(
+                        hazeState
+                    )
             )
 
             /*
-             * Scattered color areas.
-             * No Haze / no fake backdrop blur.
+             * Color spread.
              */
+
             Canvas(
                 Modifier.fillMaxSize()
             ) {
+
                 drawRect(
                     brush =
                         Brush.radialGradient(
@@ -494,6 +476,12 @@ fun NowPlaying(
                 )
             }
 
+            /*
+             * =================================================
+             * MAIN CONTENT
+             * =================================================
+             */
+
             Column(
                 Modifier
                     .fillMaxSize()
@@ -502,13 +490,16 @@ fun NowPlaying(
                     )
                     .statusBarsPadding()
                     .padding(
-                        horizontal =
-                            14.dp
+                        horizontal = 14.dp
                     )
             ) {
+
                 /*
+                 * =================================================
                  * HEADER
+                 * =================================================
                  */
+
                 Row(
                     Modifier
                         .fillMaxWidth()
@@ -516,50 +507,65 @@ fun NowPlaying(
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
-                    IconButton(
-                        onClick = {
-                            scope.launch {
-                                buttonClose()
-                            }
-                        },
-                        modifier =
-                            Modifier
-                                .size(40.dp)
-                                .clip(CircleShape)
-                                .background(
-                                    c.button
-                                )
-                                .border(
-                                    .6.dp,
-                                    c.border,
-                                    CircleShape
-                                )
+
+                    /*
+                     * DOWN BUTTON
+                     */
+
+                    Box(
+                        Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .liveBlur(
+                                hazeState,
+                                theme
+                            )
+                            .border(
+                                .6.dp,
+                                glassBorder(theme),
+                                CircleShape
+                            ),
+                        contentAlignment =
+                            Alignment.Center
                     ) {
-                        Icon(
-                            imageVector =
-                                Icons.Default
-                                    .KeyboardArrowDown,
-                            contentDescription =
-                                "Close",
-                            tint =
-                                c.text
-                        )
+
+                        IconButton(
+                            onClick = {
+                                scope.launch {
+                                    buttonClose()
+                                }
+                            },
+                            modifier =
+                                Modifier.size(40.dp)
+                        ) {
+
+                            Icon(
+                                imageVector =
+                                    Icons.Default
+                                        .KeyboardArrowDown,
+                                contentDescription =
+                                    "Close",
+                                tint =
+                                    c.text
+                            )
+                        }
                     }
 
                     Column(
                         Modifier
                             .weight(1f)
                             .padding(
-                                horizontal =
-                                    8.dp
+                                horizontal = 8.dp
                             ),
                         horizontalAlignment =
-                            Alignment
-                                .CenterHorizontally
+                            Alignment.CenterHorizontally
                     ) {
+
                         Text(
                             text =
-                                if (sourceIsCategory)
+                                if (
+                                    sourceIsCategory
+                                )
                                     "PLAYING FROM CATEGORY"
                                 else
                                     "PLAYING FROM",
@@ -591,25 +597,30 @@ fun NowPlaying(
                         )
                     }
 
+                    /*
+                     * MORE BUTTON
+                     */
+
                     Box(
                         Modifier
                             .size(40.dp)
                             .clip(CircleShape)
-                            .background(
-                                c.button
+                            .liveBlur(
+                                hazeState,
+                                theme
                             )
                             .border(
                                 .6.dp,
-                                c.border,
+                                glassBorder(theme),
                                 CircleShape
                             ),
                         contentAlignment =
                             Alignment.Center
                     ) {
+
                         Icon(
                             imageVector =
-                                Icons.Default
-                                    .MoreVert,
+                                Icons.Default.MoreVert,
                             contentDescription =
                                 null,
                             tint =
@@ -619,13 +630,18 @@ fun NowPlaying(
                 }
 
                 /*
-                 * Cover lower than old layout.
+                 * Space before artwork.
                  */
+
                 Spacer(
-                    Modifier.height(
-                        64.dp
-                    )
+                    Modifier.height(64.dp)
                 )
+
+                /*
+                 * =================================================
+                 * ARTWORK
+                 * =================================================
+                 */
 
                 ArtworkCarousel(
                     currentId =
@@ -661,23 +677,16 @@ fun NowPlaying(
                         next
                 )
 
-                /*
-                 * Visible breathing room.
-                 */
                 Spacer(
-                    Modifier.height(
-                        36.dp
-                    )
+                    Modifier.height(36.dp)
                 )
 
                 /*
                  * =================================================
-                 * TRANSLUCENT PLAYER PANEL
+                 * PLAYER GLASS PANEL
                  * =================================================
-                 *
-                 * This is translucent, NOT fake blur.
-                 * Artwork color field remains visible through it.
                  */
+
                 val panelShape =
                     RoundedCornerShape(
                         topStart = 28.dp,
@@ -688,33 +697,38 @@ fun NowPlaying(
                     Modifier
                         .fillMaxWidth()
                         .clip(panelShape)
-                        .background(
-                            when (theme) {
-                                XmoTheme.Dark ->
-                                    Color(0xB8141518)
 
-                                XmoTheme.Light ->
-                                    Color(0xD9FFFFFF)
+                        /*
+                         * REAL HAZE LIVE BLUR
+                         */
 
-                                XmoTheme.Amoled ->
-                                    Color(0xC9000000)
-                            }
+                        .liveBlur(
+                            hazeState,
+                            theme
                         )
 
                         /*
-                         * Top + side border.
-                         * No bottom border.
+                         * Thin theme-aware border.
                          */
+
                         .drawBehind {
+
                             val stroke =
                                 .7.dp.toPx()
 
                             val corner =
                                 28.dp.toPx()
 
+                            val borderColor =
+                                glassBorder(theme)
+
+                            /*
+                             * LEFT
+                             */
+
                             drawLine(
                                 color =
-                                    c.border,
+                                    borderColor,
                                 start =
                                     Offset(
                                         stroke / 2f,
@@ -729,9 +743,13 @@ fun NowPlaying(
                                     stroke
                             )
 
+                            /*
+                             * RIGHT
+                             */
+
                             drawLine(
                                 color =
-                                    c.border,
+                                    borderColor,
                                 start =
                                     Offset(
                                         size.width -
@@ -747,9 +765,14 @@ fun NowPlaying(
                                 strokeWidth =
                                     stroke
                             )
+
+                            /*
+                             * TOP
+                             */
 
                             val topPath =
                                 Path().apply {
+
                                     moveTo(
                                         0f,
                                         corner
@@ -780,66 +803,82 @@ fun NowPlaying(
                                 path =
                                     topPath,
                                 color =
-                                    c.border,
+                                    borderColor,
                                 style =
-                                    Stroke(
-                                        width =
-                                            stroke,
-                                        cap =
-                                            StrokeCap.Round
-                                    )
+                                    androidx.compose.ui.graphics
+                                        .drawscope
+                                        .Stroke(
+                                            width =
+                                                stroke,
+                                            cap =
+                                                StrokeCap.Round
+                                        )
                             )
                         }
+
                         .padding(
-                            horizontal =
-                                20.dp,
-                            vertical =
-                                24.dp
+                            horizontal = 20.dp,
+                            vertical = 24.dp
                         )
                 ) {
+
+                    /*
+                     * =================================================
+                     * SONG TITLE
+                     * =================================================
+                     */
+
                     Text(
-                        state.title.ifBlank {
-                            "Unknown song"
-                        },
-                        color = c.text,
+                        text =
+                            state.title.ifBlank {
+                                "Unknown song"
+                            },
+                        color =
+                            c.text,
                         fontFamily =
                             XmoFont.bold,
-                        fontSize = 21.sp,
-                        maxLines = 1,
+                        fontSize =
+                            21.sp,
+                        maxLines =
+                            1,
                         overflow =
                             TextOverflow.Ellipsis
                     )
 
                     Spacer(
-                        Modifier.height(
-                            3.dp
-                        )
+                        Modifier.height(3.dp)
                     )
 
                     Text(
-                        state.artist.ifBlank {
-                            "Unknown artist"
-                        },
-                        color = c.sub,
+                        text =
+                            state.artist.ifBlank {
+                                "Unknown artist"
+                            },
+                        color =
+                            c.sub,
                         fontFamily =
                             XmoFont.normal,
-                        fontSize = 13.sp,
-                        maxLines = 1,
+                        fontSize =
+                            13.sp,
+                        maxLines =
+                            1,
                         overflow =
                             TextOverflow.Ellipsis
                     )
 
                     Spacer(
-                        Modifier.height(
-                            24.dp
-                        )
+                        Modifier.height(24.dp)
                     )
+
+                    /*
+                     * =================================================
+                     * PROGRESS
+                     * =================================================
+                     */
 
                     val duration =
                         state.duration
-                            .coerceAtLeast(
-                                1L
-                            )
+                            .coerceAtLeast(1L)
 
                     Slider(
                         value =
@@ -847,64 +886,81 @@ fun NowPlaying(
                                 state.position
                                     .toFloat() /
                                     duration.toFloat()
-                                )
-                                .coerceIn(
+                                ).coerceIn(
                                     0f,
                                     1f
                                 ),
+
                         onValueChange = {
                             seekTo(
                                 (
                                     duration
                                         .toDouble() *
                                         it
-                                    )
-                                    .toLong()
+                                    ).toLong()
                             )
                         },
+
+                        /*
+                         * NO THUMB
+                         */
+
+                        thumb = {},
+
                         colors =
                             SliderDefaults.colors(
-                                thumbColor =
-                                    XmoRed,
                                 activeTrackColor =
                                     XmoRed,
                                 inactiveTrackColor =
-                                    c.border
-                            )
+                                    glassBorder(theme)
+                            ),
+
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(20.dp)
                     )
 
                     Row(
-                        Modifier
-                            .fillMaxWidth(),
+                        Modifier.fillMaxWidth(),
                         horizontalArrangement =
                             Arrangement.SpaceBetween
                     ) {
+
                         Text(
                             playerTime(
                                 state.position
                             ),
-                            color = c.sub,
+                            color =
+                                c.sub,
                             fontFamily =
                                 XmoFont.thin,
-                            fontSize = 10.sp
+                            fontSize =
+                                10.sp
                         )
 
                         Text(
                             playerTime(
                                 state.duration
                             ),
-                            color = c.sub,
+                            color =
+                                c.sub,
                             fontFamily =
                                 XmoFont.thin,
-                            fontSize = 10.sp
+                            fontSize =
+                                10.sp
                         )
                     }
 
                     Spacer(
-                        Modifier.height(
-                            20.dp
-                        )
+                        Modifier.height(20.dp)
                     )
+
+                    /*
+                     * =================================================
+                     * CONTROLS
+                     * =================================================
+                     */
 
                     Row(
                         Modifier.fillMaxWidth(),
@@ -913,22 +969,24 @@ fun NowPlaying(
                         verticalAlignment =
                             Alignment.CenterVertically
                     ) {
+
                         IconButton(
                             onClick =
                                 previous,
                             enabled =
                                 state.hasPrevious
                         ) {
+
                             PreviousPlayerIcon(
                                 color =
-                                    if (state.hasPrevious)
+                                    if (
+                                        state.hasPrevious
+                                    )
                                         c.text
                                     else
                                         c.sub,
                                 modifier =
-                                    Modifier.size(
-                                        30.dp
-                                    )
+                                    Modifier.size(30.dp)
                             )
                         }
 
@@ -946,7 +1004,11 @@ fun NowPlaying(
                                         XmoRed
                                     )
                         ) {
-                            if (state.isPlaying) {
+
+                            if (
+                                state.isPlaying
+                            ) {
+
                                 PausePlayerIcon(
                                     color =
                                         Color.White,
@@ -955,7 +1017,9 @@ fun NowPlaying(
                                             30.dp
                                         )
                                 )
+
                             } else {
+
                                 Icon(
                                     imageVector =
                                         Icons.Default
@@ -978,31 +1042,175 @@ fun NowPlaying(
                             enabled =
                                 state.hasNext
                         ) {
+
                             NextPlayerIcon(
                                 color =
-                                    if (state.hasNext)
+                                    if (
+                                        state.hasNext
+                                    )
                                         c.text
                                     else
                                         c.sub,
                                 modifier =
-                                    Modifier.size(
-                                        30.dp
-                                    )
+                                    Modifier.size(30.dp)
                             )
                         }
                     }
 
-                    if (
-                        state.album.isNotBlank()
-                    ) {
-                        Spacer(
-                            Modifier.height(
-                                58.dp
+                    /*
+                     * =================================================
+                     * LYRICS
+                     * =================================================
+                     */
+
+                    Spacer(
+                        Modifier.height(42.dp)
+                    )
+
+                    Column(
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(
+                                RoundedCornerShape(
+                                    24.dp
+                                )
                             )
+                            .liveBlur(
+                                hazeState,
+                                theme
+                            )
+                            .border(
+                                .65.dp,
+                                glassBorder(theme),
+                                RoundedCornerShape(
+                                    24.dp
+                                )
+                            )
+                            .padding(18.dp)
+                    ) {
+
+                        Row(
+                            Modifier.fillMaxWidth(),
+                            verticalAlignment =
+                                Alignment.CenterVertically
+                        ) {
+
+                            Text(
+                                text =
+                                    "LYRICS",
+                                color =
+                                    XmoRed,
+                                fontFamily =
+                                    XmoFont.bold,
+                                fontSize =
+                                    11.sp,
+                                letterSpacing =
+                                    1.sp,
+                                modifier =
+                                    Modifier.weight(1f)
+                            )
+
+                            /*
+                             * Function later.
+                             */
+
+                            IconButton(
+                                onClick = {}
+                            ) {
+
+                                Text(
+                                    text = "+",
+                                    color =
+                                        c.text,
+                                    fontSize =
+                                        22.sp
+                                )
+                            }
+
+                            /*
+                             * Fullscreen function later.
+                             */
+
+                            IconButton(
+                                onClick = {}
+                            ) {
+
+                                Text(
+                                    text = "□",
+                                    color =
+                                        c.text,
+                                    fontSize =
+                                        17.sp
+                                )
+                            }
+                        }
+
+                        Spacer(
+                            Modifier.height(10.dp)
                         )
 
                         Text(
-                            "SONG DETAILS",
+                            text =
+                                "Lyrics will appear here…",
+                            color =
+                                c.text,
+                            fontFamily =
+                                XmoFont.normal,
+                            fontSize =
+                                14.sp,
+                            lineHeight =
+                                23.sp,
+                            maxLines =
+                                6,
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+                    }
+
+                    /*
+                     * =================================================
+                     * ARTIST
+                     * =================================================
+                     */
+
+                    Spacer(
+                        Modifier.height(26.dp)
+                    )
+
+                    Text(
+                        text =
+                            state.artist.ifBlank {
+                                "Unknown artist"
+                            },
+                        color =
+                            c.sub,
+                        fontFamily =
+                            XmoFont.medium,
+                        fontSize =
+                            14.sp,
+                        maxLines =
+                            1,
+                        overflow =
+                            TextOverflow.Ellipsis
+                    )
+
+                    /*
+                     * =================================================
+                     * SONG DETAILS
+                     * =================================================
+                     */
+
+                    if (
+                        state.album.isNotBlank()
+                    ) {
+
+                        Spacer(
+                            Modifier.height(42.dp)
+                        )
+
+                        Text(
+                            text =
+                                "SONG DETAILS",
                             color =
                                 XmoRed,
                             fontFamily =
@@ -1014,16 +1222,16 @@ fun NowPlaying(
                         )
 
                         Spacer(
-                            Modifier.height(
-                                12.dp
-                            )
+                            Modifier.height(12.dp)
                         )
 
                         Row(
                             Modifier.fillMaxWidth()
                         ) {
+
                             Text(
-                                "Album",
+                                text =
+                                    "Album",
                                 color =
                                     c.sub,
                                 fontFamily =
@@ -1033,7 +1241,8 @@ fun NowPlaying(
                             )
 
                             Text(
-                                state.album,
+                                text =
+                                    state.album,
                                 color =
                                     c.text,
                                 fontFamily =
@@ -1050,17 +1259,20 @@ fun NowPlaying(
                                     Modifier
                                         .weight(1f)
                                         .padding(
-                                            start =
-                                                18.dp
+                                            start = 18.dp
                                         )
                             )
                         }
                     }
 
+                    /*
+                     * =================================================
+                     * FOOTER
+                     * =================================================
+                     */
+
                     Spacer(
-                        Modifier.height(
-                            90.dp
-                        )
+                        Modifier.height(90.dp)
                     )
 
                     Column(
@@ -1068,8 +1280,10 @@ fun NowPlaying(
                         horizontalAlignment =
                             Alignment.CenterHorizontally
                     ) {
+
                         Text(
-                            "XMO",
+                            text =
+                                "XMO",
                             color =
                                 c.text,
                             fontFamily =
@@ -1079,7 +1293,8 @@ fun NowPlaying(
                         )
 
                         Text(
-                            "lxzrvi • copyright © 2026",
+                            text =
+                                "lxzrvi • copyright © 2026",
                             color =
                                 c.sub,
                             fontFamily =
@@ -1092,15 +1307,19 @@ fun NowPlaying(
                     Spacer(
                         Modifier
                             .navigationBarsPadding()
-                            .height(
-                                12.dp
-                            )
+                            .height(12.dp)
                     )
                 }
             }
         }
     }
 }
+
+/*
+ * =============================================================
+ * ARTWORK CAROUSEL
+ * =============================================================
+ */
 
 @Composable
 private fun ArtworkCarousel(
@@ -1128,24 +1347,25 @@ private fun ArtworkCarousel(
     }
 
     var oldId by remember {
-        mutableStateOf<Long?>(
-            null
-        )
+        mutableStateOf<Long?>(null)
     }
 
     /*
-     * Real Media3 item switch complete hua tab reset.
+     * Reset only after actual Media3 item changes.
      */
-    LaunchedEffect(
-        currentId
-    ) {
+
+    LaunchedEffect(currentId) {
+
         if (
             pending != 0 &&
             oldId != null &&
             currentId != oldId
         ) {
+
             drag.snapTo(0f)
+
             pending = 0
+
             oldId = null
         }
     }
@@ -1155,14 +1375,12 @@ private fun ArtworkCarousel(
             .fillMaxWidth()
             .aspectRatio(1f)
             .clip(
-                RoundedCornerShape(
-                    24.dp
-                )
+                RoundedCornerShape(24.dp)
             )
     ) {
+
         val width =
-            constraints.maxWidth
-                .toFloat()
+            constraints.maxWidth.toFloat()
 
         val resistanceStart =
             width * .32f
@@ -1170,6 +1388,7 @@ private fun ArtworkCarousel(
         fun resisted(
             raw: Float
         ): Float {
+
             val d =
                 abs(raw)
 
@@ -1186,7 +1405,9 @@ private fun ArtworkCarousel(
                             resistanceStart
                         ) * .08f
 
-            return if (raw < 0f)
+            return if (
+                raw < 0f
+            )
                 -value
             else
                 value
@@ -1200,12 +1421,16 @@ private fun ArtworkCarousel(
                     canPrevious,
                     canNext
                 ) {
+
                     detectHorizontalDragGestures(
+
                         onHorizontalDrag = {
                                 change,
                                 amount ->
 
-                            if (pending != 0) {
+                            if (
+                                pending != 0
+                            ) {
                                 return@detectHorizontalDragGestures
                             }
 
@@ -1216,16 +1441,20 @@ private fun ArtworkCarousel(
                                     amount
 
                             scope.launch {
+
                                 drag.snapTo(
                                     when {
+
                                         raw < 0f &&
                                             !canNext ->
+
                                             resisted(
                                                 raw * .28f
                                             )
 
                                         raw > 0f &&
                                             !canPrevious ->
+
                                             resisted(
                                                 raw * .28f
                                             )
@@ -1238,23 +1467,34 @@ private fun ArtworkCarousel(
                         },
 
                         onDragEnd = {
-                            if (pending != 0) {
+
+                            if (
+                                pending != 0
+                            ) {
                                 return@detectHorizontalDragGestures
                             }
 
                             scope.launch {
+
                                 /*
-                                 * LEFT -> NEXT
+                                 * LEFT = NEXT
                                  */
+
                                 if (
                                     drag.value <
-                                    -width * .16f &&
+                                        -width * .16f &&
                                     canNext
                                 ) {
+
                                     oldId =
                                         currentId
 
                                     pending = 1
+
+                                    /*
+                                     * Current cover exits toward left.
+                                     * Next cover enters from right edge.
+                                     */
 
                                     drag.animateTo(
                                         -width,
@@ -1264,17 +1504,24 @@ private fun ArtworkCarousel(
                                     nextSong()
 
                                 /*
-                                 * RIGHT -> PREVIOUS
+                                 * RIGHT = PREVIOUS
                                  */
+
                                 } else if (
                                     drag.value >
-                                    width * .16f &&
+                                        width * .16f &&
                                     canPrevious
                                 ) {
+
                                     oldId =
                                         currentId
 
                                     pending = -1
+
+                                    /*
+                                     * Current exits right.
+                                     * Previous enters from left edge.
+                                     */
 
                                     drag.animateTo(
                                         width,
@@ -1282,7 +1529,9 @@ private fun ArtworkCarousel(
                                     )
 
                                     previousSong()
+
                                 } else {
+
                                     drag.animateTo(
                                         0f,
                                         spring(
@@ -1297,8 +1546,13 @@ private fun ArtworkCarousel(
                         },
 
                         onDragCancel = {
+
                             scope.launch {
-                                if (pending == 0) {
+
+                                if (
+                                    pending == 0
+                                ) {
+
                                     drag.animateTo(
                                         0f
                                     )
@@ -1308,21 +1562,32 @@ private fun ArtworkCarousel(
                     )
                 }
         ) {
+
             /*
-             * Previous.
+             * =================================================
+             * PREVIOUS
+             * =================================================
              */
-            if (previous != null) {
+
+            if (
+                previous != null
+            ) {
+
                 PlayerCover(
                     uri =
                         previous,
+
                     border =
                         border,
+
                     surface =
                         surface,
+
                     modifier =
                         Modifier
                             .fillMaxSize()
                             .graphicsLayer {
+
                                 translationX =
                                     drag.value -
                                         width
@@ -1331,19 +1596,26 @@ private fun ArtworkCarousel(
             }
 
             /*
-             * Current.
+             * =================================================
+             * CURRENT
+             * =================================================
              */
+
             PlayerCover(
                 uri =
                     current,
+
                 border =
                     border,
+
                 surface =
                     surface,
+
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
+
                             translationX =
                                 drag.value
 
@@ -1353,8 +1625,7 @@ private fun ArtworkCarousel(
                                         drag.value
                                     ) /
                                         width
-                                    )
-                                    .coerceIn(
+                                    ).coerceIn(
                                         0f,
                                         1f
                                     )
@@ -1369,20 +1640,30 @@ private fun ArtworkCarousel(
             )
 
             /*
-             * Next.
+             * =================================================
+             * NEXT
+             * =================================================
              */
-            if (next != null) {
+
+            if (
+                next != null
+            ) {
+
                 PlayerCover(
                     uri =
                         next,
+
                     border =
                         border,
+
                     surface =
                         surface,
+
                     modifier =
                         Modifier
                             .fillMaxSize()
                             .graphicsLayer {
+
                                 translationX =
                                     drag.value +
                                         width
@@ -1393,6 +1674,12 @@ private fun ArtworkCarousel(
     }
 }
 
+/*
+ * =============================================================
+ * PLAYER COVER
+ * =============================================================
+ */
+
 @Composable
 private fun PlayerCover(
     uri: Uri?,
@@ -1400,12 +1687,11 @@ private fun PlayerCover(
     surface: Color,
     modifier: Modifier
 ) {
+
     Box(
         modifier
             .clip(
-                RoundedCornerShape(
-                    24.dp
-                )
+                RoundedCornerShape(24.dp)
             )
             .background(
                 surface
@@ -1413,30 +1699,37 @@ private fun PlayerCover(
             .border(
                 .7.dp,
                 border,
-                RoundedCornerShape(
-                    24.dp
-                )
+                RoundedCornerShape(24.dp)
             )
     ) {
+
         AsyncImage(
             model =
                 uri,
+
             contentDescription =
                 null,
+
             modifier =
                 Modifier.fillMaxSize(),
+
             contentScale =
                 ContentScale.Crop
         )
 
-        if (uri == null) {
+        if (
+            uri == null
+        ) {
+
             Box(
                 Modifier.fillMaxSize(),
                 contentAlignment =
                     Alignment.Center
             ) {
+
                 Text(
-                    "XMO",
+                    text =
+                        "XMO",
                     color =
                         XmoRed,
                     fontFamily =
@@ -1449,28 +1742,45 @@ private fun PlayerCover(
     }
 }
 
+/*
+ * =============================================================
+ * PREVIOUS ICON
+ * =============================================================
+ */
+
 @Composable
 private fun PreviousPlayerIcon(
     color: Color,
     modifier: Modifier
 ) {
+
     Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val bar = w * .10f
+
+        val w =
+            size.width
+
+        val h =
+            size.height
+
+        val bar =
+            w * .10f
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
+
             topLeft =
                 Offset(
                     w * .20f,
                     h * .20f
                 ),
+
             size =
                 Size(
                     bar,
                     h * .60f
                 ),
+
             cornerRadius =
                 CornerRadius(
                     bar / 2f
@@ -1479,18 +1789,22 @@ private fun PreviousPlayerIcon(
 
         val path =
             Path().apply {
+
                 moveTo(
                     w * .73f,
                     h * .17f
                 )
+
                 lineTo(
                     w * .32f,
                     h * .50f
                 )
+
                 lineTo(
                     w * .73f,
                     h * .83f
                 )
+
                 close()
             }
 
@@ -1500,31 +1814,48 @@ private fun PreviousPlayerIcon(
         )
     }
 }
+
+/*
+ * =============================================================
+ * NEXT ICON
+ * =============================================================
+ */
 
 @Composable
 private fun NextPlayerIcon(
     color: Color,
     modifier: Modifier
 ) {
+
     Canvas(modifier) {
-        val w = size.width
-        val h = size.height
-        val bar = w * .10f
+
+        val w =
+            size.width
+
+        val h =
+            size.height
+
+        val bar =
+            w * .10f
 
         val path =
             Path().apply {
+
                 moveTo(
                     w * .27f,
                     h * .17f
                 )
+
                 lineTo(
                     w * .68f,
                     h * .50f
                 )
+
                 lineTo(
                     w * .27f,
                     h * .83f
                 )
+
                 close()
             }
 
@@ -1534,17 +1865,21 @@ private fun NextPlayerIcon(
         )
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
+
             topLeft =
                 Offset(
                     w * .70f,
                     h * .20f
                 ),
+
             size =
                 Size(
                     bar,
                     h * .60f
                 ),
+
             cornerRadius =
                 CornerRadius(
                     bar / 2f
@@ -1553,12 +1888,20 @@ private fun NextPlayerIcon(
     }
 }
 
+/*
+ * =============================================================
+ * PAUSE ICON
+ * =============================================================
+ */
+
 @Composable
 private fun PausePlayerIcon(
     color: Color,
     modifier: Modifier
 ) {
+
     Canvas(modifier) {
+
         val bw =
             size.width * .18f
 
@@ -1572,12 +1915,15 @@ private fun PausePlayerIcon(
                 ) / 2f
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
+
             topLeft =
                 Offset(
                     size.width * .27f,
                     top
                 ),
+
             size =
                 Size(
                     bw,
@@ -1586,12 +1932,15 @@ private fun PausePlayerIcon(
         )
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
+
             topLeft =
                 Offset(
                     size.width * .55f,
                     top
                 ),
+
             size =
                 Size(
                     bw,
@@ -1601,9 +1950,16 @@ private fun PausePlayerIcon(
     }
 }
 
+/*
+ * =============================================================
+ * PLAYER TIME
+ * =============================================================
+ */
+
 private fun playerTime(
     milliseconds: Long
 ): String {
+
     val total =
         milliseconds
             .coerceAtLeast(0L) /
