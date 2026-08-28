@@ -1,17 +1,24 @@
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
     namespace = "com.xmo.music"
-    compileSdk = 36
+
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.xmo.music"
+
         minSdk = 31
+
+        /*
+         * Compile 37 only because dependencies need API 37.
+         * Runtime behavior stays target 36.
+         */
         targetSdk = 36
+
         versionCode = 1
         versionName = "1.0"
     }
@@ -68,10 +75,15 @@ dependencies {
         "androidx.media3:media3-session:1.8.0"
     )
 
-    /*
-     * XMO shared Liquid Glass
-     */
-    implementation("dev.chrisbanes.haze:haze:2.0.0-alpha05")
-    implementation("dev.chrisbanes.haze:haze-blur:2.0.0-alpha05")
-    implementation("dev.chrisbanes.haze:haze-blur-materials:2.0.0-alpha05")
+    implementation(
+        "dev.chrisbanes.haze:haze:2.0.0-alpha05"
+    )
+
+    implementation(
+        "dev.chrisbanes.haze:haze-blur:2.0.0-alpha05"
+    )
+
+    implementation(
+        "dev.chrisbanes.haze:haze-blur-materials:2.0.0-alpha05"
+    )
 }
