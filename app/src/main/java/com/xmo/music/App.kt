@@ -1150,8 +1150,7 @@ fun App() {
                 ) {
                     NavBar(
                         selected = tab,
-                        theme = theme,
-                        backdrop = liquidBackdrop
+                        theme = theme
                     ) {
                         tab = it
                     }
