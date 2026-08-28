@@ -9,12 +9,11 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -23,13 +22,13 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -49,16 +48,95 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.R
 import com.xmo.music.XmoTheme
+import com.xmo.music.data.AccentMode
 import com.xmo.music.data.Song
+import com.xmo.music.data.XmoAppearance
 import com.xmo.music.data.XmoProfile
+import com.xmo.music.ui.blur.glassBorder
+import com.xmo.music.ui.blur.glassDivider
+import com.xmo.music.ui.blur.liveBlur
+import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.delay
 
 val XmoRed =
     Color(0xFFFF3B3B)
 
+val XmoBlue =
+    Color(0xFF398CFF)
+
 /*
  * =============================================================
- * HOME THEME COLORS
+ * GLOBAL ACCENT
+ *
+ * App.kt supplies this once. Every screen then follows the same
+ * persisted accent without hard-coding red into interaction UI.
+ * =============================================================
+ */
+
+val LocalXmoAccent =
+    compositionLocalOf {
+        XmoRed
+    }
+
+@Composable
+fun ProvideXmoAccent(
+    appearance: XmoAppearance,
+    content: @Composable () -> Unit
+) {
+    val accent =
+        when (
+            appearance.accentMode
+        ) {
+            AccentMode.Red ->
+                XmoRed
+
+            AccentMode.Blue ->
+                XmoBlue
+
+            AccentMode.Custom -> {
+                val raw =
+                    appearance
+                        .customAccent
+                        .argb
+                        .toULong()
+                        .toLong()
+
+                val base =
+                    Color(
+                        raw.toULong()
+                            .toLong()
+                    )
+
+                /*
+                 * Apply persisted transparency. Lightness is used
+                 * by the Settings color editor while the selected
+                 * ARGB remains the authoritative picked color.
+                 */
+                base.copy(
+                    alpha =
+                        appearance
+                            .customAccent
+                            .alpha
+                            .coerceIn(
+                                0f,
+                                1f
+                            )
+                )
+            }
+        }
+
+    CompositionLocalProvider(
+        LocalXmoAccent provides
+            accent,
+
+        content =
+            content
+    )
+}
+
+/*
+ * =============================================================
+ * HOME COLORS
  * =============================================================
  */
 
@@ -74,9 +152,10 @@ data class HomeColors(
 
 fun homeColors(
     theme: XmoTheme
-): HomeColors {
-    return when (theme) {
-
+): HomeColors =
+    when (
+        theme
+    ) {
         XmoTheme.Dark ->
             HomeColors(
                 bg =
@@ -165,11 +244,10 @@ fun homeColors(
                     )
             )
     }
-}
 
 /*
  * =============================================================
- * XMO DRAWABLE ICON
+ * VECTOR RESOURCE ICON
  * =============================================================
  */
 
@@ -207,17 +285,16 @@ fun XmoIcon(
 fun HomeHeader(
     c: HomeColors,
     theme: XmoTheme,
-    setTheme: (XmoTheme) -> Unit,
-    refresh: () -> Unit
+    hazeState: HazeState,
+    refresh: () -> Unit,
+    openMenu: () -> Unit,
+    openProfile: () -> Unit
 ) {
-    /*
-     * Profile is supplied once from App.kt through
-     * CompositionLocalProvider.
-     *
-     * Home.kt does not need extra profile plumbing.
-     */
     val profile =
         LocalXmoProfile.current
+
+    val accent =
+        LocalXmoAccent.current
 
     val subtitles =
         remember {
@@ -236,20 +313,10 @@ fun HomeHeader(
             )
         }
 
-    var menu by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    /*
-     * Rotating Home subtitle.
-     */
     LaunchedEffect(Unit) {
         while (true) {
             delay(
-                4500
+                4500L
             )
 
             subtitle =
@@ -265,28 +332,44 @@ fun HomeHeader(
         Modifier
             .fillMaxWidth()
             .padding(
-                start = 16.dp,
+                start = 14.dp,
                 top = 7.dp,
                 end = 12.dp,
-                bottom = 4.dp
+                bottom = 6.dp
             ),
 
         verticalAlignment =
             Alignment.CenterVertically
     ) {
-        /*
-         * Real persisted profile.
-         */
-        HomeProfileAvatar(
+        XmoProfileAvatar(
             profile =
                 profile,
 
-            c = c
+            modifier =
+                Modifier
+                    .size(
+                        40.dp
+                    )
+                    .clip(
+                        CircleShape
+                    )
+                    .combinedClickable(
+                        onClick =
+                            openProfile,
+
+                        onLongClick =
+                            openProfile
+                    ),
+
+            background =
+                accent,
+
+            border =
+                glassBorder(
+                    theme
+                )
         )
 
-        /*
-         * Username / subtitle.
-         */
         Column(
             Modifier
                 .padding(
@@ -340,7 +423,7 @@ fun HomeHeader(
                 },
 
                 label =
-                    "subtitle"
+                    "homeSubtitle"
             ) { index ->
 
                 Text(
@@ -366,323 +449,94 @@ fun HomeHeader(
         }
 
         /*
-         * -----------------------------------------------------
-         * REFRESH + MENU CAPSULE
-         * -----------------------------------------------------
+         * Same Haze material language as NavBar.
          */
-        Box {
-            Row(
-                Modifier
-                    .clip(
-                        RoundedCornerShape(
-                            24.dp
-                        )
-                    )
-                    .background(
-                        c.button
-                    )
-                    .border(
-                        .6.dp,
-                        c.border,
-                        RoundedCornerShape(
-                            24.dp
-                        )
-                    )
-                    .padding(
-                        horizontal =
-                            3.dp
-                    ),
-
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick =
-                        refresh,
-
-                    modifier =
-                        Modifier.size(
-                            38.dp
-                        )
-                ) {
-                    XmoIcon(
-                        icon =
-                            R.drawable
-                                .ic_xmo_refresh,
-
-                        tint =
-                            c.icon,
-
-                        modifier =
-                            Modifier.size(
-                                18.dp
-                            )
-                    )
-                }
-
-                /*
-                 * Divider.
-                 */
-                Box(
-                    Modifier
-                        .width(
-                            .6.dp
-                        )
-                        .height(
-                            18.dp
-                        )
-                        .background(
-                            c.border
-                        )
-                )
-
-                IconButton(
-                    onClick = {
-                        menu =
-                            true
-                    },
-
-                    modifier =
-                        Modifier.size(
-                            38.dp
-                        )
-                ) {
-                    XmoIcon(
-                        icon =
-                            R.drawable
-                                .ic_xmo_menu,
-
-                        tint =
-                            c.icon,
-
-                        modifier =
-                            Modifier.size(
-                                19.dp
-                            )
-                    )
-                }
-            }
-
-            /*
-             * Actual global XMO theme selector.
-             */
-            DropdownMenu(
-                expanded =
-                    menu,
-
-                onDismissRequest = {
-                    menu =
-                        false
-                },
-
-                containerColor =
-                    c.surface,
-
-                shape =
+        Row(
+            Modifier
+                .clip(
                     RoundedCornerShape(
-                        12.dp
-                    )
-            ) {
-                XmoTheme.entries
-                    .forEach {
-                            item ->
-
-                        DropdownMenuItem(
-                            text = {
-                                Text(
-                                    text =
-                                        when (
-                                            item
-                                        ) {
-                                            XmoTheme.Dark ->
-                                                "Dark Theme"
-
-                                            XmoTheme.Light ->
-                                                "Light Theme"
-
-                                            XmoTheme.Amoled ->
-                                                "AMOLED"
-                                        },
-
-                                    color =
-                                        if (
-                                            theme ==
-                                            item
-                                        ) {
-                                            XmoRed
-                                        } else {
-                                            c.text
-                                        },
-
-                                    fontFamily =
-                                        XmoFont.medium,
-
-                                    fontSize =
-                                        13.sp
-                                )
-                            },
-
-                            onClick = {
-                                setTheme(
-                                    item
-                                )
-
-                                menu =
-                                    false
-                            }
-                        )
-                    }
-            }
-        }
-    }
-}
-
-/*
- * =============================================================
- * PROFILE AVATAR
- * =============================================================
- */
-
-@Composable
-private fun HomeProfileAvatar(
-    profile: XmoProfile,
-    c: HomeColors
-) {
-    /*
-     * Local photo selected through Android Photo Picker.
-     */
-    val customUri =
-        remember(
-            profile.avatarUri
-        ) {
-            profile.avatarUri
-                ?.let(
-                    android.net.Uri::parse
-                )
-        }
-
-    val fallbackIcon =
-        remember(
-            profile.avatarIndex
-        ) {
-            when (
-                profile.avatarIndex
-            ) {
-                /*
-                 * Setup carousel index mapping.
-                 */
-                1 ->
-                    R.drawable
-                        .ic_xmo_songs
-
-                2 ->
-                    R.drawable
-                        .ic_xmo_album
-
-                3 ->
-                    R.drawable
-                        .ic_xmo_artist
-
-                4 ->
-                    R.drawable
-                        .ic_xmo_bolt
-
-                5 ->
-                    R.drawable
-                        .ic_xmo_spark
-
-                else ->
-                    null
-            }
-        }
-
-    Box(
-        Modifier
-            .size(
-                38.dp
-            )
-            .clip(
-                CircleShape
-            )
-            .background(
-                Brush.linearGradient(
-                    listOf(
-                        XmoRed,
-                        Color(
-                            0xFF641E27
-                        )
+                        24.dp
                     )
                 )
-            )
-            .border(
-                .6.dp,
-                c.border,
-                CircleShape
-            ),
-
-        contentAlignment =
-            Alignment.Center
-    ) {
-        when {
-            /*
-             * Real local user image.
-             */
-            customUri != null -> {
-                AsyncImage(
-                    model =
-                        customUri,
-
-                    contentDescription =
-                        "Profile",
-
-                    modifier =
-                        Modifier
-                            .fillMaxSize(),
-
-                    contentScale =
-                        ContentScale.Crop
+                .liveBlur(
+                    hazeState,
+                    theme
                 )
-            }
+                .border(
+                    .65.dp,
+                    glassBorder(
+                        theme
+                    ),
+                    RoundedCornerShape(
+                        24.dp
+                    )
+                )
+                .padding(
+                    horizontal =
+                        3.dp
+                ),
 
-            /*
-             * Built-in XMO profile icon.
-             */
-            fallbackIcon != null -> {
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            IconButton(
+                onClick =
+                    refresh,
+
+                modifier =
+                    Modifier.size(
+                        38.dp
+                    )
+            ) {
                 XmoIcon(
                     icon =
-                        fallbackIcon,
+                        R.drawable.ic_xmo_refresh,
 
                     tint =
-                        Color.White,
+                        c.icon,
+
+                    modifier =
+                        Modifier.size(
+                            18.dp
+                        )
+                )
+            }
+
+            Box(
+                Modifier
+                    .width(
+                        .6.dp
+                    )
+                    .height(
+                        18.dp
+                    )
+                    .background(
+                        glassDivider(
+                            theme
+                        )
+                    )
+            )
+
+            IconButton(
+                onClick =
+                    openMenu,
+
+                modifier =
+                    Modifier.size(
+                        38.dp
+                    )
+            ) {
+                XmoIcon(
+                    icon =
+                        R.drawable.ic_xmo_menu,
+
+                    tint =
+                        c.icon,
 
                     modifier =
                         Modifier.size(
                             19.dp
                         )
-                )
-            }
-
-            /*
-             * Default:
-             * first username letter.
-             */
-            else -> {
-                Text(
-                    text =
-                        profile.name
-                            .trim()
-                            .firstOrNull()
-                            ?.uppercase()
-                            ?: "X",
-
-                    color =
-                        Color.White,
-
-                    fontFamily =
-                        XmoFont.logo,
-
-                    fontSize =
-                        15.sp
                 )
             }
         }
@@ -705,6 +559,9 @@ fun CategoryChip(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
+    val accent =
+        LocalXmoAccent.current
+
     Row(
         modifier
             .clip(
@@ -713,24 +570,38 @@ fun CategoryChip(
                 )
             )
             .background(
-                if (active) {
-                    XmoRed.copy(
+                if (
+                    active
+                ) {
+                    accent.copy(
                         alpha = .18f
                     )
                 } else {
                     c.button
                 }
             )
+            .border(
+                .6.dp,
+                if (
+                    active
+                ) {
+                    accent.copy(
+                        alpha = .34f
+                    )
+                } else {
+                    c.border
+                },
+                RoundedCornerShape(
+                    18.dp
+                )
+            )
             .clickable(
                 onClick =
                     onClick
             )
             .padding(
-                horizontal =
-                    13.dp,
-
-                vertical =
-                    7.dp
+                horizontal = 13.dp,
+                vertical = 7.dp
             ),
 
         verticalAlignment =
@@ -746,8 +617,10 @@ fun CategoryChip(
                 icon,
 
             tint =
-                if (active) {
-                    XmoRed
+                if (
+                    active
+                ) {
+                    accent
                 } else {
                     tint
                 },
@@ -763,8 +636,10 @@ fun CategoryChip(
                 text,
 
             color =
-                if (active) {
-                    XmoRed
+                if (
+                    active
+                ) {
+                    accent
                 } else {
                     c.text
                 },
@@ -800,16 +675,16 @@ fun SectionTitle(
     action: Int? = null,
     onAction: () -> Unit = {}
 ) {
+    val accent =
+        LocalXmoAccent.current
+
     Row(
         modifier
             .fillMaxWidth()
             .animateContentSize()
             .padding(
-                horizontal =
-                    10.dp,
-
-                vertical =
-                    8.dp
+                horizontal = 10.dp,
+                vertical = 8.dp
             ),
 
         verticalAlignment =
@@ -820,7 +695,7 @@ fun SectionTitle(
                 icon,
 
             tint =
-                XmoRed,
+                accent,
 
             modifier =
                 Modifier.size(
@@ -882,21 +757,27 @@ fun SectionTitle(
             }
         }
 
-        action?.let {
-                actionIcon ->
+        action?.let { actionIcon ->
 
             Box(
                 Modifier
                     .size(
-                        28.dp
+                        30.dp
                     )
                     .clip(
                         CircleShape
                     )
                     .background(
-                        XmoRed.copy(
-                            alpha = .18f
+                        accent.copy(
+                            alpha = .16f
                         )
+                    )
+                    .border(
+                        .6.dp,
+                        accent.copy(
+                            alpha = .28f
+                        ),
+                        CircleShape
                     )
                     .clickable(
                         onClick =
@@ -911,7 +792,7 @@ fun SectionTitle(
                         actionIcon,
 
                     tint =
-                        XmoRed,
+                        accent,
 
                     modifier =
                         Modifier.size(
@@ -926,11 +807,10 @@ fun SectionTitle(
 /*
  * =============================================================
  * SONG TILE
- * =============================================================
  *
- * Shared by Home All Songs and custom-category layouts.
- *
- * onClick is the real playback entry point.
+ * Tap = playback.
+ * More button = options.
+ * Long press = same options.
  * =============================================================
  */
 
@@ -941,20 +821,13 @@ fun SongTile(
     c: HomeColors,
     theme: XmoTheme,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit = {}
+    onClick: () -> Unit = {},
+    onOptions: (Song) -> Unit = {}
 ) {
     val context =
         androidx.compose.ui.platform
             .LocalContext.current
 
-    /*
-     * Use synchronous memory cache first.
-     *
-     * This helps:
-     * - tab switching
-     * - Home re-entry
-     * - scrolling back to old tiles
-     */
     var dominant by
         remember(
             song.artwork
@@ -969,19 +842,13 @@ fun SongTile(
             )
         }
 
-    /*
-     * Only perform extraction if cache does not already contain it.
-     */
     LaunchedEffect(
         song.artwork
     ) {
-        val cached =
+        dominant =
             Artwork.cached(
                 song.artwork
             )
-
-        dominant =
-            cached
                 ?: Artwork.color(
                     context,
                     song.artwork
@@ -989,15 +856,17 @@ fun SongTile(
     }
 
     val artworkAlpha =
-        when (theme) {
+        when (
+            theme
+        ) {
             XmoTheme.Light ->
                 .35f
 
             XmoTheme.Dark ->
-                .40f
+                .42f
 
             XmoTheme.Amoled ->
-                .45f
+                .48f
         }
 
     Column(
@@ -1007,12 +876,15 @@ fun SongTile(
                     10.dp
                 )
             )
-            /*
-             * Actual playback callback supplied by Home.
-             */
-            .clickable(
+            .combinedClickable(
                 onClick =
-                    onClick
+                    onClick,
+
+                onLongClick = {
+                    onOptions(
+                        song
+                    )
+                }
             )
             .background(
                 Brush.linearGradient(
@@ -1030,97 +902,108 @@ fun SongTile(
                 )
             )
             .border(
-                width =
-                    .55.dp,
-
-                color =
-                    c.border,
-
-                shape =
-                    RoundedCornerShape(
-                        10.dp
-                    )
+                .55.dp,
+                c.border,
+                RoundedCornerShape(
+                    10.dp
+                )
             )
             .padding(
                 5.dp
             )
     ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .weight(
+                    1f,
+                    fill = false
+                )
+        )
+
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(
+                    0.dp
+                )
+        )
+
         /*
-         * Artwork.
+         * Square artwork without AspectRatio import dependency.
          */
         Box(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(
-                    1f
-                )
-                .clip(
-                    RoundedCornerShape(
-                        6.dp
-                    )
-                )
-                .background(
-                    dominant.copy(
-                        alpha =
-                            .15f
-                    )
-                )
         ) {
-            AsyncImage(
-                model =
-                    song.artwork,
-
-                contentDescription =
-                    song.title,
-
-                modifier =
-                    Modifier
-                        .fillMaxSize(),
-
-                contentScale =
-                    ContentScale.Crop
-            )
-
-            /*
-             * No fake network image fallback.
-             *
-             * When local art is null, gradient card remains visible.
-             */
-            if (
-                song.artwork ==
-                null
+            androidx.compose.foundation.layout.BoxWithConstraints(
+                Modifier.fillMaxWidth()
             ) {
                 Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment =
-                        Alignment.Center
+                    Modifier
+                        .fillMaxWidth()
+                        .height(
+                            maxWidth
+                        )
+                        .clip(
+                            RoundedCornerShape(
+                                6.dp
+                            )
+                        )
+                        .background(
+                            dominant.copy(
+                                alpha = .15f
+                            )
+                        )
                 ) {
-                    Text(
-                        text =
-                            song.title
-                                .firstOrNull()
-                                ?.uppercase()
-                                ?: "X",
+                    AsyncImage(
+                        model =
+                            song.artwork,
 
-                        color =
-                            c.text.copy(
-                                alpha =
-                                    .60f
-                            ),
+                        contentDescription =
+                            song.title,
 
-                        fontFamily =
-                            XmoFont.bold,
+                        modifier =
+                            Modifier.fillMaxSize(),
 
-                        fontSize =
-                            17.sp
+                        contentScale =
+                            ContentScale.Crop
                     )
+
+                    if (
+                        song.artwork ==
+                        null
+                    ) {
+                        Box(
+                            Modifier.fillMaxSize(),
+
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+                            Text(
+                                text =
+                                    song.title
+                                        .firstOrNull()
+                                        ?.uppercase()
+                                        ?: "X",
+
+                                color =
+                                    c.text.copy(
+                                        alpha = .60f
+                                    ),
+
+                                fontFamily =
+                                    XmoFont.bold,
+
+                                fontSize =
+                                    17.sp
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        /*
-         * Title / Artist / More.
-         */
         Row(
             Modifier
                 .fillMaxWidth()
@@ -1177,23 +1060,36 @@ fun SongTile(
                 )
             }
 
-            /*
-             * Song Options backend is still pending.
-             * Keep visual more indicator; no fake action.
-             */
-            XmoIcon(
-                icon =
-                    R.drawable
-                        .ic_xmo_more,
-
-                tint =
-                    c.sub,
-
-                modifier =
-                    Modifier.size(
-                        14.dp
+            Box(
+                Modifier
+                    .size(
+                        25.dp
                     )
-            )
+                    .clip(
+                        CircleShape
+                    )
+                    .clickable {
+                        onOptions(
+                            song
+                        )
+                    },
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                XmoIcon(
+                    icon =
+                        R.drawable.ic_xmo_more,
+
+                    tint =
+                        c.sub,
+
+                    modifier =
+                        Modifier.size(
+                            14.dp
+                        )
+                )
+            }
         }
     }
 }
