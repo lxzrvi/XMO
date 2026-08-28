@@ -24,6 +24,7 @@ import com.xmo.music.ui.NowPlaying
 import com.xmo.music.ui.Search
 import com.xmo.music.ui.Settings
 import kotlinx.coroutines.launch
+import com.xmo.music.ui.MiniPlayer
 
 enum class XmoTheme {
     Dark,
@@ -386,6 +387,35 @@ fun App() {
             }
         }
 
+        MiniPlayer(
+    state = playbackState,
+            theme = theme,
+        
+            /*
+             * Player closes fully first.
+             * Then showNowPlaying becomes false,
+             * triggering MiniPlayer's bottom entrance.
+             */
+            visible =
+                playbackState.currentSongId != null &&
+                    !showNowPlaying,
+        
+            openPlayer = {
+                showNowPlaying = true
+            },
+        
+            togglePlay = {
+                player.togglePlayPause()
+            },
+        
+            previous = {
+                player.previous()
+            },
+        
+            next = {
+                player.next()
+            }
+        )
         /*
          * -----------------------------------------------------
          * NOW PLAYING
