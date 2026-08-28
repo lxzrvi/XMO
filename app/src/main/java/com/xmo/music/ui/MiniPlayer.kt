@@ -8,12 +8,16 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
@@ -48,47 +52,50 @@ fun MiniPlayer(
         return
     }
 
-    val c = homeColors(theme)
-    val scope = rememberCoroutineScope()
+    val c =
+        homeColors(theme)
 
-    val x = remember {
-        Animatable(0f)
-    }
+    val scope =
+        rememberCoroutineScope()
 
-    val y = remember {
-        Animatable(0f)
-    }
+    val x =
+        remember {
+            Animatable(0f)
+        }
 
-    var dragging by remember {
+    val y =
+        remember {
+            Animatable(0f)
+        }
+
+    var dragged by remember {
         mutableStateOf(false)
     }
 
-    /*
-     * Mini player sits above:
-     *
-     * NavBar bottom position: 35dp + navigation inset
-     * NavBar overflow: up to ~80dp
-     *
-     * 35 + 80 + safety spacing = 127dp.
-     */
+    var totalX by remember {
+        mutableFloatStateOf(0f)
+    }
+
+    var totalY by remember {
+        mutableFloatStateOf(0f)
+    }
+
     AnimatedVisibility(
         visible = visible,
 
         enter =
             slideInVertically(
                 initialOffsetY = {
-                    it + 40
+                    it + 36
                 }
-            ) +
-                fadeIn(),
+            ) + fadeIn(),
 
         exit =
             slideOutVertically(
                 targetOffsetY = {
-                    it + 40
+                    it + 36
                 }
-            ) +
-                fadeOut(),
+            ) + fadeOut(),
 
         modifier =
             Modifier.fillMaxSize()
@@ -97,373 +104,405 @@ fun MiniPlayer(
             Modifier
                 .fillMaxSize()
                 .navigationBarsPadding()
+                /*
+                 * Approved NavBar:
+                 *
+                 * bottom ~35dp
+                 * expanded selector ~80dp
+                 *
+                 * MiniPlayer stays safely above it.
+                 */
                 .padding(
                     start = 14.dp,
                     end = 14.dp,
-                    bottom = 126.dp
+                    bottom = 128.dp
                 ),
             contentAlignment =
                 Alignment.BottomCenter
         ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(64.dp)
-                    .graphicsLayer {
-                        translationX = x.value
-                        translationY = y.value
-                    }
-                    .clip(
-                        RoundedCornerShape(15.dp)
-                    )
-                    .background(c.surface)
-                    .border(
-                        .7.dp,
-                        c.border,
-                        RoundedCornerShape(15.dp)
-                    )
-                    .pointerInput(
-                        state.currentSongId
-                    ) {
-                        detectDragGestures(
-                            onDragStart = {
-                                dragging = true
-                            },
+            BoxWithConstraints {
+                val widthPx =
+                    constraints
+                        .maxWidth
+                        .toFloat()
 
-                            onDrag = {
-                                    change,
-                                    amount ->
-
-                                change.consume()
-
-                                scope.launch {
-                                    x.snapTo(
-                                        x.value +
-                                            amount.x
-                                    )
-
-                                    y.snapTo(
-                                        (
-                                            y.value +
-                                                amount.y
-                                            )
-                                            /*
-                                             * Up allowed.
-                                             * Down has resistance.
-                                             */
-                                            .coerceAtMost(
-                                                18f
-                                            )
-                                    )
-                                }
-                            },
-
-                            onDragEnd = {
-                                dragging = false
-
-                                scope.launch {
-                                    val horizontal =
-                                        abs(x.value) >
-                                            abs(y.value)
-
-                                    /*
-                                     * LEFT -> next
-                                     */
-                                    if (
-                                        horizontal &&
-                                        x.value <
-                                        -70f
-                                    ) {
-                                        next()
-
-                                        x.animateTo(
-                                            -size.width
-                                                .toFloat(),
-                                            spring(
-                                                dampingRatio = 1f,
-                                                stiffness = 500f
-                                            )
-                                        )
-
-                                        x.snapTo(
-                                            size.width
-                                                .toFloat()
-                                        )
-
-                                        x.animateTo(
-                                            0f,
-                                            spring(
-                                                dampingRatio = .9f,
-                                                stiffness = 420f
-                                            )
-                                        )
-
-                                        y.animateTo(0f)
-
-                                        return@launch
-                                    }
-
-                                    /*
-                                     * RIGHT -> previous
-                                     */
-                                    if (
-                                        horizontal &&
-                                        x.value >
-                                        70f
-                                    ) {
-                                        previous()
-
-                                        x.animateTo(
-                                            size.width
-                                                .toFloat(),
-                                            spring(
-                                                dampingRatio = 1f,
-                                                stiffness = 500f
-                                            )
-                                        )
-
-                                        x.snapTo(
-                                            -size.width
-                                                .toFloat()
-                                        )
-
-                                        x.animateTo(
-                                            0f,
-                                            spring(
-                                                dampingRatio = .9f,
-                                                stiffness = 420f
-                                            )
-                                        )
-
-                                        y.animateTo(0f)
-
-                                        return@launch
-                                    }
-
-                                    /*
-                                     * UP:
-                                     *
-                                     * Must first return to its resting
-                                     * position. Player opens only after
-                                     * release + settle.
-                                     */
-                                    if (
-                                        !horizontal &&
-                                        y.value <
-                                        -55f
-                                    ) {
-                                        x.animateTo(0f)
-
-                                        y.animateTo(
-                                            0f,
-                                            spring(
-                                                dampingRatio = .78f,
-                                                stiffness = 430f
-                                            )
-                                        )
-
-                                        openPlayer()
-
-                                        return@launch
-                                    }
-
-                                    x.animateTo(
-                                        0f,
-                                        spring(
-                                            dampingRatio = .8f,
-                                            stiffness = 450f
-                                        )
-                                    )
-
-                                    y.animateTo(
-                                        0f,
-                                        spring(
-                                            dampingRatio = .8f,
-                                            stiffness = 450f
-                                        )
-                                    )
-                                }
-                            },
-
-                            onDragCancel = {
-                                dragging = false
-
-                                scope.launch {
-                                    x.animateTo(0f)
-                                    y.animateTo(0f)
-                                }
-                            }
-                        )
-                    }
-                    .clickable(
-                        enabled = !dragging
-                    ) {
-                        openPlayer()
-                    }
-            ) {
-                /*
-                 * ---------------------------------------------
-                 * REAL PROGRESS — TOP BORDER
-                 * ---------------------------------------------
-                 */
-                val progress =
-                    if (
-                        state.duration >
-                        0
-                    ) {
-                        (
-                            state.position
-                                .toFloat() /
-                                state.duration
-                                    .toFloat()
-                            )
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-                    } else {
-                        0f
-                    }
-
-                Canvas(
+                Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(2.dp)
-                        .align(
-                            Alignment.TopStart
-                        )
-                ) {
-                    drawRect(
-                        color = XmoRed,
-                        size =
-                            Size(
-                                width =
-                                    size.width *
-                                        progress,
-                                height =
-                                    size.height
-                            )
-                    )
-                }
+                        .height(64.dp)
+                        .graphicsLayer {
+                            translationX =
+                                x.value
 
-                Row(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(
-                            start = 4.dp,
-                            top = 4.dp,
-                            end = 8.dp,
-                            bottom = 4.dp
-                        ),
-                    verticalAlignment =
-                        Alignment.CenterVertically
+                            translationY =
+                                y.value
+                        }
+                        .clip(
+                            RoundedCornerShape(
+                                15.dp
+                            )
+                        )
+                        .background(
+                            c.surface
+                        )
+                        .border(
+                            .7.dp,
+                            c.border,
+                            RoundedCornerShape(
+                                15.dp
+                            )
+                        )
+                        .pointerInput(
+                            state.currentSongId
+                        ) {
+                            detectDragGestures(
+                                onDragStart = {
+                                    dragged = true
+                                    totalX = 0f
+                                    totalY = 0f
+                                },
+
+                                onDrag = {
+                                        change,
+                                        amount ->
+
+                                    change.consume()
+
+                                    totalX +=
+                                        amount.x
+
+                                    totalY +=
+                                        amount.y
+
+                                    scope.launch {
+                                        x.snapTo(
+                                            totalX
+                                        )
+
+                                        /*
+                                         * Up follows normally.
+                                         * Down gets limited.
+                                         */
+                                        y.snapTo(
+                                            totalY.coerceAtMost(
+                                                20f
+                                            )
+                                        )
+                                    }
+                                },
+
+                                onDragEnd = {
+                                    val horizontal =
+                                        abs(totalX) >
+                                            abs(totalY)
+
+                                    scope.launch {
+
+                                        /*
+                                         * Requirement:
+                                         *
+                                         * LEFT = PREVIOUS
+                                         */
+                                        if (
+                                            horizontal &&
+                                            totalX <
+                                            -70f
+                                        ) {
+                                            x.animateTo(
+                                                -widthPx,
+                                                spring(
+                                                    dampingRatio = 1f,
+                                                    stiffness = 500f
+                                                )
+                                            )
+
+                                            previous()
+
+                                            x.snapTo(
+                                                widthPx
+                                            )
+
+                                            x.animateTo(
+                                                0f,
+                                                spring(
+                                                    dampingRatio = .88f,
+                                                    stiffness = 420f
+                                                )
+                                            )
+
+                                            y.animateTo(0f)
+
+                                        /*
+                                         * RIGHT = NEXT
+                                         */
+                                        } else if (
+                                            horizontal &&
+                                            totalX >
+                                            70f
+                                        ) {
+                                            x.animateTo(
+                                                widthPx,
+                                                spring(
+                                                    dampingRatio = 1f,
+                                                    stiffness = 500f
+                                                )
+                                            )
+
+                                            next()
+
+                                            x.snapTo(
+                                                -widthPx
+                                            )
+
+                                            x.animateTo(
+                                                0f,
+                                                spring(
+                                                    dampingRatio = .88f,
+                                                    stiffness = 420f
+                                                )
+                                            )
+
+                                            y.animateTo(0f)
+
+                                        /*
+                                         * UP -> settle first,
+                                         * THEN player opens.
+                                         */
+                                        } else if (
+                                            !horizontal &&
+                                            totalY <
+                                            -50f
+                                        ) {
+                                            x.animateTo(0f)
+
+                                            y.animateTo(
+                                                0f,
+                                                spring(
+                                                    dampingRatio = .76f,
+                                                    stiffness = 430f
+                                                )
+                                            )
+
+                                            openPlayer()
+
+                                        } else {
+                                            x.animateTo(
+                                                0f,
+                                                spring(
+                                                    dampingRatio = .8f,
+                                                    stiffness = 430f
+                                                )
+                                            )
+
+                                            y.animateTo(
+                                                0f,
+                                                spring(
+                                                    dampingRatio = .8f,
+                                                    stiffness = 430f
+                                                )
+                                            )
+                                        }
+
+                                        totalX = 0f
+                                        totalY = 0f
+                                        dragged = false
+                                    }
+                                },
+
+                                onDragCancel = {
+                                    scope.launch {
+                                        x.animateTo(0f)
+                                        y.animateTo(0f)
+
+                                        totalX = 0f
+                                        totalY = 0f
+                                        dragged = false
+                                    }
+                                }
+                            )
+                        }
+                        .clickable(
+                            enabled =
+                                !dragged
+                        ) {
+                            openPlayer()
+                        }
                 ) {
                     /*
-                     * COVER
+                     * Real playback progress.
                      */
-                    AsyncImage(
-                        model =
-                            state.artworkUri
-                                ?.let(
-                                    Uri::parse
-                                ),
-                        contentDescription =
-                            null,
-                        modifier =
+                    val progress =
+                        if (
+                            state.duration >
+                            0L
+                        ) {
+                            (
+                                state.position
+                                    .toFloat() /
+                                    state.duration
+                                        .toFloat()
+                                )
+                                .coerceIn(
+                                    0f,
+                                    1f
+                                )
+                        } else {
+                            0f
+                        }
+
+                    Canvas(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(2.dp)
+                            .align(
+                                Alignment.TopStart
+                            )
+                    ) {
+                        drawRect(
+                            color = XmoRed,
+
+                            size =
+                                Size(
+                                    width =
+                                        size.width *
+                                            progress,
+
+                                    height =
+                                        size.height
+                                )
+                        )
+                    }
+
+                    Row(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(
+                                start = 4.dp,
+                                top = 4.dp,
+                                end = 8.dp,
+                                bottom = 4.dp
+                            ),
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model =
+                                state.artworkUri
+                                    ?.let(
+                                        Uri::parse
+                                    ),
+                            contentDescription =
+                                null,
+                            modifier =
+                                Modifier
+                                    .size(54.dp)
+                                    .clip(
+                                        RoundedCornerShape(
+                                            12.dp
+                                        )
+                                    )
+                                    .background(
+                                        c.button
+                                    ),
+                            contentScale =
+                                ContentScale.Crop
+                        )
+
+                        Column(
                             Modifier
-                                .size(54.dp)
+                                .weight(1f)
+                                .padding(
+                                    horizontal =
+                                        11.dp
+                                )
+                        ) {
+                            Text(
+                                text =
+                                    state.title,
+                                color =
+                                    c.text,
+                                fontFamily =
+                                    XmoFont.bold,
+                                fontSize =
+                                    13.sp,
+                                maxLines =
+                                    1,
+                                overflow =
+                                    TextOverflow
+                                        .Ellipsis
+                            )
+
+                            Text(
+                                text =
+                                    state.artist,
+                                color =
+                                    c.sub,
+                                fontFamily =
+                                    XmoFont.thin,
+                                fontSize =
+                                    10.sp,
+                                maxLines =
+                                    1,
+                                overflow =
+                                    TextOverflow
+                                        .Ellipsis
+                            )
+                        }
+
+                        /*
+                         * Wide Play/Pause pill.
+                         */
+                        Box(
+                            Modifier
+                                .width(72.dp)
+                                .height(44.dp)
                                 .clip(
                                     RoundedCornerShape(
-                                        12.dp
+                                        20.dp
                                     )
                                 )
                                 .background(
                                     c.button
-                                ),
-                        contentScale =
-                            ContentScale.Crop
-                    )
-
-                    /*
-                     * TEXT
-                     */
-                    Column(
-                        Modifier
-                            .weight(1f)
-                            .padding(
-                                horizontal = 11.dp
-                            )
-                    ) {
-                        Text(
-                            state.title,
-                            color = c.text,
-                            fontFamily =
-                                XmoFont.bold,
-                            fontSize = 13.sp,
-                            maxLines = 1,
-                            overflow =
-                                TextOverflow.Ellipsis
-                        )
-
-                        Text(
-                            state.artist,
-                            color = c.sub,
-                            fontFamily =
-                                XmoFont.thin,
-                            fontSize = 10.sp,
-                            maxLines = 1,
-                            overflow =
-                                TextOverflow.Ellipsis
-                        )
-                    }
-
-                    /*
-                     * PLAY / PAUSE CAPSULE
-                     */
-                    Box(
-                        Modifier
-                            .width(72.dp)
-                            .height(44.dp)
-                            .clip(
-                                RoundedCornerShape(
-                                    20.dp
                                 )
-                            )
-                            .background(
-                                c.button
-                            )
-                            .border(
-                                .6.dp,
-                                c.border,
-                                RoundedCornerShape(
-                                    20.dp
-                                )
-                            )
-                            .clickable {
-                                togglePlay()
-                            },
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-                        if (
-                            state.isPlaying
-                        ) {
-                            MiniPauseIcon(
-                                c.text,
-                                Modifier.size(
-                                    18.dp
-                                )
-                            )
-                        } else {
-                            androidx.compose.material3.Icon(
-                                Icons.Default.PlayArrow,
-                                null,
-                                tint = c.text,
-                                modifier =
-                                    Modifier.size(
-                                        21.dp
+                                .border(
+                                    .6.dp,
+                                    c.border,
+                                    RoundedCornerShape(
+                                        20.dp
                                     )
-                            )
+                                )
+                                .clickable {
+                                    togglePlay()
+                                },
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+                            if (
+                                state.isPlaying
+                            ) {
+                                MiniPauseIcon(
+                                    color =
+                                        c.text,
+                                    modifier =
+                                        Modifier.size(
+                                            18.dp
+                                        )
+                                )
+                            } else {
+                                Icon(
+                                    imageVector =
+                                        Icons.Default
+                                            .PlayArrow,
+                                    contentDescription =
+                                        null,
+                                    tint =
+                                        c.text,
+                                    modifier =
+                                        Modifier.size(
+                                            21.dp
+                                        )
+                                )
+                            }
                         }
                     }
                 }
@@ -479,28 +518,24 @@ private fun MiniPauseIcon(
         Modifier
 ) {
     Canvas(modifier) {
-        val w =
-            size.width
-
-        val h =
-            size.height
-
         val bw =
-            w * .20f
+            size.width * .19f
 
         val bh =
-            h * .70f
+            size.height * .68f
 
-        val top =
-            (h - bh) /
-                2f
+        val y =
+            (
+                size.height -
+                    bh
+                ) / 2f
 
         drawRoundRect(
-            color,
+            color = color,
             topLeft =
                 Offset(
-                    w * .24f,
-                    top
+                    size.width * .25f,
+                    y
                 ),
             size =
                 Size(
@@ -510,11 +545,11 @@ private fun MiniPauseIcon(
         )
 
         drawRoundRect(
-            color,
+            color = color,
             topLeft =
                 Offset(
-                    w * .56f,
-                    top
+                    size.width * .56f,
+                    y
                 ),
             size =
                 Size(
