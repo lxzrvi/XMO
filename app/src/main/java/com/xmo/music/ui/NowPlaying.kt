@@ -1,5 +1,3 @@
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
 fun NowPlaying(
 
 package com.xmo.music.ui
@@ -90,7 +88,8 @@ import com.xmo.music.ui.blur.rememberLiveBlurState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-
+    
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NowPlaying(
     state: PlaybackState,
