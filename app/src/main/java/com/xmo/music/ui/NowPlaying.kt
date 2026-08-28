@@ -735,26 +735,18 @@ fun NowPlaying(
                     Alignment.CenterVertically
             ) {
                 PlayerGlassButton(
-                    hazeState =
-                        hazeState,
-
-                    theme =
-                        theme
-                ) {
-                    scope.launch {
-                        closePlayer()
+                    hazeState = hazeState,
+                    theme = theme,
+                    click = {
+                        scope.launch {
+                            closePlayer()
+                        }
                     }
-                } content@{
+                ) {
                     Icon(
-                        imageVector =
-                            Icons.Default
-                                .KeyboardArrowDown,
-
-                        contentDescription =
-                            "Close",
-
-                        tint =
-                            c.text
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Close",
+                        tint = c.text
                     )
                 }
 
