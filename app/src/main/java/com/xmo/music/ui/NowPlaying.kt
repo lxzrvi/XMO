@@ -2139,17 +2139,9 @@ private fun ArtworkCarousel(
 
                     modifier =
                         Modifier
-                            .width(
-                                (coverWidth /
-                                    width *
-                                    maxWidth.value).dp
-                            )
-                            .aspectRatio(
-                                1f
-                            )
-                            .align(
-                                Alignment.Center
-                            )
+                            .fillMaxWidth(.82f)
+                            .aspectRatio(1f)
+                            .align(Alignment.Center)
                             .graphicsLayer {
                                 translationX =
                                     drag.value -
