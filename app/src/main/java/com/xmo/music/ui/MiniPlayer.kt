@@ -6,18 +6,20 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,7 +34,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,84 +47,77 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.xmo.music.R
 import com.xmo.music.XmoTheme
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.blur.glassBorder
 import com.xmo.music.ui.blur.glassHighlight
 import com.xmo.music.ui.blur.liveBlur
 import dev.chrisbanes.haze.HazeState
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sign
 
-private enum class MiniDragAxis {
+private enum class MiniAxis {
     None,
     Horizontal,
     Vertical
 }
 
-/*
- * Horizontal:
- *
- * first 60px = normal
- * after that = strong resistance
- */
-private fun horizontalResistance(
-    raw: Float
+private fun miniHorizontalResistance(
+    value: Float
 ): Float {
     val free =
-        60f
+        76f
 
     val distance =
-        abs(raw)
+        abs(value)
 
     if (
-        distance <= free
+        distance <=
+        free
     ) {
-        return raw
+        return value
     }
 
-    val result =
+    return (
         free +
             (
                 distance -
                     free
                 ) *
-            .08f
-
-    return result *
-        sign(raw)
+            .07f
+        ) *
+        sign(
+            value
+        )
 }
 
-/*
- * Vertical:
- *
- * downward drag not allowed
- *
- * first ~40px upward = normal
- * after that = very strong resistance
- */
-private fun upwardResistance(
-    raw: Float
+private fun miniVerticalResistance(
+    value: Float
 ): Float {
     if (
-        raw >= 0f
+        value >=
+        0f
     ) {
         return 0f
     }
 
     val distance =
-        -raw
+        -value
 
     val free =
-        40f
+        45f
 
     if (
-        distance <= free
+        distance <=
+        free
     ) {
         return -distance
     }
@@ -134,7 +128,7 @@ private fun upwardResistance(
                 distance -
                     free
                 ) *
-            .07f
+            .065f
         )
 }
 
@@ -143,19 +137,18 @@ fun MiniPlayer(
     state: PlaybackState,
     theme: XmoTheme,
     hazeState: HazeState,
-
-    /*
-     * 0:
-     * normal composition
-     *
-     * >0:
-     * this MiniPlayer was created after NowPlaying completely
-     * closed, so it rises from behind NavBar.
-     */
     riseKey: Int,
-
+    liked: Boolean,
     openPlayer: () -> Unit,
     togglePlay: () -> Unit,
+    toggleLike: () -> Unit,
+
+    /*
+     * XMO's intentional MiniPlayer direction:
+     *
+     * LEFT  -> previous
+     * RIGHT -> next
+     */
     previous: () -> Unit,
     next: () -> Unit
 ) {
@@ -167,20 +160,19 @@ fun MiniPlayer(
     }
 
     val c =
-        homeColors(theme)
+        homeColors(
+            theme
+        )
+
+    val accent =
+        LocalXmoAccent.current
 
     val scope =
         rememberCoroutineScope()
 
-    /*
-     * Main card gesture displacement.
-     *
-     * Horizontal swipe:
-     * x changes, y = 0
-     *
-     * Up swipe:
-     * y changes, x = 0
-     */
+    val density =
+        LocalDensity.current
+
     val x =
         remember {
             Animatable(
@@ -196,50 +188,100 @@ fun MiniPlayer(
         }
 
     /*
-     * Post-NowPlaying entrance.
-     *
-     * Because MiniPlayer is newly composed after full player
-     * dismissal, initial value itself can start below NavBar.
+     * When NowPlaying has fully disappeared, the newly composed
+     * MiniPlayer rises from behind the NavBar.
      */
     val entranceY =
-        remember {
+        remember(
+            riseKey
+        ) {
             Animatable(
                 if (
                     riseKey >
                     0
                 ) {
-                    150f
+                    with(
+                        density
+                    ) {
+                        150.dp.toPx()
+                    }
                 } else {
                     0f
                 }
             )
         }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(
+        riseKey
+    ) {
         if (
-            riseKey >
-            0
+            entranceY.value !=
+            0f
         ) {
             entranceY.animateTo(
-                targetValue =
-                    0f,
+                0f,
 
-                animationSpec =
-                    spring(
-                        dampingRatio =
-                            .86f,
+                spring(
+                    dampingRatio =
+                        .86f,
 
-                        stiffness =
-                            320f
-                    )
+                    stiffness =
+                        320f
+                )
             )
         }
+    }
+
+    /*
+     * Tap opening has an ordered transition:
+     *
+     * MiniPlayer -> below screen -> callback -> NowPlaying.
+     */
+    var opening by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    suspend fun openOrdered() {
+        if (
+            opening
+        ) {
+            return
+        }
+
+        opening =
+            true
+
+        x.snapTo(
+            0f
+        )
+
+        y.animateTo(
+            with(
+                density
+            ) {
+                150.dp.toPx()
+            },
+
+            animationSpec =
+                spring(
+                    dampingRatio =
+                        .92f,
+
+                    stiffness =
+                        430f
+                )
+        )
+
+        openPlayer()
     }
 
     var axis by
         remember {
             mutableStateOf(
-                MiniDragAxis.None
+                MiniAxis.None
             )
         }
 
@@ -257,10 +299,7 @@ fun MiniPlayer(
             )
         }
 
-    /*
-     * Stops tap callback after an actual drag.
-     */
-    var dragging by
+    var moved by
         remember {
             mutableStateOf(
                 false
@@ -273,10 +312,8 @@ fun MiniPlayer(
             0L
         ) {
             (
-                state.position
-                    .toFloat() /
-                    state.duration
-                        .toFloat()
+                state.position.toFloat() /
+                    state.duration.toFloat()
                 )
                 .coerceIn(
                     0f,
@@ -286,23 +323,22 @@ fun MiniPlayer(
             0f
         }
 
+    /*
+     * IME inset is applied before NavBar spacing. When a keyboard
+     * is visible the player therefore sits above it, while all
+     * existing card gestures remain attached to the same card.
+     */
     Box(
         Modifier
             .fillMaxSize()
+            .windowInsetsPadding(
+                WindowInsets.ime
+            )
             .navigationBarsPadding()
             .padding(
-                start =
-                    14.dp,
-
-                end =
-                    14.dp,
-
-                /*
-                 * Final location safely above approved NavBar,
-                 * including its expanded selector.
-                 */
-                bottom =
-                    128.dp
+                start = 14.dp,
+                end = 14.dp,
+                bottom = 128.dp
             ),
 
         contentAlignment =
@@ -312,134 +348,33 @@ fun MiniPlayer(
             Modifier.fillMaxWidth()
         ) {
             /*
-             * Card itself.
+             * The gesture host is deliberately taller than the
+             * visible 60dp player. Its transparent area above the
+             * card makes upward swipe acquisition easier.
              */
             Box(
                 Modifier
                     .fillMaxWidth()
                     .height(
-                        60.dp
+                        86.dp
                     )
-
-                    /*
-                     * Entire box follows finger.
-                     */
-                    .graphicsLayer {
-                        translationX =
-                            x.value
-
-                        translationY =
-                            y.value +
-                                entranceY.value
-                    }
-
-                    .clip(
-                        RoundedCornerShape(
-                            14.dp
-                        )
+                    .align(
+                        Alignment.BottomCenter
                     )
-
-                    /*
-                     * ONE shared real Haze blur.
-                     */
-                    .liveBlur(
-                        state =
-                            hazeState,
-
-                        theme =
-                            theme
-                    )
-
-                    /*
-                     * Cheap reflection / edge.
-                     */
-                    .drawBehind {
-                        val corner =
-                            14.dp.toPx()
-
-                        drawRoundRect(
-                            brush =
-                                Brush.verticalGradient(
-                                    colors =
-                                        listOf(
-                                            glassHighlight(
-                                                theme
-                                            ),
-
-                                            Color.Transparent,
-
-                                            Color.Transparent
-                                        ),
-
-                                    startY =
-                                        0f,
-
-                                    endY =
-                                        size.height *
-                                            .72f
-                                ),
-
-                            cornerRadius =
-                                CornerRadius(
-                                    corner
-                                )
-                        )
-
-                        drawRoundRect(
-                            color =
-                                glassBorder(
-                                    theme
-                                ),
-
-                            cornerRadius =
-                                CornerRadius(
-                                    corner
-                                ),
-
-                            style =
-                                Stroke(
-                                    width =
-                                        .35.dp.toPx()
-                                )
-                        )
-                    }
-
-                    .border(
-                        width =
-                            .65.dp,
-
-                        color =
-                            c.border,
-
-                        shape =
-                            RoundedCornerShape(
-                                14.dp
-                            )
-                    )
-
-                    /*
-                     * Tap:
-                     *
-                     * no MiniPlayer animation.
-                     * NowPlaying simply rises above it.
-                     */
-                    .clickable(
-                        enabled =
-                            !dragging
-                    ) {
-                        openPlayer()
-                    }
-
-                    /*
-                     * Swipe gesture.
-                     */
                     .pointerInput(
-                        state.currentSongId
+                        state.currentSongId,
+                        opening
                     ) {
+                        if (
+                            opening
+                        ) {
+                            return@pointerInput
+                        }
+
                         detectDragGestures(
                             onDragStart = {
                                 axis =
-                                    MiniDragAxis.None
+                                    MiniAxis.None
 
                                 rawX =
                                     0f
@@ -447,7 +382,7 @@ fun MiniPlayer(
                                 rawY =
                                     0f
 
-                                dragging =
+                                moved =
                                     false
                             },
 
@@ -463,21 +398,17 @@ fun MiniPlayer(
                                 rawY +=
                                     amount.y
 
-                                /*
-                                 * Wait until direction is clear,
-                                 * then lock it.
-                                 */
                                 if (
                                     axis ==
-                                    MiniDragAxis.None &&
+                                    MiniAxis.None &&
                                     (
                                         abs(rawX) >
-                                            10f ||
+                                            9f ||
                                             abs(rawY) >
-                                            10f
+                                            9f
                                         )
                                 ) {
-                                    dragging =
+                                    moved =
                                         true
 
                                     axis =
@@ -485,9 +416,9 @@ fun MiniPlayer(
                                             abs(rawX) >
                                             abs(rawY)
                                         ) {
-                                            MiniDragAxis.Horizontal
+                                            MiniAxis.Horizontal
                                         } else {
-                                            MiniDragAxis.Vertical
+                                            MiniAxis.Vertical
                                         }
                                 }
 
@@ -495,39 +426,31 @@ fun MiniPlayer(
                                     when (
                                         axis
                                     ) {
-                                        MiniDragAxis.Horizontal -> {
-                                            /*
-                                             * Horizontal gesture cannot
-                                             * move vertically.
-                                             */
+                                        MiniAxis.Horizontal -> {
                                             y.snapTo(
                                                 0f
                                             )
 
                                             x.snapTo(
-                                                horizontalResistance(
+                                                miniHorizontalResistance(
                                                     rawX
                                                 )
                                             )
                                         }
 
-                                        MiniDragAxis.Vertical -> {
-                                            /*
-                                             * Up gesture cannot move
-                                             * horizontally.
-                                             */
+                                        MiniAxis.Vertical -> {
                                             x.snapTo(
                                                 0f
                                             )
 
                                             y.snapTo(
-                                                upwardResistance(
+                                                miniVerticalResistance(
                                                     rawY
                                                 )
                                             )
                                         }
 
-                                        MiniDragAxis.None ->
+                                        MiniAxis.None ->
                                             Unit
                                     }
                                 }
@@ -547,56 +470,31 @@ fun MiniPlayer(
                                     when (
                                         finalAxis
                                     ) {
-                                        /*
-                                         * =================================
-                                         * LEFT / RIGHT
-                                         * =================================
-                                         *
-                                         * Requirement:
-                                         *
-                                         * box moves a little
-                                         *        ↓
-                                         * release
-                                         *        ↓
-                                         * FIRST restore box
-                                         *        ↓
-                                         * THEN change song/details
-                                         */
-                                        MiniDragAxis.Horizontal -> {
-
+                                        MiniAxis.Horizontal -> {
                                             y.snapTo(
                                                 0f
                                             )
 
                                             val goPrevious =
                                                 finalX <
-                                                    -40f
+                                                    -48f
 
                                             val goNext =
                                                 finalX >
-                                                    40f
+                                                    48f
 
-                                            /*
-                                             * Box comes home first.
-                                             */
                                             x.animateTo(
-                                                targetValue =
-                                                    0f,
+                                                0f,
 
-                                                animationSpec =
-                                                    spring(
-                                                        dampingRatio =
-                                                            .78f,
+                                                spring(
+                                                    dampingRatio =
+                                                        .80f,
 
-                                                        stiffness =
-                                                            440f
-                                                    )
+                                                    stiffness =
+                                                        470f
+                                                )
                                             )
 
-                                            /*
-                                             * Details only change AFTER
-                                             * exact resting position.
-                                             */
                                             if (
                                                 goPrevious
                                             ) {
@@ -608,53 +506,41 @@ fun MiniPlayer(
                                             }
                                         }
 
-                                        /*
-                                         * =================================
-                                         * SWIPE UP
-                                         * =================================
-                                         */
-                                        MiniDragAxis.Vertical -> {
-
+                                        MiniAxis.Vertical -> {
                                             x.snapTo(
                                                 0f
                                             )
 
                                             val shouldOpen =
                                                 finalY <
-                                                    -32f
+                                                    -38f
 
-                                            /*
-                                             * Card returns to its exact
-                                             * normal position first.
-                                             */
                                             y.animateTo(
-                                                targetValue =
-                                                    0f,
+                                                0f,
 
-                                                animationSpec =
-                                                    spring(
-                                                        dampingRatio =
-                                                            .76f,
+                                                spring(
+                                                    dampingRatio =
+                                                        .80f,
 
-                                                        stiffness =
-                                                            440f
-                                                    )
+                                                    stiffness =
+                                                        450f
+                                                )
                                             )
 
-                                            /*
-                                             * Only after settle.
-                                             */
                                             if (
                                                 shouldOpen
                                             ) {
-                                                openPlayer()
+                                                /*
+                                                 * Up-swipe returns to its
+                                                 * rest position first, then
+                                                 * performs the same ordered
+                                                 * exit used by a tap.
+                                                 */
+                                                openOrdered()
                                             }
                                         }
 
-                                        MiniDragAxis.None -> {
-                                            /*
-                                             * Tap is owned by clickable.
-                                             */
+                                        MiniAxis.None -> {
                                             x.snapTo(
                                                 0f
                                             )
@@ -672,15 +558,9 @@ fun MiniPlayer(
                                         0f
 
                                     axis =
-                                        MiniDragAxis.None
+                                        MiniAxis.None
 
-                                    /*
-                                     * Re-enable tap after gesture has
-                                     * completely ended.
-                                     */
-                                    withFrameNanos { }
-
-                                    dragging =
+                                    moved =
                                         false
                                 }
                             },
@@ -702,11 +582,9 @@ fun MiniPlayer(
                                         0f
 
                                     axis =
-                                        MiniDragAxis.None
+                                        MiniAxis.None
 
-                                    withFrameNanos { }
-
-                                    dragging =
+                                    moved =
                                         false
                                 }
                             }
@@ -714,207 +592,388 @@ fun MiniPlayer(
                     }
             ) {
                 /*
-                 * =================================================
-                 * TOP PLAYBACK PROGRESS
-                 * =================================================
-                 */
-                Canvas(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(
-                            1.5.dp
-                        )
-                        .align(
-                            Alignment.TopStart
-                        )
-                ) {
-                    drawRect(
-                        color =
-                            XmoRed,
-
-                        size =
-                            Size(
-                                width =
-                                    size.width *
-                                        progress,
-
-                                height =
-                                    size.height
-                            )
-                    )
-                }
-
-                /*
-                 * =================================================
-                 * CONTENT
-                 * =================================================
-                 *
-                 * Content itself does not independently slide.
-                 */
-                Row(
-                    Modifier
-                        .fillMaxSize()
-                        .padding(
-                            start =
-                                4.dp,
-
-                            top =
-                                4.dp,
-
-                            end =
-                                56.dp,
-
-                            bottom =
-                                4.dp
-                        ),
-
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model =
-                            state.artworkUri
-                                ?.let(
-                                    Uri::parse
-                                ),
-
-                        contentDescription =
-                            null,
-
-                        modifier =
-                            Modifier
-                                .size(
-                                    50.dp
-                                )
-                                .clip(
-                                    RoundedCornerShape(
-                                        11.dp
-                                    )
-                                )
-                                .background(
-                                    c.button
-                                ),
-
-                        contentScale =
-                            ContentScale.Crop
-                    )
-
-                    Column(
-                        Modifier
-                            .padding(
-                                start =
-                                    10.dp,
-
-                                end =
-                                    6.dp
-                            )
-                    ) {
-                        Text(
-                            text =
-                                state.title,
-
-                            color =
-                                c.text,
-
-                            fontFamily =
-                                XmoFont.bold,
-
-                            fontSize =
-                                13.sp,
-
-                            maxLines =
-                                1,
-
-                            overflow =
-                                TextOverflow.Ellipsis
-                        )
-
-                        Text(
-                            text =
-                                state.artist,
-
-                            color =
-                                c.sub,
-
-                            fontFamily =
-                                XmoFont.thin,
-
-                            fontSize =
-                                10.sp,
-
-                            maxLines =
-                                1,
-
-                            overflow =
-                                TextOverflow.Ellipsis
-                        )
-                    }
-                }
-
-                /*
-                 * =================================================
-                 * PLAY / PAUSE CIRCLE
-                 * =================================================
+                 * Small visible grab region at the top of the
+                 * enlarged gesture host.
                  */
                 Box(
                     Modifier
                         .align(
-                            Alignment.CenterEnd
+                            Alignment.TopCenter
                         )
                         .padding(
-                            end =
-                                7.dp
+                            top = 7.dp
                         )
-                        .size(
-                            42.dp
+                        .width(
+                            48.dp
+                        )
+                        .height(
+                            4.dp
                         )
                         .clip(
-                            CircleShape
+                            RoundedCornerShape(
+                                2.dp
+                            )
                         )
                         .background(
-                            c.button
+                            c.sub.copy(
+                                alpha = .26f
+                            )
                         )
+                )
+
+                Box(
+                    Modifier
+                        .align(
+                            Alignment.BottomCenter
+                        )
+                        .fillMaxWidth()
+                        .height(
+                            60.dp
+                        )
+                        .graphicsLayer {
+                            translationX =
+                                x.value
+
+                            translationY =
+                                y.value +
+                                    entranceY.value
+                        }
+                        .clip(
+                            RoundedCornerShape(
+                                15.dp
+                            )
+                        )
+                        .liveBlur(
+                            hazeState,
+                            theme
+                        )
+                        .drawBehind {
+                            val radius =
+                                15.dp.toPx()
+
+                            drawRoundRect(
+                                brush =
+                                    Brush.verticalGradient(
+                                        listOf(
+                                            glassHighlight(
+                                                theme
+                                            ),
+                                            Color.Transparent,
+                                            Color.Transparent
+                                        )
+                                    ),
+
+                                cornerRadius =
+                                    CornerRadius(
+                                        radius
+                                    )
+                            )
+
+                            drawRoundRect(
+                                color =
+                                    glassBorder(
+                                        theme
+                                    ),
+
+                                cornerRadius =
+                                    CornerRadius(
+                                        radius
+                                    ),
+
+                                style =
+                                    Stroke(
+                                        .4.dp.toPx()
+                                    )
+                            )
+                        }
                         .border(
-                            .6.dp,
-                            c.border,
-                            CircleShape
+                            .65.dp,
+                            glassBorder(
+                                theme
+                            ),
+                            RoundedCornerShape(
+                                15.dp
+                            )
                         )
-                        .clickable {
-                            togglePlay()
-                        },
-
-                    contentAlignment =
-                        Alignment.Center
                 ) {
-                    if (
-                        state.isPlaying
+                    /*
+                     * Real playback progress.
+                     */
+                    Canvas(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(
+                                1.5.dp
+                            )
+                            .align(
+                                Alignment.TopStart
+                            )
                     ) {
-                        MiniPauseIcon(
+                        drawRect(
                             color =
-                                c.text,
+                                accent,
 
-                            modifier =
-                                Modifier.size(
-                                    18.dp
+                            size =
+                                Size(
+                                    size.width *
+                                        progress,
+
+                                    size.height
                                 )
                         )
-                    } else {
-                        Icon(
-                            imageVector =
-                                Icons.Default
-                                    .PlayArrow,
+                    }
+
+                    /*
+                     * Card tap region excludes interactive right
+                     * buttons, preventing accidental opening.
+                     */
+                    Row(
+                        Modifier
+                            .fillMaxSize()
+                            .padding(
+                                start = 4.dp,
+                                top = 4.dp,
+                                end = 94.dp,
+                                bottom = 4.dp
+                            ),
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
+                        AsyncImage(
+                            model =
+                                state.artworkUri
+                                    ?.let(
+                                        Uri::parse
+                                    ),
 
                             contentDescription =
                                 null,
 
-                            tint =
-                                c.text,
-
                             modifier =
-                                Modifier.size(
-                                    21.dp
-                                )
+                                Modifier
+                                    .size(
+                                        50.dp
+                                    )
+                                    .clip(
+                                        RoundedCornerShape(
+                                            11.dp
+                                        )
+                                    )
+                                    .background(
+                                        c.button
+                                    ),
+
+                            contentScale =
+                                ContentScale.Crop
                         )
+
+                        Column(
+                            Modifier
+                                .weight(
+                                    1f
+                                )
+                                .padding(
+                                    start = 9.dp,
+                                    end = 5.dp
+                                )
+                        ) {
+                            Text(
+                                state.title,
+
+                                color =
+                                    c.text,
+
+                                fontFamily =
+                                    XmoFont.bold,
+
+                                fontSize =
+                                    12.sp,
+
+                                maxLines =
+                                    1,
+
+                                overflow =
+                                    TextOverflow.Ellipsis
+                            )
+
+                            Text(
+                                state.artist,
+
+                                color =
+                                    c.sub,
+
+                                fontFamily =
+                                    XmoFont.thin,
+
+                                fontSize =
+                                    9.sp,
+
+                                maxLines =
+                                    1,
+
+                                overflow =
+                                    TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+
+                    /*
+                     * Transparent tap layer over artwork/text only.
+                     */
+                    Box(
+                        Modifier
+                            .align(
+                                Alignment.CenterStart
+                            )
+                            .fillMaxWidth()
+                            .height(
+                                58.dp
+                            )
+                            .padding(
+                                end =
+                                    94.dp
+                            )
+                            .pointerInput(
+                                state.currentSongId,
+                                moved,
+                                opening
+                            ) {
+                                if (
+                                    opening
+                                ) {
+                                    return@pointerInput
+                                }
+
+                                detectTapGestures(
+                                    onTap = {
+                                        if (
+                                            !moved
+                                        ) {
+                                            scope.launch {
+                                                openOrdered()
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                    )
+
+                    /*
+                     * Like + play controls use the same pill/glass
+                     * language as Home refresh/hamburger.
+                     */
+                    Row(
+                        Modifier
+                            .align(
+                                Alignment.CenterEnd
+                            )
+                            .padding(
+                                end = 6.dp
+                            )
+                            .clip(
+                                RoundedCornerShape(
+                                    22.dp
+                                )
+                            )
+                            .background(
+                                c.button
+                            )
+                            .border(
+                                .6.dp,
+                                glassBorder(
+                                    theme
+                                ),
+                                RoundedCornerShape(
+                                    22.dp
+                                )
+                            ),
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
+                        Box(
+                            Modifier
+                                .size(
+                                    38.dp
+                                )
+                                .pointerInput(
+                                    liked
+                                ) {
+                                    detectTapGestures {
+                                        toggleLike()
+                                    }
+                                },
+
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+                            XmoIcon(
+                                icon =
+                                    R.drawable.ic_xmo_heart,
+
+                                tint =
+                                    if (
+                                        liked
+                                    ) {
+                                        accent
+                                    } else {
+                                        c.icon
+                                    },
+
+                                modifier =
+                                    Modifier.size(
+                                        17.dp
+                                    )
+                            )
+                        }
+
+                        Box(
+                            Modifier
+                                .size(
+                                    42.dp
+                                )
+                                .pointerInput(
+                                    state.isPlaying
+                                ) {
+                                    detectTapGestures {
+                                        togglePlay()
+                                    }
+                                },
+
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+                            if (
+                                state.isPlaying
+                            ) {
+                                MiniPauseIcon(
+                                    color =
+                                        c.text,
+
+                                    modifier =
+                                        Modifier.size(
+                                            18.dp
+                                        )
+                                )
+                            } else {
+                                Icon(
+                                    imageVector =
+                                        Icons.Default.PlayArrow,
+
+                                    contentDescription =
+                                        "Play",
+
+                                    tint =
+                                        c.text,
+
+                                    modifier =
+                                        Modifier.size(
+                                            22.dp
+                                        )
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -954,7 +1013,6 @@ private fun MiniPauseIcon(
                 Offset(
                     size.width *
                         .25f,
-
                     top
                 ),
 
@@ -962,6 +1020,12 @@ private fun MiniPauseIcon(
                 Size(
                     barWidth,
                     barHeight
+                ),
+
+            cornerRadius =
+                CornerRadius(
+                    barWidth /
+                        2f
                 )
         )
 
@@ -973,7 +1037,6 @@ private fun MiniPauseIcon(
                 Offset(
                     size.width *
                         .56f,
-
                     top
                 ),
 
@@ -981,6 +1044,12 @@ private fun MiniPauseIcon(
                 Size(
                     barWidth,
                     barHeight
+                ),
+
+            cornerRadius =
+                CornerRadius(
+                    barWidth /
+                        2f
                 )
         )
     }
