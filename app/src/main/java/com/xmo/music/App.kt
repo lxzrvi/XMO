@@ -7,15 +7,32 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
-import com.xmo.music.data.*
+import com.xmo.music.data.Library
+import com.xmo.music.data.Song
+import com.xmo.music.data.Store
+import com.xmo.music.data.UserCategory
 import com.xmo.music.player.XmoPlayer
-import com.xmo.music.ui.*
+import com.xmo.music.ui.Home
+import com.xmo.music.ui.MiniPlayer
+import com.xmo.music.ui.NavBar
+import com.xmo.music.ui.NowPlaying
+import com.xmo.music.ui.Search
+import com.xmo.music.ui.Settings
 import kotlinx.coroutines.launch
 
 enum class XmoTheme {
@@ -32,7 +49,7 @@ fun App() {
     val scope =
         rememberCoroutineScope()
 
-    val holder =
+    val stateHolder =
         rememberSaveableStateHolder()
 
     val player =
@@ -112,8 +129,29 @@ fun App() {
         )
     }
 
+    /*
+     * =========================================================
+     * PLAYER NAVIGATION
+     * =========================================================
+     */
     var showPlayer by remember {
         mutableStateOf(false)
+    }
+
+    /*
+     * While NowPlaying enters, MiniPlayer stays underneath.
+     * onOpened() then removes it.
+     */
+    var miniVisible by remember {
+        mutableStateOf(false)
+    }
+
+    /*
+     * Increment after NowPlaying fully exits.
+     * MiniPlayer uses it for bottom-rise animation.
+     */
+    var miniRiseKey by remember {
+        mutableIntStateOf(0)
     }
 
     var source by remember {
@@ -127,15 +165,15 @@ fun App() {
     }
 
     /*
-     * Only true after full player has actually exited.
+     * =========================================================
+     * INITIAL DATA
+     * =========================================================
      */
-    var miniEnterFromBottom by remember {
-        mutableStateOf(false)
-    }
-
     LaunchedEffect(Unit) {
         order =
-            Store.order(context)
+            Store.order(
+                context
+            )
 
         categories =
             Store.categories(
@@ -167,28 +205,83 @@ fun App() {
         }
     }
 
+    /*
+     * Shared playback launcher for Home/Search.
+     */
+    fun playSong(
+        song: Song,
+        from: String,
+        isCategory: Boolean,
+        queue: List<Song>
+    ) {
+        val index =
+            queue.indexOfFirst {
+                it.id ==
+                    song.id
+            }
+
+        if (index < 0) {
+            return
+        }
+
+        source =
+            from
+
+        sourceIsCategory =
+            isCategory
+
+        /*
+         * If no old player exists yet, MiniPlayer doesn't need
+         * to be visible under entrance.
+         *
+         * If a song was already playing, keep current MiniPlayer
+         * until NowPlaying visually covers it.
+         */
+        miniVisible =
+            playback.currentSongId !=
+                null
+
+        showPlayer =
+            true
+
+        player.play(
+            queue,
+            index
+        )
+    }
+
     Box(
         Modifier.fillMaxSize()
     ) {
+        /*
+         * =====================================================
+         * TAB CONTENT
+         * =====================================================
+         */
         Box(
             Modifier
                 .fillMaxSize()
                 .zIndex(0f)
         ) {
-            holder.SaveableStateProvider(
-                "tab_$tab"
+            stateHolder.SaveableStateProvider(
+                key =
+                    "tab_$tab"
             ) {
                 when (tab) {
                     0 -> {
                         Home(
                             songs =
                                 songs,
+
                             allowed =
                                 allowed,
+
                             theme =
                                 theme,
+
                             order =
                                 order,
+
                             categories =
                                 categories,
 
@@ -223,8 +316,7 @@ fun App() {
                             },
 
                             saveCategories = {
-                                categories =
-                                    it
+                                categories = it
 
                                 scope.launch {
                                     Store.saveCategories(
@@ -240,46 +332,80 @@ fun App() {
                                     isCategory,
                                     queue ->
 
-                                val index =
+                                playSong(
+                                    song,
+                                    from,
+                                    isCategory,
                                     queue
-                                        .indexOfFirst {
-                                            it.id ==
-                                                song.id
-                                        }
-
-                                if (index >= 0) {
-                                    source = from
-                                    sourceIsCategory =
-                                        isCategory
-
-                                    /*
-                                     * MiniPlayer is removed
-                                     * immediately without exit
-                                     * animation.
-                                     */
-                                    miniEnterFromBottom =
-                                        false
-
-                                    showPlayer = true
-
-                                    player.play(
-                                        queue,
-                                        index
-                                    )
-                                }
+                                )
                             }
                         )
                     }
 
-                    1 -> Search()
+                    1 -> {
+                        Search(
+                            songs =
+                                songs,
 
-                    else -> Settings()
+                            categories =
+                                categories,
+
+                            theme =
+                                theme,
+
+                            setTheme = {
+                                theme = it
+                            },
+
+                            onPlaySong = {
+                                    song,
+                                    from,
+                                    isCategory,
+                                    queue ->
+
+                                playSong(
+                                    song,
+                                    from,
+                                    isCategory,
+                                    queue
+                                )
+                            }
+                        )
+                    }
+
+                    else -> {
+                        Settings(
+                            theme =
+                                theme,
+
+                            setTheme = {
+                                theme = it
+                            },
+
+                            rescan = {
+                                if (!allowed) {
+                                    launcher.launch(
+                                        permission
+                                    )
+                                } else {
+                                    scope.launch {
+                                        songs =
+                                            Library.songs(
+                                                context
+                                            )
+                                    }
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
 
         /*
-         * Approved navbar.
+         * =====================================================
+         * APPROVED NAVBAR
+         * =====================================================
          */
         Box(
             Modifier
@@ -297,15 +423,20 @@ fun App() {
         }
 
         /*
-         * MiniPlayer.
+         * =====================================================
+         * MINI PLAYER
+         * =====================================================
          *
-         * Direct conditional means opening full player causes
-         * immediate disappearance — NO exit animation.
+         * zIndex below NowPlaying.
+         *
+         * During full-player entrance it can remain here until
+         * onOpened() removes it, but is naturally covered by
+         * NowPlaying as the sheet rises.
          */
         if (
             playback.currentSongId !=
                 null &&
-            !showPlayer
+            miniVisible
         ) {
             Box(
                 Modifier
@@ -319,16 +450,16 @@ fun App() {
                     theme =
                         theme,
 
-                    enterFromBottom =
-                        miniEnterFromBottom,
+                    riseKey =
+                        miniRiseKey,
 
                     openPlayer = {
                         /*
-                         * Immediate removal.
+                         * DON'T hide MiniPlayer here.
+                         *
+                         * It stays still exactly where it is.
+                         * NowPlaying rises over it.
                          */
-                        miniEnterFromBottom =
-                            false
-
                         showPlayer =
                             true
                     },
@@ -350,7 +481,9 @@ fun App() {
         }
 
         /*
-         * Full Now Playing.
+         * =====================================================
+         * NOW PLAYING
+         * =====================================================
          */
         if (showPlayer) {
             Box(
@@ -373,6 +506,16 @@ fun App() {
 
                     queue =
                         player.queue(),
+
+                    /*
+                     * Full player has completed entrance and now
+                     * covers MiniPlayer. Remove MiniPlayer from
+                     * background without any animation.
+                     */
+                    onOpened = {
+                        miniVisible =
+                            false
+                    },
 
                     refreshPosition = {
                         player
@@ -397,17 +540,44 @@ fun App() {
                     },
 
                     /*
-                     * Called ONLY once NowPlaying has completed
-                     * its own downward exit.
+                     * NowPlaying calls this only AFTER it is fully
+                     * below the display.
                      */
                     dismiss = {
-                        miniEnterFromBottom =
-                            true
-
                         showPlayer =
                             false
+
+                        miniRiseKey++
+
+                        miniVisible =
+                            playback.currentSongId !=
+                                null
                     }
                 )
+            }
+        }
+
+        /*
+         * First playback case:
+         *
+         * Song starts and NowPlaying is later dismissed ->
+         * MiniPlayer becomes visible via dismiss callback.
+         *
+         * If playback exists after process state changes and no
+         * player overlay is open, make MiniPlayer available.
+         */
+        LaunchedEffect(
+            playback.currentSongId,
+            showPlayer
+        ) {
+            if (
+                playback.currentSongId !=
+                    null &&
+                !showPlayer &&
+                !miniVisible
+            ) {
+                miniVisible =
+                    true
             }
         }
     }
