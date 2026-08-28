@@ -22,10 +22,17 @@ jobs:
       - name: Android kitchen is ready
         uses: android-actions/setup-android@v3
 
-      - name: Install Android API 37
+      - name: Update Android SDK tools
+        run: |
+          sdkmanager --update
+
+      - name: Accept Android licenses
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager "platforms;android-37"
+
+      - name: Install Android API 37
+        run: |
+          sdkmanager --channel=3 "platforms;android-37"
 
       - name: Adding ingredients
         uses: gradle/actions/setup-gradle@v4
