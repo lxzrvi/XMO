@@ -3,12 +3,14 @@ package com.xmo.music.ui
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.*
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
@@ -24,18 +26,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
+import com.xmo.music.data.Song
 import com.xmo.music.player.PlaybackState
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -47,6 +49,7 @@ fun NowPlaying(
     theme: XmoTheme,
     source: String,
     sourceIsCategory: Boolean,
+    queue: List<Song>,
     refreshPosition: () -> Unit,
     togglePlay: () -> Unit,
     previous: () -> Unit,
@@ -57,20 +60,17 @@ fun NowPlaying(
     val c =
         homeColors(theme)
 
+    val context =
+        LocalContext.current
+
     val scope =
         rememberCoroutineScope()
 
-    /*
-     * AnimatedVisibility controls only full entrance/exit.
-     */
     var visible by remember {
         mutableStateOf(false)
     }
 
-    /*
-     * Finger-follow offset while already open.
-     */
-    val dragY =
+    val sheetY =
         remember {
             Animatable(0f)
         }
@@ -79,17 +79,143 @@ fun NowPlaying(
         mutableFloatStateOf(1f)
     }
 
-    /*
-     * Must happen after initial composition.
-     *
-     * false -> true is what triggers slideInVertically.
-     */
     LaunchedEffect(Unit) {
         visible = true
     }
 
     /*
-     * Real MediaController position polling.
+     * Current Song object from real playback queue.
+     */
+    val queueIndex =
+        state.currentIndex
+            .takeIf {
+                it in queue.indices
+            }
+            ?: queue.indexOfFirst {
+                it.id ==
+                    state.currentSongId
+            }
+
+    val currentSong =
+        queue.getOrNull(
+            queueIndex
+        )
+
+    val previousSong =
+        queue.getOrNull(
+            queueIndex - 1
+        )
+
+    val nextSong =
+        queue.getOrNull(
+            queueIndex + 1
+        )
+
+    /*
+     * =========================================================
+     * ARTWORK DOMINANT BACKGROUND
+     * =========================================================
+     */
+    var dominant by remember {
+        mutableStateOf(
+            Color(0xFF35353A)
+        )
+    }
+
+    LaunchedEffect(
+        currentSong?.artwork,
+        state.artworkUri
+    ) {
+        dominant =
+            if (
+                currentSong !=
+                null
+            ) {
+                Artwork.cached(
+                    currentSong.artwork
+                )
+                    ?: Artwork.color(
+                        context,
+                        currentSong.artwork
+                    )
+            } else {
+                state.artworkUri
+                    ?.let(
+                        Uri::parse
+                    )
+                    ?.let {
+                        Artwork.cached(it)
+                            ?: Artwork.color(
+                                context,
+                                it
+                            )
+                    }
+                    ?: Color(
+                        0xFF35353A
+                    )
+            }
+    }
+
+    val animatedDominant by
+        animateColorAsState(
+            targetValue =
+                dominant,
+            animationSpec =
+                tween(
+                    durationMillis =
+                        430
+                ),
+            label =
+                "playerBackground"
+        )
+
+    val gradientEnd =
+        Artwork.end(
+            animatedDominant,
+            theme
+        )
+
+    val backgroundBrush =
+        Brush.verticalGradient(
+            colors =
+                when (theme) {
+                    XmoTheme.Light ->
+                        listOf(
+                            animatedDominant
+                                .copy(
+                                    alpha =
+                                        .35f
+                                ),
+                            gradientEnd,
+                            c.bg
+                        )
+
+                    XmoTheme.Dark ->
+                        listOf(
+                            animatedDominant
+                                .copy(
+                                    alpha =
+                                        .50f
+                                ),
+                            gradientEnd,
+                            c.bg
+                        )
+
+                    XmoTheme.Amoled ->
+                        listOf(
+                            animatedDominant
+                                .copy(
+                                    alpha =
+                                        .38f
+                                ),
+                            gradientEnd,
+                            Color.Black
+                        )
+                }
+        )
+
+    /*
+     * Real playback progress polling.
      */
     LaunchedEffect(
         state.currentSongId,
@@ -99,7 +225,9 @@ fun NowPlaying(
             refreshPosition()
 
             delay(
-                if (state.isPlaying) {
+                if (
+                    state.isPlaying
+                ) {
                     250L
                 } else {
                     500L
@@ -108,19 +236,10 @@ fun NowPlaying(
         }
     }
 
-    /*
-     * Full animated dismissal.
-     *
-     * First return drag sheet to zero when needed, then let
-     * AnimatedVisibility own the final bottom exit.
-     */
-    suspend fun close() {
+    suspend fun closePlayer() {
         visible = false
 
-        /*
-         * Keep composable alive while slideOut runs.
-         */
-        delay(370L)
+        delay(370)
 
         dismiss()
     }
@@ -129,12 +248,13 @@ fun NowPlaying(
         enabled = visible
     ) {
         scope.launch {
-            close()
+            closePlayer()
         }
     }
 
     AnimatedVisibility(
-        visible = visible,
+        visible =
+            visible,
 
         enter =
             slideInVertically(
@@ -142,9 +262,7 @@ fun NowPlaying(
                     it
                 },
                 animationSpec =
-                    tween(
-                        durationMillis = 420
-                    )
+                    tween(420)
             ),
 
         exit =
@@ -153,20 +271,15 @@ fun NowPlaying(
                     it
                 },
                 animationSpec =
-                    tween(
-                        durationMillis = 360
-                    )
+                    tween(360)
             ),
 
         modifier =
             Modifier.fillMaxSize()
     ) {
-        /*
-         * Drag progress drives corner rounding.
-         */
-        val dragProgress =
+        val closeProgress =
             (
-                dragY.value /
+                sheetY.value /
                     screenHeight
                 )
                 .coerceIn(
@@ -176,7 +289,7 @@ fun NowPlaying(
 
         val radius =
             30.dp *
-                dragProgress
+                closeProgress
 
         Box(
             Modifier
@@ -191,7 +304,7 @@ fun NowPlaying(
                 }
                 .graphicsLayer {
                     translationY =
-                        dragY.value
+                        sheetY.value
                 }
                 .clip(
                     RoundedCornerShape(
@@ -202,7 +315,7 @@ fun NowPlaying(
                     )
                 )
                 .background(
-                    c.bg
+                    backgroundBrush
                 )
         ) {
             Column(
@@ -215,12 +328,13 @@ fun NowPlaying(
                         WindowInsets.statusBars
                     )
                     .padding(
-                        horizontal = 14.dp
+                        horizontal =
+                            14.dp
                     )
             ) {
                 /*
                  * =================================================
-                 * HEADER + PLAYER DRAG HANDLE AREA
+                 * HEADER / CLOSE DRAG
                  * =================================================
                  */
                 Row(
@@ -237,23 +351,16 @@ fun NowPlaying(
 
                                     change.consume()
 
-                                    /*
-                                     * Only downward displacement is
-                                     * allowed from the open position.
-                                     */
-                                    val target =
-                                        (
-                                            dragY.value +
-                                                amount
-                                            )
-                                            .coerceIn(
-                                                0f,
-                                                screenHeight
-                                            )
-
                                     scope.launch {
-                                        dragY.snapTo(
-                                            target
+                                        sheetY.snapTo(
+                                            (
+                                                sheetY.value +
+                                                    amount
+                                                )
+                                                .coerceIn(
+                                                    0f,
+                                                    screenHeight
+                                                )
                                         )
                                     }
                                 },
@@ -261,37 +368,31 @@ fun NowPlaying(
                                 onDragEnd = {
                                     scope.launch {
                                         if (
-                                            dragY.value >
+                                            sheetY.value >
                                             screenHeight *
                                                 .18f
                                         ) {
                                             /*
-                                             * Finish remaining finger
-                                             * displacement first.
+                                             * Full finger-follow exit.
                                              *
-                                             * This gives a continuous
-                                             * gesture rather than jumping
-                                             * back to top before exit.
+                                             * MiniPlayer doesn't appear
+                                             * until dismiss() afterwards.
                                              */
-                                            dragY.animateTo(
+                                            sheetY.animateTo(
                                                 screenHeight,
-                                                animationSpec =
-                                                    tween(
-                                                        220
-                                                    )
+                                                tween(250)
                                             )
 
                                             dismiss()
                                         } else {
-                                            dragY.animateTo(
+                                            sheetY.animateTo(
                                                 0f,
-                                                animationSpec =
-                                                    spring(
-                                                        dampingRatio =
-                                                            .82f,
-                                                        stiffness =
-                                                            400f
-                                                    )
+                                                spring(
+                                                    dampingRatio =
+                                                        .82f,
+                                                    stiffness =
+                                                        400f
+                                                )
                                             )
                                         }
                                     }
@@ -299,15 +400,8 @@ fun NowPlaying(
 
                                 onDragCancel = {
                                     scope.launch {
-                                        dragY.animateTo(
-                                            0f,
-                                            animationSpec =
-                                                spring(
-                                                    dampingRatio =
-                                                        .85f,
-                                                    stiffness =
-                                                        380f
-                                                )
+                                        sheetY.animateTo(
+                                            0f
                                         )
                                     }
                                 }
@@ -316,22 +410,16 @@ fun NowPlaying(
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
-                    /*
-                     * DOWN BUTTON
-                     */
                     IconButton(
                         onClick = {
                             scope.launch {
-                                close()
+                                closePlayer()
                             }
                         },
-
                         modifier =
                             Modifier
                                 .size(40.dp)
-                                .clip(
-                                    CircleShape
-                                )
+                                .clip(CircleShape)
                                 .background(
                                     c.button
                                 )
@@ -342,97 +430,63 @@ fun NowPlaying(
                                 )
                     ) {
                         Icon(
-                            imageVector =
-                                Icons.Default
-                                    .KeyboardArrowDown,
-
-                            contentDescription =
-                                "Close player",
-
+                            Icons.Default
+                                .KeyboardArrowDown,
+                            "Close",
                             tint =
-                                c.text,
-
-                            modifier =
-                                Modifier.size(
-                                    25.dp
-                                )
+                                c.text
                         )
                     }
 
-                    /*
-                     * SOURCE
-                     */
                     Column(
                         Modifier
                             .weight(1f)
                             .padding(
-                                horizontal = 8.dp
+                                horizontal =
+                                    8.dp
                             ),
-
                         horizontalAlignment =
                             Alignment
                                 .CenterHorizontally
                     ) {
                         Text(
-                            text =
-                                if (
-                                    sourceIsCategory
-                                ) {
-                                    "PLAYING FROM CATEGORY"
-                                } else {
-                                    "PLAYING FROM"
-                                },
-
+                            if (
+                                sourceIsCategory
+                            ) {
+                                "PLAYING FROM CATEGORY"
+                            } else {
+                                "PLAYING FROM"
+                            },
                             color =
                                 c.sub,
-
                             fontFamily =
                                 XmoFont.medium,
-
                             fontSize =
                                 9.sp,
-
                             letterSpacing =
-                                1.sp,
-
-                            maxLines =
-                                1
+                                1.sp
                         )
 
                         Text(
-                            text =
-                                source,
-
+                            source,
                             color =
                                 c.text,
-
                             fontFamily =
                                 XmoFont.bold,
-
                             fontSize =
                                 13.sp,
-
                             maxLines =
                                 1,
-
                             overflow =
                                 TextOverflow
                                     .Ellipsis
                         )
                     }
 
-                    /*
-                     * MENU VISUAL.
-                     *
-                     * Functional menu is added only when
-                     * real actions exist.
-                     */
                     Box(
                         Modifier
                             .size(40.dp)
-                            .clip(
-                                CircleShape
-                            )
+                            .clip(CircleShape)
                             .background(
                                 c.button
                             )
@@ -441,116 +495,82 @@ fun NowPlaying(
                                 c.border,
                                 CircleShape
                             ),
-
                         contentAlignment =
                             Alignment.Center
                     ) {
                         Icon(
-                            imageVector =
-                                Icons.Default
-                                    .MoreVert,
-
-                            contentDescription =
-                                null,
-
+                            Icons.Default
+                                .MoreVert,
+                            null,
                             tint =
-                                c.icon,
-
-                            modifier =
-                                Modifier.size(
-                                    21.dp
-                                )
+                                c.icon
                         )
                     }
                 }
 
+                /*
+                 * Cover intentionally lower than previous version.
+                 */
                 Spacer(
                     Modifier.height(
-                        22.dp
+                        42.dp
                     )
                 )
 
                 /*
                  * =================================================
-                 * ARTWORK
+                 * ARTWORK CAROUSEL
                  * =================================================
                  */
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
-                        .clip(
-                            RoundedCornerShape(
-                                24.dp
-                            )
-                        )
-                        .background(
-                            c.surface
-                        )
-                        .border(
-                            .7.dp,
-                            c.border,
-                            RoundedCornerShape(
-                                24.dp
-                            )
-                        )
-                ) {
-                    AsyncImage(
-                        model =
-                            state.artworkUri
+                ArtworkCarousel(
+                    current =
+                        currentSong
+                            ?.artwork
+                            ?: state.artworkUri
                                 ?.let(
                                     Uri::parse
                                 ),
 
-                        contentDescription =
-                            state.title,
+                    previous =
+                        previousSong
+                            ?.artwork,
 
-                        modifier =
-                            Modifier
-                                .fillMaxSize(),
+                    next =
+                        nextSong
+                            ?.artwork,
 
-                        contentScale =
-                            ContentScale.Crop
-                    )
+                    border =
+                        c.border,
 
-                    if (
-                        state.artworkUri ==
-                        null
-                    ) {
-                        Box(
-                            Modifier
-                                .fillMaxSize(),
+                    surface =
+                        c.surface,
 
-                            contentAlignment =
-                                Alignment.Center
-                        ) {
-                            Text(
-                                "XMO",
+                    canPrevious =
+                        previousSong !=
+                            null,
 
-                                color =
-                                    XmoRed.copy(
-                                        alpha = .72f
-                                    ),
+                    canNext =
+                        nextSong !=
+                            null,
 
-                                fontFamily =
-                                    XmoFont.logo,
+                    previousSong = {
+                        previous()
+                    },
 
-                                fontSize =
-                                    32.sp
-                            )
-                        }
+                    nextSong = {
+                        next()
                     }
-                }
+                )
 
                 Spacer(
                     Modifier.height(
-                        24.dp
+                        28.dp
                     )
                 )
 
                 /*
                  * =================================================
-                 * CONNECTED PLAYER SURFACE
+                 * PLAYER PANEL
                  * =================================================
                  */
                 Column(
@@ -558,80 +578,71 @@ fun NowPlaying(
                         .fillMaxWidth()
                         .clip(
                             RoundedCornerShape(
-                                topStart = 28.dp,
-                                topEnd = 28.dp,
-                                bottomStart = 10.dp,
-                                bottomEnd = 10.dp
+                                topStart =
+                                    28.dp,
+                                topEnd =
+                                    28.dp,
+                                bottomStart =
+                                    10.dp,
+                                bottomEnd =
+                                    10.dp
                             )
                         )
                         .background(
-                            c.surface
+                            c.surface.copy(
+                                alpha =
+                                    .93f
+                            )
                         )
                         .border(
                             .7.dp,
                             c.border,
                             RoundedCornerShape(
-                                topStart = 28.dp,
-                                topEnd = 28.dp,
-                                bottomStart = 10.dp,
-                                bottomEnd = 10.dp
+                                topStart =
+                                    28.dp,
+                                topEnd =
+                                    28.dp,
+                                bottomStart =
+                                    10.dp,
+                                bottomEnd =
+                                    10.dp
                             )
                         )
                         .padding(
-                            horizontal = 20.dp,
-                            vertical = 24.dp
+                            20.dp
                         )
                 ) {
-                    /*
-                     * SONG
-                     */
                     Text(
-                        text =
-                            state.title.ifBlank {
+                        state.title
+                            .ifBlank {
                                 "Unknown song"
                             },
-
                         color =
                             c.text,
-
                         fontFamily =
                             XmoFont.bold,
-
                         fontSize =
                             21.sp,
-
                         maxLines =
                             1,
-
                         overflow =
                             TextOverflow
                                 .Ellipsis
                     )
 
-                    Spacer(
-                        Modifier.height(
-                            3.dp
-                        )
-                    )
-
                     Text(
-                        text =
-                            state.artist.ifBlank {
+                        state.artist
+                            .ifBlank {
                                 "Unknown artist"
                             },
-
                         color =
                             c.sub,
-
                         fontFamily =
                             XmoFont.normal,
-
                         fontSize =
                             13.sp,
-
                         maxLines =
                             1,
-
                         overflow =
                             TextOverflow
                                 .Ellipsis
@@ -643,41 +654,31 @@ fun NowPlaying(
                         )
                     )
 
-                    /*
-                     * =================================================
-                     * SEEK
-                     * =================================================
-                     */
                     val duration =
                         state.duration
                             .coerceAtLeast(
                                 1L
                             )
 
-                    val progress =
-                        (
-                            state.position
-                                .toFloat() /
-                                duration
-                                    .toFloat()
-                            )
-                            .coerceIn(
-                                0f,
-                                1f
-                            )
-
                     Slider(
                         value =
-                            progress,
+                            (
+                                state.position
+                                    .toFloat() /
+                                    duration
+                                        .toFloat()
+                                )
+                                .coerceIn(
+                                    0f,
+                                    1f
+                                ),
 
                         onValueChange = {
-                                value ->
-
                             seekTo(
                                 (
                                     duration
                                         .toDouble() *
-                                        value
+                                        it
                                     )
                                     .toLong()
                             )
@@ -687,10 +688,8 @@ fun NowPlaying(
                             SliderDefaults.colors(
                                 thumbColor =
                                     XmoRed,
-
                                 activeTrackColor =
                                     XmoRed,
-
                                 inactiveTrackColor =
                                     c.border
                             )
@@ -699,37 +698,30 @@ fun NowPlaying(
                     Row(
                         Modifier
                             .fillMaxWidth(),
-
                         horizontalArrangement =
                             Arrangement
                                 .SpaceBetween
                     ) {
                         Text(
-                            formatPlayerTime(
+                            playerTime(
                                 state.position
                             ),
-
                             color =
                                 c.sub,
-
                             fontFamily =
                                 XmoFont.thin,
-
                             fontSize =
                                 10.sp
                         )
 
                         Text(
-                            formatPlayerTime(
+                            playerTime(
                                 state.duration
                             ),
-
                             color =
                                 c.sub,
-
                             fontFamily =
                                 XmoFont.thin,
-
                             fontSize =
                                 10.sp
                         )
@@ -741,19 +733,12 @@ fun NowPlaying(
                         )
                     )
 
-                    /*
-                     * =================================================
-                     * PREVIOUS / PLAY / NEXT
-                     * =================================================
-                     */
                     Row(
                         Modifier
                             .fillMaxWidth(),
-
                         horizontalArrangement =
                             Arrangement
                                 .SpaceEvenly,
-
                         verticalAlignment =
                             Alignment
                                 .CenterVertically
@@ -761,42 +746,28 @@ fun NowPlaying(
                         IconButton(
                             onClick =
                                 previous,
-
                             enabled =
-                                state.currentSongId !=
-                                    null
+                                state.hasPrevious
                         ) {
-                            PreviousPlayerIcon(
-                                color =
-                                    if (
-                                        state.currentSongId !=
-                                        null
-                                    ) {
-                                        c.text
-                                    } else {
-                                        c.sub
-                                    },
-
-                                modifier =
-                                    Modifier.size(
-                                        30.dp
-                                    )
+                            PreviousIcon(
+                                if (
+                                    state.hasPrevious
+                                )
+                                    c.text
+                                else
+                                    c.sub,
+                                Modifier.size(
+                                    30.dp
+                                )
                             )
                         }
 
                         IconButton(
                             onClick =
                                 togglePlay,
-
-                            enabled =
-                                state.currentSongId !=
-                                    null,
-
                             modifier =
                                 Modifier
-                                    .size(
-                                        60.dp
-                                    )
+                                    .size(60.dp)
                                     .clip(
                                         CircleShape
                                     )
@@ -807,27 +778,19 @@ fun NowPlaying(
                             if (
                                 state.isPlaying
                             ) {
-                                PausePlayerIcon(
-                                    color =
-                                        Color.White,
-
-                                    modifier =
-                                        Modifier.size(
-                                            30.dp
-                                        )
+                                PlayerPauseIcon(
+                                    Color.White,
+                                    Modifier.size(
+                                        30.dp
+                                    )
                                 )
                             } else {
                                 Icon(
-                                    imageVector =
-                                        Icons.Default
-                                            .PlayArrow,
-
-                                    contentDescription =
-                                        null,
-
+                                    Icons.Default
+                                        .PlayArrow,
+                                    null,
                                     tint =
                                         Color.White,
-
                                     modifier =
                                         Modifier.size(
                                             31.dp
@@ -839,33 +802,23 @@ fun NowPlaying(
                         IconButton(
                             onClick =
                                 next,
-
                             enabled =
                                 state.hasNext
                         ) {
-                            NextPlayerIcon(
-                                color =
-                                    if (
-                                        state.hasNext
-                                    ) {
-                                        c.text
-                                    } else {
-                                        c.sub
-                                    },
-
-                                modifier =
-                                    Modifier.size(
-                                        30.dp
-                                    )
+                            NextIcon(
+                                if (
+                                    state.hasNext
+                                )
+                                    c.text
+                                else
+                                    c.sub,
+                                Modifier.size(
+                                    30.dp
+                                )
                             )
                         }
                     }
 
-                    /*
-                     * =================================================
-                     * DETAILS
-                     * =================================================
-                     */
                     if (
                         state.album
                             .isNotBlank()
@@ -878,16 +831,12 @@ fun NowPlaying(
 
                         Text(
                             "SONG DETAILS",
-
                             color =
                                 XmoRed,
-
                             fontFamily =
                                 XmoFont.bold,
-
                             fontSize =
                                 11.sp,
-
                             letterSpacing =
                                 1.sp
                         )
@@ -900,64 +849,44 @@ fun NowPlaying(
 
                         Row(
                             Modifier
-                                .fillMaxWidth(),
-
-                            verticalAlignment =
-                                Alignment
-                                    .CenterVertically
+                                .fillMaxWidth()
                         ) {
                             Text(
                                 "Album",
-
                                 color =
                                     c.sub,
-
                                 fontFamily =
                                     XmoFont.thin,
-
                                 fontSize =
                                     12.sp
                             )
 
                             Text(
                                 state.album,
-
                                 color =
                                     c.text,
-
                                 fontFamily =
                                     XmoFont.medium,
-
                                 fontSize =
                                     12.sp,
-
                                 maxLines =
                                     1,
-
                                 overflow =
                                     TextOverflow
                                         .Ellipsis,
-
                                 textAlign =
                                     TextAlign.End,
-
                                 modifier =
                                     Modifier
-                                        .weight(
-                                            1f
-                                        )
+                                        .weight(1f)
                                         .padding(
-                                            start = 18.dp
+                                            start =
+                                                18.dp
                                         )
                             )
                         }
                     }
 
-                    /*
-                     * =================================================
-                     * FOOTER
-                     * =================================================
-                     */
                     Spacer(
                         Modifier.height(
                             90.dp
@@ -967,39 +896,26 @@ fun NowPlaying(
                     Column(
                         Modifier
                             .fillMaxWidth(),
-
                         horizontalAlignment =
                             Alignment
                                 .CenterHorizontally
                     ) {
                         Text(
                             "XMO",
-
                             color =
                                 c.text,
-
                             fontFamily =
                                 XmoFont.logo,
-
                             fontSize =
                                 18.sp
                         )
 
-                        Spacer(
-                            Modifier.height(
-                                3.dp
-                            )
-                        )
-
                         Text(
                             "lxzrvi  •  copyright © 2026",
-
                             color =
                                 c.sub,
-
                             fontFamily =
                                 XmoFont.thin,
-
                             fontSize =
                                 9.sp
                         )
@@ -1008,9 +924,7 @@ fun NowPlaying(
                     Spacer(
                         Modifier
                             .navigationBarsPadding()
-                            .height(
-                                12.dp
-                            )
+                            .height(12.dp)
                     )
                 }
             }
@@ -1018,48 +932,331 @@ fun NowPlaying(
     }
 }
 
-/*
- * =============================================================
- * CUSTOM LIGHTWEIGHT ICONS
- * =============================================================
- */
+@Composable
+private fun ArtworkCarousel(
+    current: Uri?,
+    previous: Uri?,
+    next: Uri?,
+    border: Color,
+    surface: Color,
+    canPrevious: Boolean,
+    canNext: Boolean,
+    previousSong: () -> Unit,
+    nextSong: () -> Unit
+) {
+    val scope =
+        rememberCoroutineScope()
+
+    val drag =
+        remember {
+            Animatable(0f)
+        }
+
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .aspectRatio(1f)
+    ) {
+        val width =
+            constraints
+                .maxWidth
+                .toFloat()
+
+        val gap =
+            16.dp.value *
+                androidx.compose.ui.platform
+                    .LocalDensity.current
+                    .density
+
+        val step =
+            width +
+                gap
+
+        /*
+         * Artwork drag layer.
+         */
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(
+                    current,
+                    canPrevious,
+                    canNext
+                ) {
+                    detectHorizontalDragGestures(
+                        onHorizontalDrag = {
+                                change,
+                                amount ->
+
+                            change.consume()
+
+                            scope.launch {
+                                val target =
+                                    drag.value +
+                                        amount
+
+                                drag.snapTo(
+                                    when {
+                                        target > 0f &&
+                                            !canPrevious ->
+                                            target * .25f
+
+                                        target < 0f &&
+                                            !canNext ->
+                                            target * .25f
+
+                                        else ->
+                                            target
+                                    }
+                                )
+                            }
+                        },
+
+                        onDragEnd = {
+                            scope.launch {
+                                /*
+                                 * LEFT -> NEXT
+                                 */
+                                if (
+                                    drag.value <
+                                    -width *
+                                        .20f &&
+                                    canNext
+                                ) {
+                                    drag.animateTo(
+                                        -step,
+                                        tween(280)
+                                    )
+
+                                    nextSong()
+
+                                    delay(90)
+
+                                    drag.snapTo(
+                                        0f
+                                    )
+
+                                /*
+                                 * RIGHT -> PREVIOUS
+                                 */
+                                } else if (
+                                    drag.value >
+                                    width *
+                                        .20f &&
+                                    canPrevious
+                                ) {
+                                    drag.animateTo(
+                                        step,
+                                        tween(280)
+                                    )
+
+                                    previousSong()
+
+                                    delay(90)
+
+                                    drag.snapTo(
+                                        0f
+                                    )
+
+                                } else {
+                                    drag.animateTo(
+                                        0f,
+                                        spring(
+                                            dampingRatio =
+                                                .8f,
+                                            stiffness =
+                                                420f
+                                        )
+                                    )
+                                }
+                            }
+                        },
+
+                        onDragCancel = {
+                            scope.launch {
+                                drag.animateTo(
+                                    0f
+                                )
+                            }
+                        }
+                    )
+                }
+        ) {
+            /*
+             * Previous card
+             */
+            if (
+                previous !=
+                null
+            ) {
+                PlayerArtwork(
+                    uri =
+                        previous,
+                    border =
+                        border,
+                    surface =
+                        surface,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX =
+                                    drag.value -
+                                        step
+                            }
+                )
+            }
+
+            /*
+             * Current
+             */
+            PlayerArtwork(
+                uri =
+                    current,
+                border =
+                    border,
+                surface =
+                    surface,
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            translationX =
+                                drag.value
+
+                            val p =
+                                (
+                                    abs(
+                                        drag.value
+                                    ) /
+                                        width
+                                    )
+                                    .coerceIn(
+                                        0f,
+                                        1f
+                                    )
+
+                            scaleX =
+                                1f -
+                                    p *
+                                    .06f
+
+                            scaleY =
+                                scaleX
+                        }
+            )
+
+            /*
+             * Next
+             */
+            if (
+                next !=
+                null
+            ) {
+                PlayerArtwork(
+                    uri =
+                        next,
+                    border =
+                        border,
+                    surface =
+                        surface,
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .graphicsLayer {
+                                translationX =
+                                    drag.value +
+                                        step
+                            }
+                )
+            }
+        }
+    }
+}
 
 @Composable
-private fun PreviousPlayerIcon(
-    color: Color,
+private fun PlayerArtwork(
+    uri: Uri?,
+    border: Color,
+    surface: Color,
     modifier: Modifier =
         Modifier
 ) {
+    Box(
+        modifier
+            .clip(
+                RoundedCornerShape(
+                    24.dp
+                )
+            )
+            .background(
+                surface
+            )
+            .border(
+                .7.dp,
+                border,
+                RoundedCornerShape(
+                    24.dp
+                )
+            )
+    ) {
+        AsyncImage(
+            model =
+                uri,
+            contentDescription =
+                null,
+            modifier =
+                Modifier.fillMaxSize(),
+            contentScale =
+                ContentScale.Crop
+        )
+
+        if (
+            uri == null
+        ) {
+            Box(
+                Modifier
+                    .fillMaxSize(),
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                Text(
+                    "XMO",
+                    color =
+                        XmoRed,
+                    fontFamily =
+                        XmoFont.logo,
+                    fontSize =
+                        32.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun PreviousIcon(
+    color: Color,
+    modifier: Modifier
+) {
     Canvas(modifier) {
-        val w =
-            size.width
-
-        val h =
-            size.height
-
-        val bar =
-            w * .10f
+        val w = size.width
+        val h = size.height
+        val bar = w * .1f
 
         drawRoundRect(
-            color =
-                color,
-
-            topLeft =
-                Offset(
-                    w * .20f,
-                    h * .20f
-                ),
-
-            size =
-                Size(
-                    bar,
-                    h * .60f
-                ),
-
-            cornerRadius =
-                CornerRadius(
-                    bar / 2f
-                )
+            color,
+            Offset(
+                w * .2f,
+                h * .2f
+            ),
+            Size(
+                bar,
+                h * .6f
+            ),
+            CornerRadius(
+                bar / 2
+            )
         )
 
         val path =
@@ -1071,7 +1268,7 @@ private fun PreviousPlayerIcon(
 
                 lineTo(
                     w * .32f,
-                    h * .50f
+                    h * .5f
                 )
 
                 lineTo(
@@ -1083,30 +1280,21 @@ private fun PreviousPlayerIcon(
             }
 
         drawPath(
-            path =
-                path,
-
-            color =
-                color
+            path,
+            color
         )
     }
 }
 
 @Composable
-private fun NextPlayerIcon(
+private fun NextIcon(
     color: Color,
-    modifier: Modifier =
-        Modifier
+    modifier: Modifier
 ) {
     Canvas(modifier) {
-        val w =
-            size.width
-
-        val h =
-            size.height
-
-        val bar =
-            w * .10f
+        val w = size.width
+        val h = size.height
+        val bar = w * .1f
 
         val path =
             Path().apply {
@@ -1117,7 +1305,7 @@ private fun NextPlayerIcon(
 
                 lineTo(
                     w * .68f,
-                    h * .50f
+                    h * .5f
                 )
 
                 lineTo(
@@ -1129,130 +1317,91 @@ private fun NextPlayerIcon(
             }
 
         drawPath(
-            path =
-                path,
-
-            color =
-                color
+            path,
+            color
         )
 
         drawRoundRect(
-            color =
-                color,
-
-            topLeft =
-                Offset(
-                    w * .70f,
-                    h * .20f
-                ),
-
-            size =
-                Size(
-                    bar,
-                    h * .60f
-                ),
-
-            cornerRadius =
-                CornerRadius(
-                    bar / 2f
-                )
+            color,
+            Offset(
+                w * .7f,
+                h * .2f
+            ),
+            Size(
+                bar,
+                h * .6f
+            ),
+            CornerRadius(
+                bar / 2
+            )
         )
     }
 }
 
 @Composable
-private fun PausePlayerIcon(
+private fun PlayerPauseIcon(
     color: Color,
-    modifier: Modifier =
-        Modifier
+    modifier: Modifier
 ) {
     Canvas(modifier) {
-        val barWidth =
+        val bw =
             size.width *
                 .18f
 
-        val barHeight =
+        val bh =
             size.height *
                 .62f
 
         val top =
             (
                 size.height -
-                    barHeight
-                ) /
-                2f
+                    bh
+                ) / 2
 
         drawRoundRect(
-            color =
-                color,
-
-            topLeft =
-                Offset(
-                    size.width *
-                        .27f,
-                    top
-                ),
-
-            size =
-                Size(
-                    barWidth,
-                    barHeight
-                ),
-
-            cornerRadius =
-                CornerRadius(
-                    barWidth *
-                        .22f
-                )
+            color,
+            Offset(
+                size.width *
+                    .27f,
+                top
+            ),
+            Size(
+                bw,
+                bh
+            )
         )
 
         drawRoundRect(
-            color =
-                color,
-
-            topLeft =
-                Offset(
-                    size.width *
-                        .55f,
-                    top
-                ),
-
-            size =
-                Size(
-                    barWidth,
-                    barHeight
-                ),
-
-            cornerRadius =
-                CornerRadius(
-                    barWidth *
-                        .22f
-                )
+            color,
+            Offset(
+                size.width *
+                    .55f,
+                top
+            ),
+            Size(
+                bw,
+                bh
+            )
         )
     }
 }
 
-private fun formatPlayerTime(
-    milliseconds: Long
+private fun playerTime(
+    ms: Long
 ): String {
-    val seconds =
-        milliseconds
-            .coerceAtLeast(
-                0L
-            ) /
-            1000L
+    val total =
+        ms.coerceAtLeast(
+            0
+        ) / 1000
 
-    val minutes =
-        seconds /
-            60L
+    val min =
+        total / 60
 
-    val remaining =
-        seconds %
-            60L
+    val sec =
+        total % 60
 
-    return "$minutes:${
-        remaining
-            .toString()
+    return "$min:${
+        sec.toString()
             .padStart(
                 2,
                 '0'
