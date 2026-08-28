@@ -1,5 +1,5 @@
 name: XMO
-run-name: XMO #${{ github.run_number }}
+run-name: XMO
 
 on:
   workflow_dispatch:
@@ -20,9 +20,9 @@ jobs:
           java-version: '17'
 
       - name: Android kitchen is ready
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
 
-      - name: Update Android SDK tools
+      - name: Update Android SDK
         run: |
           sdkmanager --update
 
@@ -33,6 +33,11 @@ jobs:
       - name: Install Android API 37
         run: |
           sdkmanager --channel=3 "platforms;android-37"
+
+      - name: Verify Android API 37
+        run: |
+          sdkmanager --list --channel=3 | grep -E "platforms;android-37" || true
+          ls -la "$ANDROID_SDK_ROOT/platforms"
 
       - name: Adding ingredients
         uses: gradle/actions/setup-gradle@v4
