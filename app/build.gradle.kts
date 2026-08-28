@@ -30,6 +30,8 @@ android {
 }
 
 dependencies {
+
+    // Compose
     implementation(
         platform(
             "androidx.compose:compose-bom:2025.08.00"
@@ -48,10 +50,12 @@ dependencies {
         "androidx.compose.material:material-icons-core"
     )
 
+    // DataStore
     implementation(
         "androidx.datastore:datastore-preferences:1.1.7"
     )
 
+    // Images
     implementation(
         "io.coil-kt.coil3:coil-compose:3.3.0"
     )
@@ -60,6 +64,7 @@ dependencies {
         "androidx.palette:palette-ktx:1.0.0"
     )
 
+    // Media
     implementation(
         "androidx.media3:media3-exoplayer:1.8.0"
     )
@@ -68,6 +73,7 @@ dependencies {
         "androidx.media3:media3-session:1.8.0"
     )
 
+    // Haze
     implementation(
         "dev.chrisbanes.haze:haze:2.0.0-alpha05"
     )
