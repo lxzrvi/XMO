@@ -2782,7 +2782,7 @@ private fun BorderSection(
     c: HomeColors,
     title: String,
     right: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
-    content: @Composable Column.() -> Unit
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     val accent =
         LocalXmoAccent.current
