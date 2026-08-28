@@ -18,13 +18,8 @@ import com.xmo.music.data.Song
 import com.xmo.music.data.Store
 import com.xmo.music.data.UserCategory
 import com.xmo.music.player.XmoPlayer
-import com.xmo.music.ui.Home
-import com.xmo.music.ui.NavBar
-import com.xmo.music.ui.NowPlaying
-import com.xmo.music.ui.Search
-import com.xmo.music.ui.Settings
+import com.xmo.music.ui.*
 import kotlinx.coroutines.launch
-import com.xmo.music.ui.MiniPlayer
 
 enum class XmoTheme {
     Dark,
@@ -43,14 +38,6 @@ fun App() {
     val stateHolder =
         rememberSaveableStateHolder()
 
-    /*
-     * =========================================================
-     * PLAYER
-     * =========================================================
-     *
-     * XmoPlayer owns MediaController.
-     * PlaybackService owns ExoPlayer.
-     */
     val player =
         remember {
             XmoPlayer(context)
@@ -65,14 +52,10 @@ fun App() {
     }
 
     val playbackState by
-        player.state.collectAsState()
+        player.state
+            .collectAsState()
 
-    /*
-     * =========================================================
-     * AUDIO PERMISSION
-     * =========================================================
-     */
-    val audioPermission =
+    val permission =
         if (
             Build.VERSION.SDK_INT >=
             33
@@ -82,93 +65,65 @@ fun App() {
             Manifest.permission.READ_EXTERNAL_STORAGE
         }
 
-    var allowed by
-        remember {
-            mutableStateOf(
-                ContextCompat.checkSelfPermission(
-                    context,
-                    audioPermission
-                ) ==
-                    PackageManager.PERMISSION_GRANTED
-            )
-        }
+    var allowed by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                permission
+            ) ==
+                PackageManager.PERMISSION_GRANTED
+        )
+    }
+
+    var tab by remember {
+        mutableIntStateOf(0)
+    }
+
+    var theme by remember {
+        mutableStateOf(
+            XmoTheme.Dark
+        )
+    }
+
+    var songs by remember {
+        mutableStateOf<List<Song>>(
+            emptyList()
+        )
+    }
+
+    var order by remember {
+        mutableStateOf(
+            Store.defaults
+        )
+    }
+
+    var categories by remember {
+        mutableStateOf<List<UserCategory>>(
+            emptyList()
+        )
+    }
+
+    var showNowPlaying by remember {
+        mutableStateOf(false)
+    }
+
+    var playingSource by remember {
+        mutableStateOf(
+            "All Songs"
+        )
+    }
+
+    var sourceIsCategory by remember {
+        mutableStateOf(false)
+    }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts.RequestPermission()
-        ) { granted ->
-            allowed =
-                granted
+        ) {
+            allowed = it
         }
 
-    /*
-     * =========================================================
-     * APP STATE
-     * =========================================================
-     */
-    var tab by
-        remember {
-            mutableIntStateOf(0)
-        }
-
-    var theme by
-        remember {
-            mutableStateOf(
-                XmoTheme.Dark
-            )
-        }
-
-    var songs by
-        remember {
-            mutableStateOf<List<Song>>(
-                emptyList()
-            )
-        }
-
-    var order by
-        remember {
-            mutableStateOf(
-                Store.defaults
-            )
-        }
-
-    var categories by
-        remember {
-            mutableStateOf<List<UserCategory>>(
-                emptyList()
-            )
-        }
-
-    /*
-     * =========================================================
-     * NOW PLAYING STATE
-     * =========================================================
-     *
-     * NowPlaying is NOT a NavBar tab.
-     * It sits above the entire app.
-     */
-    var showNowPlaying by
-        remember {
-            mutableStateOf(false)
-        }
-
-    var playingSource by
-        remember {
-            mutableStateOf(
-                "All Songs"
-            )
-        }
-
-    var playingFromCategory by
-        remember {
-            mutableStateOf(false)
-        }
-
-    /*
-     * =========================================================
-     * INITIAL LOAD
-     * =========================================================
-     */
     LaunchedEffect(Unit) {
         order =
             Store.order(
@@ -188,12 +143,7 @@ fun App() {
         }
     }
 
-    /*
-     * Permission can be granted after the first composition.
-     */
-    LaunchedEffect(
-        allowed
-    ) {
+    LaunchedEffect(allowed) {
         if (allowed) {
             songs =
                 Library.songs(
@@ -205,224 +155,198 @@ fun App() {
     LaunchedEffect(Unit) {
         if (!allowed) {
             permissionLauncher.launch(
-                audioPermission
+                permission
             )
         }
     }
 
-    /*
-     * =========================================================
-     * ROOT
-     * =========================================================
-     */
     Box(
         Modifier.fillMaxSize()
     ) {
         /*
-         * -----------------------------------------------------
-         * MAIN TAB CONTENT
-         * -----------------------------------------------------
+         * =====================================================
+         * TAB CONTENT
+         * =====================================================
          */
         Box(
             Modifier
                 .fillMaxSize()
                 .zIndex(0f)
         ) {
-            stateHolder.SaveableStateProvider(
-                key = "tab_$tab"
-            ) {
-                when (tab) {
-                    0 -> {
-                        Home(
-                            songs =
-                                songs,
+            stateHolder
+                .SaveableStateProvider(
+                    "tab_$tab"
+                ) {
+                    when (tab) {
+                        0 -> {
+                            Home(
+                                songs =
+                                    songs,
 
-                            allowed =
-                                allowed,
+                                allowed =
+                                    allowed,
 
-                            theme =
-                                theme,
-
-                            order =
-                                order,
-
-                            categories =
-                                categories,
-
-                            setTheme = {
                                 theme =
-                                    it
-                            },
+                                    theme,
 
-                            refresh = {
-                                if (!allowed) {
-                                    permissionLauncher.launch(
-                                        audioPermission
-                                    )
-                                } else {
-                                    scope.launch {
-                                        songs =
-                                            Library.songs(
-                                                context
-                                            )
-                                    }
-                                }
-                            },
-
-                            saveOrder = {
                                 order =
-                                    it
+                                    order,
 
-                                scope.launch {
-                                    Store.saveOrder(
-                                        context,
-                                        it
-                                    )
-                                }
-                            },
-
-                            saveCategories = {
                                 categories =
-                                    it
+                                    categories,
 
-                                scope.launch {
-                                    Store.saveCategories(
-                                        context,
-                                        it
-                                    )
-                                }
-                            },
+                                setTheme = {
+                                    theme = it
+                                },
 
-                            /*
-                             * ---------------------------------
-                             * SONG TAP
-                             * ---------------------------------
-                             *
-                             * Do NOT wait for playbackState.
-                             * Open NowPlaying immediately.
-                             */
-                            onPlaySong = {
-                                    song,
-                                    source,
-                                    isCategory,
-                                    queue ->
-
-                                if (
-                                    queue.isNotEmpty()
-                                ) {
-                                    val index =
-                                        queue.indexOfFirst {
-                                            it.id ==
-                                                song.id
+                                refresh = {
+                                    if (!allowed) {
+                                        permissionLauncher.launch(
+                                            permission
+                                        )
+                                    } else {
+                                        scope.launch {
+                                            songs =
+                                                Library.songs(
+                                                    context
+                                                )
                                         }
+                                    }
+                                },
+
+                                saveOrder = {
+                                    order = it
+
+                                    scope.launch {
+                                        Store.saveOrder(
+                                            context,
+                                            it
+                                        )
+                                    }
+                                },
+
+                                saveCategories = {
+                                    categories =
+                                        it
+
+                                    scope.launch {
+                                        Store.saveCategories(
+                                            context,
+                                            it
+                                        )
+                                    }
+                                },
+
+                                onPlaySong = {
+                                        song,
+                                        source,
+                                        isCategory,
+                                        queue ->
+
+                                    val index =
+                                        queue
+                                            .indexOfFirst {
+                                                it.id ==
+                                                    song.id
+                                            }
 
                                     if (
-                                        index >=
-                                        0
+                                        index >= 0
                                     ) {
-                                        /*
-                                         * Store source first.
-                                         */
                                         playingSource =
                                             source
 
-                                        playingFromCategory =
+                                        sourceIsCategory =
                                             isCategory
 
                                         /*
-                                         * Open UI immediately.
-                                         *
-                                         * This is deliberately
-                                         * BEFORE player.play().
+                                         * Open immediately.
                                          */
                                         showNowPlaying =
                                             true
 
-                                        /*
-                                         * Real Media3 playback.
-                                         */
                                         player.play(
-                                            songs =
-                                                queue,
-
-                                            index =
-                                                index
+                                            queue,
+                                            index
                                         )
                                     }
                                 }
-                            }
-                        )
-                    }
+                            )
+                        }
 
-                    1 -> {
-                        Search()
-                    }
+                        1 -> Search()
 
-                    else -> {
-                        Settings()
+                        else -> Settings()
                     }
                 }
-            }
         }
 
         /*
-         * -----------------------------------------------------
-         * APPROVED NAVBAR
-         * -----------------------------------------------------
+         * =====================================================
+         * NAVBAR
+         * =====================================================
          */
         Box(
             Modifier
                 .fillMaxSize()
-                .zIndex(1f)
+                .zIndex(10f)
         ) {
             NavBar(
-                selected =
-                    tab,
-
-                theme =
-                    theme
-            ) { value ->
-                tab =
-                    value
+                selected = tab,
+                theme = theme
+            ) {
+                tab = it
             }
         }
 
+        /*
+         * =====================================================
+         * MINI PLAYER
+         * =====================================================
+         */
         MiniPlayer(
-    state = playbackState,
-            theme = theme,
-        
-            /*
-             * Player closes fully first.
-             * Then showNowPlaying becomes false,
-             * triggering MiniPlayer's bottom entrance.
-             */
+            state =
+                playbackState,
+
+            theme =
+                theme,
+
             visible =
-                playbackState.currentSongId != null &&
+                playbackState.currentSongId !=
+                    null &&
                     !showNowPlaying,
-        
+
             openPlayer = {
-                showNowPlaying = true
+                showNowPlaying =
+                    true
             },
-        
+
             togglePlay = {
-                player.togglePlayPause()
+                player
+                    .togglePlayPause()
             },
-        
+
+            /*
+             * User requested MiniPlayer:
+             *
+             * left = previous
+             * right = next
+             *
+             * MiniPlayer itself handles that mapping.
+             */
             previous = {
                 player.previous()
             },
-        
+
             next = {
                 player.next()
             }
         )
+
         /*
-         * -----------------------------------------------------
+         * =====================================================
          * NOW PLAYING
-         * -----------------------------------------------------
-         *
-         * Highest z-index.
-         * Therefore NavBar can never draw over it.
+         * =====================================================
          */
         if (
             showNowPlaying
@@ -443,14 +367,23 @@ fun App() {
                         playingSource,
 
                     sourceIsCategory =
-                        playingFromCategory,
+                        sourceIsCategory,
+
+                    /*
+                     * Current real queue provides adjacent
+                     * local artwork for carousel.
+                     */
+                    queue =
+                        player.queue(),
 
                     refreshPosition = {
-                        player.refreshPosition()
+                        player
+                            .refreshPosition()
                     },
 
                     togglePlay = {
-                        player.togglePlayPause()
+                        player
+                            .togglePlayPause()
                     },
 
                     previous = {
@@ -468,7 +401,9 @@ fun App() {
                     },
 
                     /*
-                     * Closing UI does NOT stop audio.
+                     * Called only after full player exit.
+                     * MiniPlayer visibility becomes true then,
+                     * so it rises from bottom afterwards.
                      */
                     dismiss = {
                         showNowPlaying =
