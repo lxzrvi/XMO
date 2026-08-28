@@ -18,6 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
@@ -26,13 +27,16 @@ import com.xmo.music.data.Library
 import com.xmo.music.data.Song
 import com.xmo.music.data.Store
 import com.xmo.music.data.UserCategory
+import com.xmo.music.data.XmoProfile
 import com.xmo.music.player.XmoPlayer
 import com.xmo.music.ui.Home
+import com.xmo.music.ui.LocalXmoProfile
 import com.xmo.music.ui.MiniPlayer
 import com.xmo.music.ui.NavBar
 import com.xmo.music.ui.NowPlaying
 import com.xmo.music.ui.Search
 import com.xmo.music.ui.Settings
+import com.xmo.music.ui.Setup
 import kotlinx.coroutines.launch
 
 enum class XmoTheme {
@@ -52,6 +56,11 @@ fun App() {
     val stateHolder =
         rememberSaveableStateHolder()
 
+    /*
+     * =========================================================
+     * PLAYER
+     * =========================================================
+     */
     val player =
         remember {
             XmoPlayer(context)
@@ -69,6 +78,11 @@ fun App() {
         player.state
             .collectAsState()
 
+    /*
+     * =========================================================
+     * AUDIO PERMISSION
+     * =========================================================
+     */
     val permission =
         if (
             Build.VERSION.SDK_INT >=
@@ -101,6 +115,31 @@ fun App() {
             allowed = it
         }
 
+    /*
+     * =========================================================
+     * BOOT / SETUP
+     * =========================================================
+     *
+     * null:
+     * DataStore is still loading.
+     */
+    var setupComplete by remember {
+        mutableStateOf<Boolean?>(
+            null
+        )
+    }
+
+    var profile by remember {
+        mutableStateOf(
+            XmoProfile()
+        )
+    }
+
+    /*
+     * =========================================================
+     * MAIN APP STATE
+     * =========================================================
+     */
     var tab by remember {
         mutableIntStateOf(0)
     }
@@ -130,31 +169,21 @@ fun App() {
     }
 
     /*
-     * =========================================================
-     * PLAYER NAVIGATION
-     * =========================================================
+     * Player navigation.
      */
     var showPlayer by remember {
         mutableStateOf(false)
     }
 
-    /*
-     * While NowPlaying enters, MiniPlayer stays underneath.
-     * onOpened() then removes it.
-     */
     var miniVisible by remember {
         mutableStateOf(false)
     }
 
-    /*
-     * Increment after NowPlaying fully exits.
-     * MiniPlayer uses it for bottom-rise animation.
-     */
     var miniRiseKey by remember {
         mutableIntStateOf(0)
     }
 
-    var source by remember {
+    var playingSource by remember {
         mutableStateOf(
             "All Songs"
         )
@@ -166,12 +195,15 @@ fun App() {
 
     /*
      * =========================================================
-     * INITIAL DATA
+     * INITIAL DATA LOAD
      * =========================================================
      */
     LaunchedEffect(Unit) {
-        order =
-            Store.order(
+        /*
+         * Read profile/setup before deciding which screen appears.
+         */
+        profile =
+            Store.profile(
                 context
             )
 
@@ -180,7 +212,20 @@ fun App() {
                 context
             )
 
-        if (allowed) {
+        order =
+            Store.order(
+                context
+            )
+
+        setupComplete =
+            Store.setupComplete(
+                context
+            )
+
+        if (
+            setupComplete == true &&
+            allowed
+        ) {
             songs =
                 Library.songs(
                     context
@@ -188,8 +233,17 @@ fun App() {
         }
     }
 
-    LaunchedEffect(allowed) {
-        if (allowed) {
+    /*
+     * Permission may become granted from Setup or later.
+     */
+    LaunchedEffect(
+        allowed,
+        setupComplete
+    ) {
+        if (
+            allowed &&
+            setupComplete == true
+        ) {
             songs =
                 Library.songs(
                     context
@@ -197,8 +251,20 @@ fun App() {
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (!allowed) {
+    /*
+     * Do NOT automatically launch audio permission before Setup.
+     *
+     * Setup owns its own permission interaction on first run.
+     *
+     * Returning users still receive the existing permission flow.
+     */
+    LaunchedEffect(
+        setupComplete
+    ) {
+        if (
+            setupComplete == true &&
+            !allowed
+        ) {
             launcher.launch(
                 permission
             )
@@ -206,11 +272,173 @@ fun App() {
     }
 
     /*
-     * Shared playback launcher for Home/Search.
+     * =========================================================
+     * LOADING
+     * =========================================================
      */
+    if (
+        setupComplete ==
+        null
+    ) {
+        Box(
+            Modifier.fillMaxSize()
+        )
+
+        return
+    }
+
+    /*
+     * =========================================================
+     * FIRST-RUN SETUP
+     * =========================================================
+     */
+    if (
+        setupComplete ==
+        false
+    ) {
+        Setup(
+            initialProfile =
+                profile,
+
+            existingCategories =
+                categories,
+
+            /*
+             * Categories appear immediately in Setup and are
+             * also persisted immediately.
+             */
+            onCategoriesChanged = {
+                categories =
+                    it
+
+                scope.launch {
+                    Store.saveCategories(
+                        context,
+                        it
+                    )
+
+                    /*
+                     * Ensure custom IDs exist in home order.
+                     */
+                    val customIds =
+                        it.map {
+                                category ->
+                            category.id
+                        }
+
+                    val builtIns =
+                        order.filter {
+                            id ->
+                            id in
+                                Store.defaults
+                        }
+
+                    val existingCustom =
+                        order.filter {
+                            id ->
+                            id !in
+                                Store.defaults &&
+                                id in
+                                customIds
+                        }
+
+                    val missing =
+                        customIds.filterNot {
+                            id ->
+                            id in
+                                existingCustom
+                        }
+
+                    val nextOrder =
+                        builtIns +
+                            existingCustom +
+                            missing
+
+                    order =
+                        nextOrder
+
+                    Store.saveOrder(
+                        context,
+                        nextOrder
+                    )
+                }
+            },
+
+            finish = {
+                    result ->
+
+                scope.launch {
+                    /*
+                     * Re-check actual permission because Setup's
+                     * launcher is local to Setup composable.
+                     */
+                    allowed =
+                        ContextCompat
+                            .checkSelfPermission(
+                                context,
+                                permission
+                            ) ==
+                            PackageManager
+                                .PERMISSION_GRANTED
+
+                    profile =
+                        result
+
+                    Store.finishSetup(
+                        context,
+                        result
+                    )
+
+                    setupComplete =
+                        true
+
+                    if (allowed) {
+                        songs =
+                            Library.songs(
+                                context
+                            )
+                    }
+                }
+            },
+
+            setupLater = {
+                    result ->
+
+                scope.launch {
+                    /*
+                     * Setup Later means:
+                     *
+                     * persist current profile/defaults and don't
+                     * force onboarding every launch.
+                     *
+                     * Audio permission can be requested by main app.
+                     */
+                    profile =
+                        result
+
+                    Store.finishSetup(
+                        context,
+                        result
+                    )
+
+                    setupComplete =
+                        true
+                }
+            }
+        )
+
+        return
+    }
+
+    /*
+     * =========================================================
+     * MAIN APPLICATION
+     * =========================================================
+     */
+
     fun playSong(
         song: Song,
-        from: String,
+        source: String,
         isCategory: Boolean,
         queue: List<Song>
     ) {
@@ -224,18 +452,15 @@ fun App() {
             return
         }
 
-        source =
-            from
+        playingSource =
+            source
 
         sourceIsCategory =
             isCategory
 
         /*
-         * If no old player exists yet, MiniPlayer doesn't need
-         * to be visible under entrance.
-         *
-         * If a song was already playing, keep current MiniPlayer
-         * until NowPlaying visually covers it.
+         * Existing MiniPlayer remains behind NowPlaying while
+         * entrance is running.
          */
         miniVisible =
             playback.currentSongId !=
@@ -250,334 +475,335 @@ fun App() {
         )
     }
 
-    Box(
-        Modifier.fillMaxSize()
+    CompositionLocalProvider(
+        LocalXmoProfile provides
+            profile
     ) {
-        /*
-         * =====================================================
-         * TAB CONTENT
-         * =====================================================
-         */
         Box(
-            Modifier
-                .fillMaxSize()
-                .zIndex(0f)
+            Modifier.fillMaxSize()
         ) {
-            stateHolder.SaveableStateProvider(
-                key =
-                    "tab_$tab"
+            /*
+             * =================================================
+             * TAB CONTENT
+             * =================================================
+             */
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(0f)
             ) {
-                when (tab) {
-                    0 -> {
-                        Home(
-                            songs =
-                                songs,
+                stateHolder
+                    .SaveableStateProvider(
+                        key =
+                            "tab_$tab"
+                    ) {
+                        when (tab) {
+                            0 -> {
+                                Home(
+                                    songs =
+                                        songs,
 
-                            allowed =
-                                allowed,
+                                    allowed =
+                                        allowed,
 
-                            theme =
-                                theme,
+                                    theme =
+                                        theme,
 
-                            order =
-                                order,
+                                    order =
+                                        order,
 
-                            categories =
-                                categories,
+                                    categories =
+                                        categories,
 
-                            setTheme = {
-                                theme = it
-                            },
+                                    setTheme = {
+                                        theme =
+                                            it
+                                    },
 
-                            refresh = {
-                                if (!allowed) {
-                                    launcher.launch(
-                                        permission
-                                    )
-                                } else {
-                                    scope.launch {
-                                        songs =
-                                            Library.songs(
-                                                context
+                                    refresh = {
+                                        if (!allowed) {
+                                            launcher.launch(
+                                                permission
                                             )
+                                        } else {
+                                            scope.launch {
+                                                songs =
+                                                    Library.songs(
+                                                        context
+                                                    )
+                                            }
+                                        }
+                                    },
+
+                                    saveOrder = {
+                                        order =
+                                            it
+
+                                        scope.launch {
+                                            Store.saveOrder(
+                                                context,
+                                                it
+                                            )
+                                        }
+                                    },
+
+                                    saveCategories = {
+                                        categories =
+                                            it
+
+                                        scope.launch {
+                                            Store.saveCategories(
+                                                context,
+                                                it
+                                            )
+                                        }
+                                    },
+
+                                    onPlaySong = {
+                                            song,
+                                            source,
+                                            isCategory,
+                                            queue ->
+
+                                        playSong(
+                                            song,
+                                            source,
+                                            isCategory,
+                                            queue
+                                        )
                                     }
-                                }
-                            },
-
-                            saveOrder = {
-                                order = it
-
-                                scope.launch {
-                                    Store.saveOrder(
-                                        context,
-                                        it
-                                    )
-                                }
-                            },
-
-                            saveCategories = {
-                                categories = it
-
-                                scope.launch {
-                                    Store.saveCategories(
-                                        context,
-                                        it
-                                    )
-                                }
-                            },
-
-                            onPlaySong = {
-                                    song,
-                                    from,
-                                    isCategory,
-                                    queue ->
-
-                                playSong(
-                                    song,
-                                    from,
-                                    isCategory,
-                                    queue
                                 )
                             }
-                        )
-                    }
 
-                    1 -> {
-                        Search(
-                            songs =
-                                songs,
+                            1 -> {
+                                Search(
+                                    songs =
+                                        songs,
 
-                            categories =
-                                categories,
+                                    categories =
+                                        categories,
 
-                            theme =
-                                theme,
+                                    theme =
+                                        theme,
 
-                            setTheme = {
-                                theme = it
-                            },
+                                    setTheme = {
+                                        theme =
+                                            it
+                                    },
 
-                            onPlaySong = {
-                                    song,
-                                    from,
-                                    isCategory,
-                                    queue ->
+                                    onPlaySong = {
+                                            song,
+                                            source,
+                                            isCategory,
+                                            queue ->
 
-                                playSong(
-                                    song,
-                                    from,
-                                    isCategory,
-                                    queue
+                                        playSong(
+                                            song,
+                                            source,
+                                            isCategory,
+                                            queue
+                                        )
+                                    }
                                 )
                             }
-                        )
-                    }
 
-                    else -> {
-                        Settings(
-                            theme =
-                                theme,
+                            else -> {
+                                Settings(
+                                    theme =
+                                        theme,
 
-                            setTheme = {
-                                theme = it
-                            },
+                                    setTheme = {
+                                        theme =
+                                            it
+                                    },
 
-                            rescan = {
-                                if (!allowed) {
-                                    launcher.launch(
-                                        permission
-                                    )
-                                } else {
-                                    scope.launch {
-                                        songs =
-                                            Library.songs(
-                                                context
+                                    rescan = {
+                                        if (!allowed) {
+                                            launcher.launch(
+                                                permission
                                             )
+                                        } else {
+                                            scope.launch {
+                                                songs =
+                                                    Library.songs(
+                                                        context
+                                                    )
+                                            }
+                                        }
                                     }
-                                }
+                                )
                             }
-                        )
+                        }
                     }
+            }
+
+            /*
+             * =================================================
+             * APPROVED NAVBAR
+             * =================================================
+             */
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(10f)
+            ) {
+                NavBar(
+                    selected =
+                        tab,
+
+                    theme =
+                        theme
+                ) {
+                    tab =
+                        it
                 }
             }
-        }
 
-        /*
-         * =====================================================
-         * APPROVED NAVBAR
-         * =====================================================
-         */
-        Box(
-            Modifier
-                .fillMaxSize()
-                .zIndex(10f)
-        ) {
-            NavBar(
-                selected =
-                    tab,
-                theme =
-                    theme
-            ) {
-                tab = it
-            }
-        }
-
-        /*
-         * =====================================================
-         * MINI PLAYER
-         * =====================================================
-         *
-         * zIndex below NowPlaying.
-         *
-         * During full-player entrance it can remain here until
-         * onOpened() removes it, but is naturally covered by
-         * NowPlaying as the sheet rises.
-         */
-        if (
-            playback.currentSongId !=
-                null &&
-            miniVisible
-        ) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .zIndex(20f)
-            ) {
-                MiniPlayer(
-                    state =
-                        playback,
-
-                    theme =
-                        theme,
-
-                    riseKey =
-                        miniRiseKey,
-
-                    openPlayer = {
-                        /*
-                         * DON'T hide MiniPlayer here.
-                         *
-                         * It stays still exactly where it is.
-                         * NowPlaying rises over it.
-                         */
-                        showPlayer =
-                            true
-                    },
-
-                    togglePlay = {
-                        player
-                            .togglePlayPause()
-                    },
-
-                    previous = {
-                        player.previous()
-                    },
-
-                    next = {
-                        player.next()
-                    }
-                )
-            }
-        }
-
-        /*
-         * =====================================================
-         * NOW PLAYING
-         * =====================================================
-         */
-        if (showPlayer) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .zIndex(100f)
-            ) {
-                NowPlaying(
-                    state =
-                        playback,
-
-                    theme =
-                        theme,
-
-                    source =
-                        source,
-
-                    sourceIsCategory =
-                        sourceIsCategory,
-
-                    queue =
-                        player.queue(),
-
-                    /*
-                     * Full player has completed entrance and now
-                     * covers MiniPlayer. Remove MiniPlayer from
-                     * background without any animation.
-                     */
-                    onOpened = {
-                        miniVisible =
-                            false
-                    },
-
-                    refreshPosition = {
-                        player
-                            .refreshPosition()
-                    },
-
-                    togglePlay = {
-                        player
-                            .togglePlayPause()
-                    },
-
-                    previous = {
-                        player.previous()
-                    },
-
-                    next = {
-                        player.next()
-                    },
-
-                    seekTo = {
-                        player.seekTo(it)
-                    },
-
-                    /*
-                     * NowPlaying calls this only AFTER it is fully
-                     * below the display.
-                     */
-                    dismiss = {
-                        showPlayer =
-                            false
-
-                        miniRiseKey++
-
-                        miniVisible =
-                            playback.currentSongId !=
-                                null
-                    }
-                )
-            }
-        }
-
-        /*
-         * First playback case:
-         *
-         * Song starts and NowPlaying is later dismissed ->
-         * MiniPlayer becomes visible via dismiss callback.
-         *
-         * If playback exists after process state changes and no
-         * player overlay is open, make MiniPlayer available.
-         */
-        LaunchedEffect(
-            playback.currentSongId,
-            showPlayer
-        ) {
+            /*
+             * =================================================
+             * MINIPLAYER
+             * =================================================
+             */
             if (
                 playback.currentSongId !=
                     null &&
-                !showPlayer &&
-                !miniVisible
+                miniVisible
             ) {
-                miniVisible =
-                    true
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .zIndex(20f)
+                ) {
+                    MiniPlayer(
+                        state =
+                            playback,
+
+                        theme =
+                            theme,
+
+                        riseKey =
+                            miniRiseKey,
+
+                        openPlayer = {
+                            /*
+                             * Do not animate/remove MiniPlayer here.
+                             * NowPlaying rises over it.
+                             */
+                            showPlayer =
+                                true
+                        },
+
+                        togglePlay = {
+                            player
+                                .togglePlayPause()
+                        },
+
+                        previous = {
+                            player.previous()
+                        },
+
+                        next = {
+                            player.next()
+                        }
+                    )
+                }
+            }
+
+            /*
+             * =================================================
+             * NOW PLAYING
+             * =================================================
+             */
+            if (showPlayer) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .zIndex(100f)
+                ) {
+                    NowPlaying(
+                        state =
+                            playback,
+
+                        theme =
+                            theme,
+
+                        source =
+                            playingSource,
+
+                        sourceIsCategory =
+                            sourceIsCategory,
+
+                        queue =
+                            player.queue(),
+
+                        /*
+                         * Entrance complete: MiniPlayer can now be
+                         * removed invisibly from background.
+                         */
+                        onOpened = {
+                            miniVisible =
+                                false
+                        },
+
+                        refreshPosition = {
+                            player
+                                .refreshPosition()
+                        },
+
+                        togglePlay = {
+                            player
+                                .togglePlayPause()
+                        },
+
+                        previous = {
+                            player.previous()
+                        },
+
+                        next = {
+                            player.next()
+                        },
+
+                        seekTo = {
+                            player.seekTo(
+                                it
+                            )
+                        },
+
+                        /*
+                         * Called only after player fully leaves
+                         * viewport.
+                         */
+                        dismiss = {
+                            showPlayer =
+                                false
+
+                            miniRiseKey++
+
+                            miniVisible =
+                                playback.currentSongId !=
+                                    null
+                        }
+                    )
+                }
+            }
+
+            /*
+             * Keep MiniPlayer available whenever playback exists
+             * and no full player is active.
+             */
+            LaunchedEffect(
+                playback.currentSongId,
+                showPlayer
+            ) {
+                if (
+                    playback.currentSongId !=
+                        null &&
+                    !showPlayer &&
+                    !miniVisible
+                ) {
+                    miniVisible =
+                        true
+                }
             }
         }
     }
