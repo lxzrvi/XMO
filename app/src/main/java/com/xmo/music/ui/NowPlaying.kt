@@ -1485,28 +1485,17 @@ fun NowPlaying(
                         )
 
                         PlayerPillButton(
-                            active =
-                                false,
-
-                            c =
-                                c,
-
+                            active = false,
+                            c = c,
                             click = {
-                                fullLyrics =
-                                    true
+                                fullLyrics = true
                             }
                         ) {
                             Text(
-                                "□",
-
-                                color =
-                                    c.text,
-
-                                fontFamily =
-                                    XmoFont.medium,
-
-                                fontSize =
-                                    17.sp
+                                text = "□",
+                                color = c.text,
+                                fontFamily = XmoFont.medium,
+                                fontSize = 17.sp
                             )
                         }
                     }
