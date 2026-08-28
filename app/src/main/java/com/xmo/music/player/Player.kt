@@ -14,29 +14,17 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/*
- * State exposed to Compose.
- *
- * ExoPlayer itself remains inside PlaybackService.
- */
 data class PlaybackState(
     val connected: Boolean = false,
-
     val currentSongId: Long? = null,
-
     val title: String = "",
     val artist: String = "",
     val album: String = "",
-
     val artworkUri: String? = null,
-
     val isPlaying: Boolean = false,
-
     val duration: Long = 0L,
     val position: Long = 0L,
-
     val currentIndex: Int = -1,
-
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false
 )
@@ -44,7 +32,6 @@ data class PlaybackState(
 class XmoPlayer(
     context: Context
 ) {
-
     private val appContext =
         context.applicationContext
 
@@ -56,42 +43,26 @@ class XmoPlayer(
     val state: StateFlow<PlaybackState> =
         _state.asStateFlow()
 
-    /*
-     * MediaController is UI/application-side proxy
-     * to the MediaSessionService.
-     */
+    private var controllerFuture:
+        ListenableFuture<MediaController>? =
+        null
+
     private var controller:
         MediaController? = null
 
-    private var controllerFuture:
-        ListenableFuture<MediaController>? = null
-
-    /*
-     * Real Song queue retained for XMO UI operations.
-     *
-     * Actual playback queue also exists in Media3 as MediaItems.
-     */
     private var songQueue:
         List<Song> = emptyList()
 
     private val listener =
         object : Player.Listener {
-
             override fun onEvents(
                 player: Player,
                 events: Player.Events
             ) {
-                publishState(
-                    player
-                )
+                publishState(player)
             }
         }
 
-    /*
-     * ---------------------------------------------------------
-     * CONNECT
-     * ---------------------------------------------------------
-     */
     fun connect() {
         if (
             controller != null ||
@@ -100,10 +71,9 @@ class XmoPlayer(
             return
         }
 
-        val sessionToken =
+        val token =
             SessionToken(
                 appContext,
-
                 ComponentName(
                     appContext,
                     PlaybackService::class.java
@@ -111,98 +81,59 @@ class XmoPlayer(
             )
 
         val future =
-            MediaController
-                .Builder(
-                    appContext,
-                    sessionToken
-                )
+            MediaController.Builder(
+                appContext,
+                token
+            )
                 .buildAsync()
 
-        controllerFuture =
-            future
+        controllerFuture = future
 
         future.addListener(
             {
-                /*
-                 * This callback runs on main executor.
-                 */
                 runCatching {
                     future.get()
+                }.onSuccess { result ->
+
+                    if (
+                        controllerFuture !== future
+                    ) {
+                        return@onSuccess
+                    }
+
+                    controller = result
+
+                    result.addListener(
+                        listener
+                    )
+
+                    publishState(result)
+
+                }.onFailure {
+                    if (
+                        controllerFuture === future
+                    ) {
+                        controllerFuture = null
+                    }
+
+                    _state.value =
+                        PlaybackState()
                 }
-                    .onSuccess {
-                            mediaController ->
-
-                        /*
-                         * XmoPlayer could have been released while
-                         * asynchronous connection was happening.
-                         */
-                        if (
-                            controllerFuture !==
-                            future
-                        ) {
-                            mediaController
-                                .release()
-
-                            return@onSuccess
-                        }
-
-                        controllerFuture =
-                            null
-
-                        controller =
-                            mediaController
-
-                        mediaController
-                            .addListener(
-                                listener
-                            )
-
-                        publishState(
-                            mediaController
-                        )
-                    }
-                    .onFailure {
-                        if (
-                            controllerFuture ===
-                            future
-                        ) {
-                            controllerFuture =
-                                null
-                        }
-
-                        _state.value =
-                            PlaybackState(
-                                connected =
-                                    false
-                            )
-                    }
             },
-
-            ContextCompat
-                .getMainExecutor(
-                    appContext
-                )
+            ContextCompat.getMainExecutor(
+                appContext
+            )
         )
     }
 
-    /*
-     * ---------------------------------------------------------
-     * PLAY QUEUE
-     * ---------------------------------------------------------
-     *
-     * This is the main entry point when a SongTile is tapped.
-     */
     fun play(
         songs: List<Song>,
         index: Int
     ) {
-        val mediaController =
-            controller
-                ?: return
+        val player =
+            controller ?: return
 
-        if (
-            songs.isEmpty()
-        ) {
+        if (songs.isEmpty()) {
             return
         }
 
@@ -212,334 +143,145 @@ class XmoPlayer(
                 songs.lastIndex
             )
 
-        songQueue =
-            songs
+        songQueue = songs
 
-        val mediaItems =
+        player.setMediaItems(
             songs.map {
                 it.toMediaItem()
-            }
-
-        mediaController
-            .setMediaItems(
-                mediaItems,
-                safeIndex,
-                0L
-            )
-
-        mediaController
-            .prepare()
-
-        mediaController
-            .play()
-
-        publishState(
-            mediaController
+            },
+            safeIndex,
+            0L
         )
-    }
 
-    /*
-     * Convenience API.
-     */
-    fun playSong(
-        song: Song,
-        queue: List<Song>
-    ) {
-        val index =
-            queue.indexOfFirst {
-                it.id ==
-                    song.id
-            }
+        player.prepare()
+        player.play()
 
-        if (
-            index >= 0
-        ) {
-            play(
-                queue,
-                index
-            )
-        }
-    }
-
-    /*
-     * ---------------------------------------------------------
-     * PLAY / PAUSE
-     * ---------------------------------------------------------
-     */
-    fun play() {
-        controller
-            ?.play()
-    }
-
-    fun pause() {
-        controller
-            ?.pause()
+        publishState(player)
     }
 
     fun togglePlayPause() {
-        val mediaController =
-            controller
-                ?: return
+        val player =
+            controller ?: return
 
-        if (
-            mediaController
-                .isPlaying
-        ) {
-            mediaController
-                .pause()
+        if (player.isPlaying) {
+            player.pause()
         } else {
-            /*
-             * If playback reached the end, play() alone may leave
-             * it at the final position. Seek back when appropriate.
-             */
             if (
-                mediaController
-                    .playbackState ==
+                player.playbackState ==
                 Player.STATE_ENDED
             ) {
-                mediaController
-                    .seekTo(
-                        mediaController
-                            .currentMediaItemIndex
-                            .coerceAtLeast(
-                                0
-                            ),
-                        0L
-                    )
+                player.seekTo(
+                    player.currentMediaItemIndex
+                        .coerceAtLeast(0),
+                    0L
+                )
             }
 
-            mediaController
-                .play()
+            player.play()
         }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * PREVIOUS / NEXT
-     * ---------------------------------------------------------
-     */
     fun previous() {
-        val mediaController =
-            controller
-                ?: return
+        val player =
+            controller ?: return
 
-        /*
-         * Common music-player behaviour:
-         * if song has played >3 sec, Previous restarts it.
-         */
         if (
-            mediaController
-                .currentPosition >
+            player.currentPosition >
             3_000L
         ) {
-            mediaController
-                .seekTo(
-                    0L
-                )
-
-            return
-        }
-
-        if (
-            mediaController
-                .hasPreviousMediaItem()
+            player.seekTo(0L)
+        } else if (
+            player.hasPreviousMediaItem()
         ) {
-            mediaController
-                .seekToPreviousMediaItem()
+            player.seekToPreviousMediaItem()
         } else {
-            mediaController
-                .seekTo(
-                    0L
-                )
+            player.seekTo(0L)
         }
     }
 
     fun next() {
-        val mediaController =
-            controller
-                ?: return
-
-        if (
-            mediaController
-                .hasNextMediaItem()
-        ) {
-            mediaController
-                .seekToNextMediaItem()
-        }
+        controller
+            ?.takeIf {
+                it.hasNextMediaItem()
+            }
+            ?.seekToNextMediaItem()
     }
 
-    /*
-     * ---------------------------------------------------------
-     * SEEK
-     * ---------------------------------------------------------
-     */
     fun seekTo(
-        positionMs: Long
+        position: Long
     ) {
-        val mediaController =
-            controller
-                ?: return
+        val player =
+            controller ?: return
 
         val duration =
-            mediaController
-                .duration
+            player.duration
 
         val target =
-            if (
-                duration > 0L
-            ) {
-                positionMs.coerceIn(
+            if (duration > 0) {
+                position.coerceIn(
                     0L,
                     duration
                 )
             } else {
-                positionMs.coerceAtLeast(
-                    0L
-                )
+                position.coerceAtLeast(0L)
             }
 
-        mediaController
-            .seekTo(
-                target
-            )
+        player.seekTo(target)
     }
 
-    fun seekBy(
-        amountMs: Long
-    ) {
-        val mediaController =
-            controller
-                ?: return
-
-        seekTo(
-            mediaController
-                .currentPosition +
-                amountMs
-        )
+    fun refreshPosition() {
+        controller?.let {
+            publishState(it)
+        }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * QUEUE
-     * ---------------------------------------------------------
-     */
-    fun queue():
-        List<Song> {
-        return songQueue
-    }
-
-    fun currentSong():
-        Song? {
+    fun currentSong(): Song? {
         val id =
-            _state
-                .value
-                .currentSongId
+            _state.value.currentSongId
                 ?: return null
 
-        return songQueue
-            .firstOrNull {
-                it.id ==
-                    id
-            }
+        return songQueue.firstOrNull {
+            it.id == id
+        }
     }
 
-    /*
-     * ---------------------------------------------------------
-     * POSITION REFRESH
-     * ---------------------------------------------------------
-     *
-     * Player.Listener doesn't emit every progress millisecond.
-     * NowPlaying can call this from a light coroutine every
-     * ~250ms while visible.
-     *
-     * No fake timer:
-     * value always comes directly from MediaController.
-     */
-    fun refreshPosition() {
-        controller
-            ?.let {
-                publishState(
-                    it
-                )
-            }
-    }
+    fun queue(): List<Song> =
+        songQueue
 
-    /*
-     * ---------------------------------------------------------
-     * RELEASE CONTROLLER
-     * ---------------------------------------------------------
-     *
-     * Releasing controller does NOT destroy PlaybackService.
-     * Music can continue through MediaSession/notification.
-     */
     fun release() {
-        val mediaController =
-            controller
+        controller?.removeListener(
+            listener
+        )
 
-        if (
-            mediaController != null
-        ) {
-            mediaController
-                .removeListener(
-                    listener
-                )
-
-            mediaController
-                .release()
+        /*
+         * buildAsync lifecycle is owned through this Future.
+         */
+        controllerFuture?.let {
+            MediaController.releaseFuture(it)
         }
 
-        controller =
-            null
-
-        controllerFuture
-            ?.let { future ->
-                MediaController
-                    .releaseFuture(
-                        future
-                    )
-            }
-
-        controllerFuture =
-            null
-
-        songQueue =
-            emptyList()
+        controllerFuture = null
+        controller = null
 
         _state.value =
             PlaybackState()
     }
 
-    /*
-     * ---------------------------------------------------------
-     * STATE
-     * ---------------------------------------------------------
-     */
     private fun publishState(
         player: Player
     ) {
-        val mediaItem =
-            player
-                .currentMediaItem
+        val item =
+            player.currentMediaItem
 
         val metadata =
-            mediaItem
-                ?.mediaMetadata
-
-        val duration =
-            player
-                .duration
-                .takeIf {
-                    it > 0L
-                }
-                ?: 0L
+            item?.mediaMetadata
 
         _state.value =
             PlaybackState(
-                connected =
-                    true,
+                connected = true,
 
                 currentSongId =
-                    mediaItem
+                    item
                         ?.mediaId
                         ?.toLongOrNull(),
 
@@ -567,80 +309,45 @@ class XmoPlayer(
                         ?.toString(),
 
                 isPlaying =
-                    player
-                        .isPlaying,
+                    player.isPlaying,
 
                 duration =
-                    duration,
+                    player.duration
+                        .takeIf {
+                            it > 0
+                        }
+                        ?: 0L,
 
                 position =
-                    player
-                        .currentPosition
-                        .coerceAtLeast(
-                            0L
-                        ),
+                    player.currentPosition
+                        .coerceAtLeast(0L),
 
                 currentIndex =
-                    player
-                        .currentMediaItemIndex,
+                    player.currentMediaItemIndex,
 
                 hasPrevious =
-                    player
-                        .hasPreviousMediaItem(),
+                    player.hasPreviousMediaItem(),
 
                 hasNext =
-                    player
-                        .hasNextMediaItem()
+                    player.hasNextMediaItem()
             )
     }
 }
-
-/*
- * =============================================================
- * SONG -> MEDIA ITEM
- * =============================================================
- */
 
 private fun Song.toMediaItem():
     MediaItem {
 
     val metadata =
-        MediaMetadata
-            .Builder()
-            .setTitle(
-                title
-            )
-            .setArtist(
-                artist
-            )
-            .setAlbumTitle(
-                album
-            )
-            .setArtworkUri(
-                artwork
-            )
+        MediaMetadata.Builder()
+            .setTitle(title)
+            .setArtist(artist)
+            .setAlbumTitle(album)
+            .setArtworkUri(artwork)
             .build()
 
-    return MediaItem
-        .Builder()
-
-        /*
-         * MediaStore ID becomes stable Media3 ID.
-         */
-        .setMediaId(
-            id.toString()
-        )
-
-        /*
-         * content://media/... URI
-         */
-        .setUri(
-            uri
-        )
-
-        .setMediaMetadata(
-            metadata
-        )
-
+    return MediaItem.Builder()
+        .setMediaId(id.toString())
+        .setUri(uri)
+        .setMediaMetadata(metadata)
         .build()
 }
