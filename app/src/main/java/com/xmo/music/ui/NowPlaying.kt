@@ -74,6 +74,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.graphics.ColorUtils
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
+import com.xmo.music.ui.blur.glassBorder
+import com.xmo.music.ui.blur.glassTint
+import com.xmo.music.ui.blur.glassHighlight
 import com.xmo.music.data.Song
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.blur.liveBlur
