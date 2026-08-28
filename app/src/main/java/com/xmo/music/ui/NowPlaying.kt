@@ -816,26 +816,18 @@ fun NowPlaying(
                 }
 
                 PlayerGlassButton(
-                    hazeState =
-                        hazeState,
-
-                    theme =
-                        theme,
-
+                    hazeState = hazeState,
+                    theme = theme,
                     click = {
-                        menuOpen =
-                            true
+                        scope.launch {
+                            closePlayer()
+                        }
                     }
                 ) {
                     Icon(
-                        imageVector =
-                            Icons.Default.MoreVert,
-
-                        contentDescription =
-                            "Options",
-
-                        tint =
-                            c.icon
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Close",
+                        tint = c.text
                     )
                 }
             }
