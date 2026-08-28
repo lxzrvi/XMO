@@ -19,6 +19,14 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Android kitchen is ready
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android API 37
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-37"
+
       - name: Adding ingredients
         uses: gradle/actions/setup-gradle@v4
 
