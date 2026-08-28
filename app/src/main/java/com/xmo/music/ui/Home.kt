@@ -112,9 +112,6 @@ fun Home(
             )
         }
 
-    /*
-     * Rebuilt only when categories actually change.
-     */
     val customSections =
         remember(categories) {
             categories.map { category ->
@@ -154,8 +151,8 @@ fun Home(
         }
 
     /*
-     * DataStore can contain old/removed IDs.
-     * Strip them, then append newly created categories.
+     * Remove stale IDs, preserve saved order,
+     * then append new categories.
      */
     val resolvedOrder =
         remember(
@@ -213,7 +210,7 @@ fun Home(
         }
 
     /*
-     * Real category dock height.
+     * Actual category dock height.
      */
     var categoryHeightPx by
         remember {
@@ -222,9 +219,6 @@ fun Home(
             )
         }
 
-    /*
-     * Metadata calculation only when songs change.
-     */
     val albumCount =
         remember(songs) {
             Library
@@ -235,10 +229,10 @@ fun Home(
     /*
      * LazyColumn:
      *
-     * 0 Header
-     * 1 Sticky category dock
-     * 2 Recently Played
-     * 3+ reordered sections
+     * 0 = Header
+     * 1 = Sticky categories
+     * 2 = Recently Played
+     * 3+ = reordered sections
      */
     suspend fun openSection(
         id: String
@@ -269,7 +263,7 @@ fun Home(
             orderIndex + 3
 
         /*
-         * Place the section below the pinned categories.
+         * First navigation.
          */
         state.animateScrollToItem(
             index = lazyIndex,
@@ -278,12 +272,12 @@ fun Home(
         )
 
         /*
-         * Let stickyHeader settle.
+         * Allow sticky header to settle.
          */
         withFrameNanos { }
 
         /*
-         * Exact final correction.
+         * Exact correction.
          */
         val info =
             state.layoutInfo
@@ -304,7 +298,8 @@ fun Home(
                     wanted
 
             if (
-                abs(error) > 1
+                abs(error) >
+                1
             ) {
                 state.scrollBy(
                     error.toFloat()
@@ -332,9 +327,6 @@ fun Home(
              * =================================================
              * HEADER
              * =================================================
-             *
-             * Real list item.
-             * Scrolls completely off screen.
              */
             item(
                 key = "home_header"
@@ -361,7 +353,7 @@ fun Home(
 
             /*
              * =================================================
-             * PINNED CATEGORIES
+             * STICKY CATEGORY DOCK
              * =================================================
              */
             stickyHeader(
@@ -489,7 +481,7 @@ fun Home(
 
             /*
              * =================================================
-             * REORDERABLE HOME SECTIONS
+             * HOME SECTIONS
              * =================================================
              */
             items(
@@ -532,9 +524,6 @@ fun Home(
              * =================================================
              * FOOTER
              * =================================================
-             *
-             * One complete viewport gives the final section
-             * enough trailing scroll range.
              */
             item(
                 key = "branding"
@@ -591,7 +580,7 @@ fun Home(
 
     /*
      * =========================================================
-     * ADD CUSTOM CATEGORY
+     * ADD CATEGORY
      * =========================================================
      */
     if (
@@ -669,15 +658,6 @@ fun Home(
                                             4
                                 )
 
-                            /*
-                             * IMPORTANT:
-                             *
-                             * Update category + local order before
-                             * dialog closes.
-                             *
-                             * This fixes custom chip disappearing
-                             * while its section already exists.
-                             */
                             val nextCategories =
                                 categories +
                                     category
@@ -686,6 +666,10 @@ fun Home(
                                 currentOrder +
                                     category.id
 
+                            /*
+                             * Update immediately so chip and
+                             * section appear together.
+                             */
                             currentOrder =
                                 nextOrder
 
@@ -707,6 +691,7 @@ fun Home(
                 ) {
                     Text(
                         "Add",
+
                         color =
                             XmoRed
                     )
@@ -725,6 +710,7 @@ fun Home(
                 ) {
                     Text(
                         "Cancel",
+
                         color =
                             c.sub
                     )
@@ -736,7 +722,7 @@ fun Home(
 
 /*
  * =============================================================
- * CATEGORY REORDER
+ * CATEGORY DRAG / REORDER
  * =============================================================
  */
 
@@ -762,21 +748,18 @@ private fun CategoryDragRow(
     val density =
         LocalDensity.current
 
-    val edgePx =
+    val edgeZonePx =
         with(density) {
-            64.dp.toPx()
+            76.dp.toPx()
         }
 
-    val gapPx =
+    val autoScrollBasePx =
         with(density) {
             8.dp.toPx()
         }
 
     /*
-     * IMPORTANT FIX:
-     *
-     * New custom category changes "order".
-     * remember(order) immediately gives the row the new item.
+     * Important for newly added custom categories.
      */
     var working by
         remember(order) {
@@ -792,7 +775,22 @@ private fun CategoryDragRow(
             )
         }
 
+    /*
+     * Current graphics translation of lifted chip.
+     */
     var dragOffset by
+        remember {
+            mutableFloatStateOf(
+                0f
+            )
+        }
+
+    /*
+     * Finger X in LazyRow viewport coordinates.
+     *
+     * The finger stays here while the list itself auto-scrolls.
+     */
+    var fingerX by
         remember {
             mutableFloatStateOf(
                 0f
@@ -826,65 +824,88 @@ private fun CategoryDragRow(
             null
     }
 
-    fun swapIfRequired(
+    /*
+     * Use stable keys rather than reorder-sensitive indexes.
+     */
+    fun itemInfo(
+        id: String
+    ): LazyListItemInfo? {
+        return state
+            .layoutInfo
+            .visibleItemsInfo
+            .firstOrNull {
+                it.key ==
+                    "drag_$id"
+            }
+    }
+
+    /*
+     * Keep dragged item's visual center attached to finger.
+     */
+    fun lockToFinger(
         id: String
     ) {
-        val sourceIndex =
+        val info =
+            itemInfo(id)
+                ?: return
+
+        val naturalCenter =
+            info.offset +
+                info.size /
+                    2f
+
+        dragOffset =
+            fingerX -
+                naturalCenter
+    }
+
+    /*
+     * Swap with neighbour when finger crosses its center.
+     *
+     * One swap per layout frame lets LazyRow publish the
+     * new keyed positions cleanly before the next swap.
+     */
+    fun reorderForFinger(
+        id: String
+    ) {
+        val from =
             working.indexOf(
                 id
             )
 
         if (
-            sourceIndex < 0
+            from < 0
         ) {
             return
         }
 
-        val sourceInfo =
-            state.layoutInfo
-                .visibleItemsInfo
-                .firstOrNull {
-                    it.key ==
-                        "drag_$id"
-                }
-                ?: return
-
-        val sourceCenter =
-            sourceInfo.offset +
-                sourceInfo.size /
-                    2f +
-                dragOffset
-
         /*
-         * Move RIGHT.
+         * RIGHT
          */
         if (
-            sourceIndex <
+            from <
             working.lastIndex
         ) {
             val rightId =
                 working[
-                    sourceIndex + 1
+                    from + 1
                 ]
 
-            val rightInfo =
-                state.layoutInfo
-                    .visibleItemsInfo
-                    .firstOrNull {
-                        it.key ==
-                            "drag_$rightId"
-                    }
+            val right =
+                itemInfo(
+                    rightId
+                )
 
             if (
-                rightInfo != null
+                right != null
             ) {
                 val rightCenter =
-                    rightInfo.offset +
-                        rightInfo.size /
+                    right.offset +
+                        right.size /
                             2f
 
                 if (
-                    sourceCenter >
+                    fingerX >
                     rightCenter
                 ) {
                     val next =
@@ -892,23 +913,14 @@ private fun CategoryDragRow(
                             .toMutableList()
 
                     next.add(
-                        sourceIndex + 1,
-
+                        from + 1,
                         next.removeAt(
-                            sourceIndex
+                            from
                         )
                     )
 
                     working =
                         next
-
-                    /*
-                     * Layout moves the item automatically.
-                     * Counter that movement so it stays with finger.
-                     */
-                    dragOffset -=
-                        rightInfo.size +
-                            gapPx
 
                     return
                 }
@@ -916,35 +928,31 @@ private fun CategoryDragRow(
         }
 
         /*
-         * Move LEFT.
+         * LEFT
          */
         if (
-            sourceIndex >
-            0
+            from > 0
         ) {
             val leftId =
                 working[
-                    sourceIndex - 1
+                    from - 1
                 ]
 
-            val leftInfo =
-                state.layoutInfo
-                    .visibleItemsInfo
-                    .firstOrNull {
-                        it.key ==
-                            "drag_$leftId"
-                    }
+            val left =
+                itemInfo(
+                    leftId
+                )
 
             if (
-                leftInfo != null
+                left != null
             ) {
                 val leftCenter =
-                    leftInfo.offset +
-                        leftInfo.size /
+                    left.offset +
+                        left.size /
                             2f
 
                 if (
-                    sourceCenter <
+                    fingerX <
                     leftCenter
                 ) {
                     val next =
@@ -952,22 +960,44 @@ private fun CategoryDragRow(
                             .toMutableList()
 
                     next.add(
-                        sourceIndex - 1,
-
+                        from - 1,
                         next.removeAt(
-                            sourceIndex
+                            from
                         )
                     )
 
                     working =
                         next
-
-                    dragOffset +=
-                        leftInfo.size +
-                            gapPx
                 }
             }
         }
+    }
+
+    /*
+     * After a swap, the same stable-key chip receives a new
+     * natural slot. Re-lock it to the same finger.
+     */
+    LaunchedEffect(
+        working,
+        draggingId
+    ) {
+        val id =
+            draggingId
+                ?: return@LaunchedEffect
+
+        withFrameNanos { }
+
+        lockToFinger(
+            id
+        )
+
+        /*
+         * If finger travelled far enough to cross another chip,
+         * continue on the next layout frame.
+         */
+        reorderForFinger(
+            id
+        )
     }
 
     LazyRow(
@@ -977,7 +1007,9 @@ private fun CategoryDragRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(44.dp),
+                .height(
+                    44.dp
+                ),
 
         contentPadding =
             PaddingValues(
@@ -992,11 +1024,20 @@ private fun CategoryDragRow(
             Arrangement
                 .spacedBy(
                     8.dp
-                )
+                ),
+
+        /*
+         * While reordering, only our edge auto-scroll controls
+         * LazyRow. This avoids gesture conflict.
+         */
+        userScrollEnabled =
+            draggingId ==
+                null
     ) {
         /*
-         * ALL
-         * permanently fixed.
+         * -----------------------------------------------------
+         * ALL — FIXED
+         * -----------------------------------------------------
          */
         item(
             key = "__all__"
@@ -1027,7 +1068,9 @@ private fun CategoryDragRow(
         }
 
         /*
-         * Reorderable middle categories.
+         * -----------------------------------------------------
+         * REORDERABLE CATEGORIES
+         * -----------------------------------------------------
          */
         items(
             items =
@@ -1049,46 +1092,61 @@ private fun CategoryDragRow(
             Box(
                 Modifier
                     .zIndex(
-                        if (moving)
-                            100f
-                        else
+                        if (
+                            moving
+                        ) {
+                            1000f
+                        } else {
                             0f
+                        }
                     )
                     .graphicsLayer {
-                        translationX =
-                            if (
-                                moving
-                            ) {
+                        if (
+                            moving
+                        ) {
+                            translationX =
                                 dragOffset
-                            } else {
-                                0f
-                            }
 
-                        val scale =
-                            if (
-                                moving
-                            ) {
+                            scaleX =
                                 1.09f
-                            } else {
-                                1f
-                            }
 
-                        scaleX =
-                            scale
-
-                        scaleY =
-                            scale
+                            scaleY =
+                                1.09f
+                        }
                     }
                     .pointerInput(
                         id
                     ) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
+                                    offset ->
+
                                 draggingId =
                                     id
 
-                                dragOffset =
-                                    0f
+                                val info =
+                                    itemInfo(
+                                        id
+                                    )
+
+                                /*
+                                 * Convert local pointer coordinate
+                                 * into LazyRow viewport coordinate.
+                                 */
+                                fingerX =
+                                    if (
+                                        info !=
+                                        null
+                                    ) {
+                                        info.offset +
+                                            offset.x
+                                    } else {
+                                        offset.x
+                                    }
+
+                                lockToFinger(
+                                    id
+                                )
 
                                 haptic
                                     .performHapticFeedback(
@@ -1103,113 +1161,167 @@ private fun CategoryDragRow(
 
                                 change.consume()
 
-                                dragOffset +=
+                                /*
+                                 * Only real finger movement changes
+                                 * fingerX.
+                                 */
+                                fingerX +=
                                     amount.x
 
-                                swapIfRequired(
+                                lockToFinger(
                                     id
                                 )
 
-                                val current =
+                                reorderForFinger(
+                                    id
+                                )
+
+                                val viewportStart =
                                     state.layoutInfo
-                                        .visibleItemsInfo
-                                        .firstOrNull {
-                                            it.key ==
-                                                "drag_$id"
-                                        }
+                                        .viewportStartOffset
+                                        .toFloat()
+
+                                val viewportEnd =
+                                    state.layoutInfo
+                                        .viewportEndOffset
+                                        .toFloat()
+
+                                val nearLeft =
+                                    fingerX <
+                                        viewportStart +
+                                            edgeZonePx
+
+                                val nearRight =
+                                    fingerX >
+                                        viewportEnd -
+                                            edgeZonePx
+
+                                val canGoLeft =
+                                    nearLeft &&
+                                        state
+                                            .canScrollBackward
+
+                                val canGoRight =
+                                    nearRight &&
+                                        state
+                                            .canScrollForward
 
                                 if (
-                                    current !=
-                                    null
+                                    canGoLeft ||
+                                    canGoRight
                                 ) {
-                                    val center =
-                                        current.offset +
-                                            current.size /
-                                                2f +
-                                            dragOffset
-
-                                    val viewportStart =
-                                        state.layoutInfo
-                                            .viewportStartOffset
-                                            .toFloat()
-
-                                    val viewportEnd =
-                                        state.layoutInfo
-                                            .viewportEndOffset
-                                            .toFloat()
-
-                                    val goLeft =
-                                        center <
-                                            viewportStart +
-                                                edgePx &&
-                                            state
-                                                .canScrollBackward
-
-                                    val goRight =
-                                        center >
-                                            viewportEnd -
-                                                edgePx &&
-                                            state
-                                                .canScrollForward
+                                    val direction =
+                                        if (
+                                            canGoLeft
+                                        ) {
+                                            -1f
+                                        } else {
+                                            1f
+                                        }
 
                                     if (
-                                        goLeft ||
-                                        goRight
+                                        autoScrollJob
+                                            ?.isActive !=
+                                        true
                                     ) {
-                                        val direction =
-                                            if (
-                                                goLeft
-                                            ) {
-                                                -1f
-                                            } else {
-                                                1f
-                                            }
+                                        autoScrollJob =
+                                            scope.launch {
 
-                                        if (
-                                            autoScrollJob
-                                                ?.isActive !=
-                                            true
-                                        ) {
-                                            autoScrollJob =
-                                                scope.launch {
-                                                    while (
-                                                        isActive
-                                                    ) {
-                                                        val consumed =
-                                                            state.scrollBy(
-                                                                direction *
-                                                                    14f
-                                                            )
+                                                while (
+                                                    isActive &&
+                                                    draggingId ==
+                                                        id
+                                                ) {
+                                                    /*
+                                                     * Re-read viewport every frame.
+                                                     */
+                                                    val start =
+                                                        state.layoutInfo
+                                                            .viewportStartOffset
+                                                            .toFloat()
 
-                                                        /*
-                                                         * Compensate scrolling
-                                                         * under stationary finger.
-                                                         */
-                                                        dragOffset +=
-                                                            consumed
+                                                    val end =
+                                                        state.layoutInfo
+                                                            .viewportEndOffset
+                                                            .toFloat()
 
-                                                        swapIfRequired(
-                                                            id
-                                                        )
-
+                                                    val strength =
                                                         if (
-                                                            abs(
-                                                                consumed
-                                                            ) <
-                                                            .1f
+                                                            direction <
+                                                            0f
                                                         ) {
-                                                            break
+                                                            (
+                                                                1f -
+                                                                    (
+                                                                        fingerX -
+                                                                            start
+                                                                        ) /
+                                                                    edgeZonePx
+                                                                )
+                                                                .coerceIn(
+                                                                    0f,
+                                                                    1f
+                                                                )
+                                                        } else {
+                                                            (
+                                                                1f -
+                                                                    (
+                                                                        end -
+                                                                            fingerX
+                                                                        ) /
+                                                                    edgeZonePx
+                                                                )
+                                                                .coerceIn(
+                                                                    0f,
+                                                                    1f
+                                                                )
                                                         }
 
-                                                        delay(
-                                                            16
+                                                    val amountToScroll =
+                                                        direction *
+                                                            autoScrollBasePx *
+                                                            (
+                                                                .8f +
+                                                                    strength *
+                                                                    1.8f
+                                                                )
+
+                                                    val consumed =
+                                                        state.scrollBy(
+                                                            amountToScroll
                                                         )
+
+                                                    /*
+                                                     * Do NOT move fingerX.
+                                                     *
+                                                     * Content moves underneath
+                                                     * the stationary finger.
+                                                     */
+                                                    lockToFinger(
+                                                        id
+                                                    )
+
+                                                    reorderForFinger(
+                                                        id
+                                                    )
+
+                                                    if (
+                                                        abs(
+                                                            consumed
+                                                        ) <
+                                                        .1f
+                                                    ) {
+                                                        break
                                                     }
+
+                                                    delay(
+                                                        16
+                                                    )
                                                 }
-                                        }
-                                    } else {
-                                        stopAutoScroll()
+                                            }
                                     }
+                                } else {
+                                    stopAutoScroll()
                                 }
                             },
 
@@ -1226,6 +1338,9 @@ private fun CategoryDragRow(
                                 dragOffset =
                                     0f
 
+                                fingerX =
+                                    0f
+
                                 commit(
                                     final
                                 )
@@ -1238,6 +1353,9 @@ private fun CategoryDragRow(
                                     null
 
                                 dragOffset =
+                                    0f
+
+                                fingerX =
                                     0f
 
                                 working =
@@ -1268,16 +1386,19 @@ private fun CategoryDragRow(
                         ) {
                             Modifier
                                 .border(
-                                    1.dp,
+                                    width =
+                                        1.dp,
 
-                                    XmoRed.copy(
-                                        alpha =
-                                            .7f
-                                    ),
+                                    color =
+                                        XmoRed.copy(
+                                            alpha =
+                                                .72f
+                                        ),
 
-                                    RoundedCornerShape(
-                                        18.dp
-                                    )
+                                    shape =
+                                        RoundedCornerShape(
+                                            18.dp
+                                        )
                                 )
                         } else {
                             Modifier
@@ -1296,8 +1417,9 @@ private fun CategoryDragRow(
         }
 
         /*
-         * ADD
-         * permanently fixed final item.
+         * -----------------------------------------------------
+         * ADD — FIXED
+         * -----------------------------------------------------
          */
         item(
             key = "__add__"
@@ -1331,28 +1453,19 @@ private fun CategoryDragRow(
 
 /*
  * =============================================================
- * ALL SONGS ARROW CONTROLLER
+ * SONG ARROW CONTROLLER
  * =============================================================
- *
- * Tap and hold are separate states.
- *
- * Tap:
- * exact one-column movement.
- *
- * Hold:
- * continuous pixel scrolling.
  */
+
 @Stable
 private class SongArrowController {
 
     var tapRequest by
         mutableIntStateOf(0)
-
         private set
 
     var fastScrolling by
         mutableStateOf(false)
-
         private set
 
     fun tap() {
@@ -1397,6 +1510,30 @@ private fun HomeSection(
         } else {
             null
         }
+
+    /*
+     * + on:
+     *
+     * Albums
+     * Liked Songs
+     * Every custom category
+     *
+     * No + on:
+     *
+     * All Songs
+     * Artists
+     */
+    val showAddAction =
+        section.id ==
+            "albums" ||
+            section.id ==
+            "liked" ||
+            (
+                section.id !=
+                    "songs" &&
+                    section.id !=
+                    "artists"
+                )
 
     Column(
         Modifier
@@ -1450,11 +1587,13 @@ private fun HomeSection(
                     )
             )
 
+            /*
+             * Custom category also gets the circular +.
+             *
+             * It is deliberately not wired to fake behavior yet.
+             */
             if (
-                section.id ==
-                "albums" ||
-                section.id ==
-                "liked"
+                showAddAction
             ) {
                 Box(
                     Modifier
@@ -1579,7 +1718,7 @@ private fun HomeSection(
 
 /*
  * =============================================================
- * ARROW INPUT
+ * SONG ARROW
  * =============================================================
  */
 
@@ -1594,7 +1733,8 @@ private fun SongArrowButton(
     Box(
         Modifier
             .padding(
-                start = 7.dp
+                start =
+                    7.dp
             )
             .size(
                 28.dp
@@ -1616,12 +1756,6 @@ private fun SongArrowButton(
                         var holdStarted =
                             false
 
-                        /*
-                         * Only detects hold.
-                         *
-                         * It DOES NOT produce repeated
-                         * "next column" requests.
-                         */
                         val holdJob =
                             scope.launch {
                                 delay(
@@ -1641,15 +1775,13 @@ private fun SongArrowButton(
                         holdJob.cancel()
 
                         /*
-                         * Release must stop fast scroll
-                         * immediately.
+                         * Release instantly stops hold scrolling.
                          */
                         controller
                             .stopFast()
 
                         /*
-                         * Short press only:
-                         * exactly one column.
+                         * Short tap = exactly one column.
                          */
                         if (
                             released &&
@@ -1680,7 +1812,7 @@ private fun SongArrowButton(
 
 /*
  * =============================================================
- * ALL SONGS
+ * ALL SONGS GRID
  * =============================================================
  */
 
@@ -1733,7 +1865,7 @@ private fun SongsGrid(
             8.dp
 
         /*
-         * Exactly four cards.
+         * Exactly 4 complete visible columns.
          */
         val card =
             (
@@ -1751,9 +1883,6 @@ private fun SongsGrid(
                 3 +
                 gap * 2
 
-        /*
-         * Complete 12-item visual pages.
-         */
         val slotCount =
             (
                 (songs.size + 11) /
@@ -1762,16 +1891,15 @@ private fun SongsGrid(
 
         /*
          * -----------------------------------------------------
-         * TAP
+         * TAP = ONE COLUMN
          * -----------------------------------------------------
-         *
-         * One press = one horizontal column.
          */
         LaunchedEffect(
             tapRequest
         ) {
             if (
-                tapRequest <= 0
+                tapRequest <=
+                0
             ) {
                 return@LaunchedEffect
             }
@@ -1820,13 +1948,8 @@ private fun SongsGrid(
 
         /*
          * -----------------------------------------------------
-         * HOLD
+         * HOLD = CONTINUOUS FAST SCROLL
          * -----------------------------------------------------
-         *
-         * Fast continuous scrolling.
-         *
-         * No column-by-column animation.
-         * No repeated arrow requests.
          */
         LaunchedEffect(
             fastScrolling
@@ -1837,28 +1960,19 @@ private fun SongsGrid(
                 return@LaunchedEffect
             }
 
-            /*
-             * ~1100 px/sec at 60fps.
-             *
-             * Smooth + visibly fast without giant jumps.
-             */
-            val pixelsPerFrame =
-                18f
-
             while (
                 isActive &&
                 arrow.fastScrolling
             ) {
                 val consumed =
                     gridState.scrollBy(
-                        pixelsPerFrame
+                        18f
                     )
 
-                /*
-                 * End reached.
-                 */
                 if (
-                    abs(consumed) <
+                    abs(
+                        consumed
+                    ) <
                     .1f
                 ) {
                     break
@@ -1914,13 +2028,7 @@ private fun SongsGrid(
             ) { slot ->
 
                 /*
-                 * LazyHorizontalGrid naturally fills:
-                 *
-                 * 0  3  6  9
-                 * 1  4  7 10
-                 * 2  5  8 11
-                 *
-                 * Map it to:
+                 * Required visual order:
                  *
                  * 1  2  3  4
                  * 5  6  7  8
@@ -1986,7 +2094,7 @@ private fun SongsGrid(
 
 /*
  * =============================================================
- * ALBUM
+ * ALBUMS
  * =============================================================
  */
 
@@ -2022,9 +2130,6 @@ private fun ArtistBody(
     songs: List<Song>,
     c: HomeColors
 ) {
-    /*
-     * Don't rebuild grouping during normal Home scroll.
-     */
     val artists =
         remember(songs) {
             Library.artists(
