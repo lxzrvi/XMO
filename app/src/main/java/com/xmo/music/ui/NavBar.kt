@@ -30,7 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -44,6 +44,9 @@ import dev.chrisbanes.haze.HazeState
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+/*
+ * Approved XMO geometry.
+ */
 private val BarW =
     246.dp
 
@@ -60,46 +63,56 @@ private val RestH =
 fun BoxScope.NavBar(
     selected: Int,
     theme: XmoTheme,
-
-    /*
-     * ONE App-level shared HazeState.
-     *
-     * NavBar does not create its own backdrop.
-     */
     hazeState: HazeState,
-
     select: (Int) -> Unit
 ) {
-    var pos by remember {
-        mutableFloatStateOf(
-            selected.toFloat()
-        )
-    }
+    val accent =
+        LocalXmoAccent.current
 
-    var down by remember {
-        mutableStateOf(false)
-    }
+    var position by
+        remember {
+            mutableFloatStateOf(
+                selected.toFloat()
+            )
+        }
 
-    var velocity by remember {
-        mutableFloatStateOf(0f)
-    }
+    var pressed by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
+
+    var velocity by
+        remember {
+            mutableFloatStateOf(
+                0f
+            )
+        }
 
     /*
-     * External tab selection keeps selector in sync.
+     * Keep selector synchronized with programmatic/back navigation.
      */
     LaunchedEffect(
         selected
     ) {
-        if (!down) {
-            pos =
-                selected.toFloat()
+        if (
+            !pressed
+        ) {
+            position =
+                selected
+                    .coerceIn(
+                        0,
+                        2
+                    )
+                    .toFloat()
         }
     }
 
-    val x by
+    val animatedPosition by
         animateFloatAsState(
             targetValue =
-                pos,
+                position,
 
             animationSpec =
                 spring(
@@ -111,16 +124,19 @@ fun BoxScope.NavBar(
                 ),
 
             label =
-                "position"
+                "xmoNavPosition"
         )
 
     val grow by
         animateFloatAsState(
             targetValue =
-                if (down)
+                if (
+                    pressed
+                ) {
                     1f
-                else
-                    0f,
+                } else {
+                    0f
+                },
 
             animationSpec =
                 spring(
@@ -132,16 +148,19 @@ fun BoxScope.NavBar(
                 ),
 
             label =
-                "grow"
+                "xmoNavGrow"
         )
 
-    val barScale by
+    val parentScale by
         animateFloatAsState(
             targetValue =
-                if (down)
+                if (
+                    pressed
+                ) {
                     1.04f
-                else
-                    1f,
+                } else {
+                    1f
+                },
 
             animationSpec =
                 spring(
@@ -153,60 +172,45 @@ fun BoxScope.NavBar(
                 ),
 
             label =
-                "bar"
+                "xmoNavParent"
         )
 
-    /*
-     * ---------------------------------------------------------
-     * GLASS COLORS
-     * ---------------------------------------------------------
-     *
-     * Blur itself comes from LiveBlur.
-     * These are cheap overlays only.
-     */
     val parentBorder =
-        when (theme) {
-            XmoTheme.Dark ->
-                XmoRed.copy(
-                    alpha = .30f
-                )
+        accent.copy(
+            alpha =
+                when (
+                    theme
+                ) {
+                    XmoTheme.Light ->
+                        .28f
 
-            XmoTheme.Amoled ->
-                XmoRed.copy(
-                    alpha = .34f
-                )
+                    XmoTheme.Dark ->
+                        .30f
 
-            XmoTheme.Light ->
-                XmoRed.copy(
-                    alpha = .28f
-                )
-        }
-
-    val glassEdge =
-        glassBorder(
-            theme
-        )
-
-    val highlight =
-        glassHighlight(
-            theme
+                    XmoTheme.Amoled ->
+                        .35f
+                }
         )
 
     val inactive =
-        when (theme) {
+        when (
+            theme
+        ) {
             XmoTheme.Light ->
-                Color(
-                    0x80000000
+                Color.Black.copy(
+                    alpha = .50f
                 )
 
             else ->
-                Color(
-                    0x70FFFFFF
+                Color.White.copy(
+                    alpha = .44f
                 )
         }
 
     val active =
-        when (theme) {
+        when (
+            theme
+        ) {
             XmoTheme.Light ->
                 Color(
                     0xFF161616
@@ -228,9 +232,9 @@ fun BoxScope.NavBar(
     /*
      * =========================================================
      * 96dp INVISIBLE OVERFLOW / GESTURE HOST
-     * =========================================================
      *
-     * Approved geometry unchanged.
+     * Approved positioning is intentionally retained.
+     * =========================================================
      */
     Box(
         Modifier
@@ -258,6 +262,10 @@ fun BoxScope.NavBar(
 
                     val start =
                         selected
+                            .coerceIn(
+                                0,
+                                2
+                            )
 
                     val slot =
                         size.width /
@@ -272,7 +280,7 @@ fun BoxScope.NavBar(
                     var change =
                         first
 
-                    down =
+                    pressed =
                         true
 
                     velocity =
@@ -289,48 +297,61 @@ fun BoxScope.NavBar(
                                 .first()
 
                         if (
-                            change.pressed
+                            !change.pressed
                         ) {
-                            val dx =
-                                change.position.x -
-                                    lastX
+                            continue
+                        }
 
-                            total =
-                                change.position.x -
-                                    startX
+                        val currentX =
+                            change.position.x
 
-                            lastX =
-                                change.position.x
+                        val dx =
+                            currentX -
+                                lastX
 
-                            velocity =
-                                velocity *
-                                    .62f +
-                                    dx *
-                                    .38f
+                        total =
+                            currentX -
+                                startX
 
-                            pos =
-                                (
-                                    start +
-                                        total /
-                                        slot
-                                    )
-                                    .coerceIn(
-                                        0f,
-                                        2f
-                                    )
+                        lastX =
+                            currentX
 
-                            if (
-                                abs(total) >
-                                2f
-                            ) {
-                                change.consume()
-                            }
+                        /*
+                         * Low-pass velocity gives selector stretch
+                         * without noisy single-frame spikes.
+                         */
+                        velocity =
+                            velocity *
+                                .64f +
+                                dx *
+                                .36f
+
+                        position =
+                            (
+                                start +
+                                    total /
+                                    slot
+                                )
+                                .coerceIn(
+                                    0f,
+                                    2f
+                                )
+
+                        if (
+                            abs(
+                                total
+                            ) >
+                            2f
+                        ) {
+                            change.consume()
                         }
                     }
 
                     val target =
                         if (
-                            abs(total) <=
+                            abs(
+                                total
+                            ) <=
                             7f
                         ) {
                             (
@@ -343,7 +364,7 @@ fun BoxScope.NavBar(
                                     2
                                 )
                         } else {
-                            pos
+                            position
                                 .roundToInt()
                                 .coerceIn(
                                     0,
@@ -351,11 +372,18 @@ fun BoxScope.NavBar(
                                 )
                         }
 
+                    /*
+                     * Settle selector first; selected tab updates
+                     * immediately through App.
+                     */
+                    position =
+                        target.toFloat()
+
                     velocity =
                         0f
 
-                    pos =
-                        target.toFloat()
+                    pressed =
+                        false
 
                     if (
                         target !=
@@ -365,20 +393,13 @@ fun BoxScope.NavBar(
                             target
                         )
                     }
-
-                    down =
-                        false
                 }
             }
     ) {
         /*
          * =====================================================
-         * GLASS PARENT — 246 × 64
+         * PARENT GLASS — 246 × 64
          * =====================================================
-         *
-         * ONLY this whole parent gets Haze blur.
-         *
-         * Selector/icons do NOT create another blur.
          */
         Box(
             Modifier
@@ -391,10 +412,10 @@ fun BoxScope.NavBar(
                 )
                 .graphicsLayer {
                     scaleX =
-                        barScale
+                        parentScale
 
                     scaleY =
-                        barScale
+                        parentScale
 
                     shape =
                         RoundedCornerShape(
@@ -404,10 +425,6 @@ fun BoxScope.NavBar(
                     clip =
                         true
                 }
-
-                /*
-                 * Real shared Haze.
-                 */
                 .liveBlur(
                     state =
                         hazeState,
@@ -415,19 +432,21 @@ fun BoxScope.NavBar(
                     theme =
                         theme
                 )
-
-                /*
-                 * Subtle upper glass reflection.
-                 *
-                 * Cheap gradient only.
-                 */
                 .drawBehind {
+                    val radius =
+                        33.dp.toPx()
+
+                    /*
+                     * Subtle top reflection.
+                     */
                     drawRoundRect(
                         brush =
                             Brush.verticalGradient(
                                 colors =
                                     listOf(
-                                        highlight,
+                                        glassHighlight(
+                                            theme
+                                        ),
                                         Color.Transparent,
                                         Color.Transparent
                                     ),
@@ -441,38 +460,34 @@ fun BoxScope.NavBar(
                             ),
 
                         cornerRadius =
-                            androidx.compose.ui.geometry
-                                .CornerRadius(
-                                    33.dp.toPx()
-                                )
+                            CornerRadius(
+                                radius
+                            )
                     )
 
                     /*
-                     * Very subtle neutral glass edge under
-                     * the branded red border.
+                     * Neutral glass edge.
                      */
                     drawRoundRect(
                         color =
-                            glassEdge,
+                            glassBorder(
+                                theme
+                            ),
 
                         cornerRadius =
-                            androidx.compose.ui.geometry
-                                .CornerRadius(
-                                    33.dp.toPx()
-                                ),
+                            CornerRadius(
+                                radius
+                            ),
 
                         style =
-                            androidx.compose.ui.graphics.drawscope
+                            androidx.compose.ui.graphics
+                                .drawscope
                                 .Stroke(
                                     width =
                                         .35.dp.toPx()
                                 )
                     )
                 }
-
-                /*
-                 * Existing XMO-red parent border stays.
-                 */
                 .border(
                     width =
                         .6.dp,
@@ -489,30 +504,31 @@ fun BoxScope.NavBar(
 
         /*
          * =====================================================
-         * SELECTOR
+         * MOVING SELECTOR
+         *
+         * Rest     78 × 56
+         * Expanded 110 × 80
          * =====================================================
-         *
-         * Geometry and interaction unchanged.
-         *
-         * It is intentionally NOT independently blurred.
          */
-        val selectorW =
+        val selectorWidth =
             RestW +
                 32.dp *
                 grow
 
-        val selectorH =
+        val selectorHeight =
             RestH +
                 24.dp *
                 grow
 
-        val radius =
+        val selectorRadius =
             29.dp +
                 13.dp *
                 grow
 
         val stretch =
-            if (down) {
+            if (
+                pressed
+            ) {
                 (
                     abs(
                         velocity
@@ -527,23 +543,22 @@ fun BoxScope.NavBar(
                 0f
             }
 
-        val selector =
-            when (theme) {
-                XmoTheme.Dark ->
-                    XmoRed.copy(
-                        alpha = .26f
-                    )
+        val selectorColor =
+            accent.copy(
+                alpha =
+                    when (
+                        theme
+                    ) {
+                        XmoTheme.Light ->
+                            .24f
 
-                XmoTheme.Amoled ->
-                    XmoRed.copy(
-                        alpha = .29f
-                    )
+                        XmoTheme.Dark ->
+                            .26f
 
-                XmoTheme.Light ->
-                    XmoRed.copy(
-                        alpha = .24f
-                    )
-            }
+                        XmoTheme.Amoled ->
+                            .30f
+                    }
+            )
 
         Box(
             Modifier
@@ -555,15 +570,15 @@ fun BoxScope.NavBar(
                         4.dp +
                             160.dp *
                             (
-                                x /
+                                animatedPosition /
                                     2f
                                 ) -
                             16.dp *
                             grow
                 )
                 .size(
-                    selectorW,
-                    selectorH
+                    selectorWidth,
+                    selectorHeight
                 )
                 .graphicsLayer {
                     val skew =
@@ -607,22 +622,22 @@ fun BoxScope.NavBar(
                 .graphicsLayer {
                     shape =
                         RoundedCornerShape(
-                            radius
+                            selectorRadius
                         )
 
                     clip =
                         true
                 }
                 .background(
-                    selector
+                    selectorColor
                 )
                 .border(
                     .65.dp,
-                    XmoRed.copy(
-                        alpha = .42f
+                    accent.copy(
+                        alpha = .44f
                     ),
                     RoundedCornerShape(
-                        radius
+                        selectorRadius
                     )
                 )
         )
@@ -653,9 +668,9 @@ fun BoxScope.NavBar(
                     index,
                     icon ->
 
-                val chosen =
+                val selectedVisual =
                     abs(
-                        x -
+                        animatedPosition -
                             index
                     ) <
                         .5f
@@ -664,8 +679,8 @@ fun BoxScope.NavBar(
                     animateFloatAsState(
                         targetValue =
                             if (
-                                chosen &&
-                                down
+                                selectedVisual &&
+                                pressed
                             ) {
                                 1.10f
                             } else {
@@ -682,7 +697,7 @@ fun BoxScope.NavBar(
                             ),
 
                         label =
-                            "icon$index"
+                            "xmoNavIcon$index"
                     )
 
                 Box(
@@ -700,10 +715,23 @@ fun BoxScope.NavBar(
                             icon,
 
                         contentDescription =
-                            null,
+                            when (
+                                index
+                            ) {
+                                0 ->
+                                    "Home"
+
+                                1 ->
+                                    "Search"
+
+                                else ->
+                                    "Settings"
+                            },
 
                         tint =
-                            if (chosen) {
+                            if (
+                                selectedVisual
+                            ) {
                                 active
                             } else {
                                 inactive
