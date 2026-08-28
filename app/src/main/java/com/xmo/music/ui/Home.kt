@@ -1,7 +1,5 @@
 package com.xmo.music.ui
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -13,22 +11,29 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.*
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.xmo.music.R
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.*
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 private data class HSection(
     val id: String,
@@ -36,10 +41,6 @@ private data class HSection(
     val icon: Int,
     val tint: Color = XmoRed
 )
-
-private object Arrow {
-    var tick by mutableIntStateOf(0)
-}
 
 @Composable
 fun Home(
@@ -51,184 +52,131 @@ fun Home(
     setTheme: (XmoTheme) -> Unit,
     refresh: () -> Unit,
     saveOrder: (List<String>) -> Unit,
-    saveCategories:
-        (List<UserCategory>) -> Unit
+    saveCategories: (List<UserCategory>) -> Unit
 ) {
-    val c =
-        homeColors(theme)
+    val c = homeColors(theme)
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
 
-    val state =
-        rememberLazyListState()
-
-    val scope =
-        rememberCoroutineScope()
-
-    val density =
-        LocalDensity.current
-
-    val customIcons =
-        remember {
-            listOf(
-                R.drawable.ic_xmo_star,
-                R.drawable.ic_xmo_spark,
-                R.drawable.ic_xmo_diamond,
-                R.drawable.ic_xmo_bolt
-            )
-        }
-
-    val customTints =
-        remember {
-            listOf(
-                Color(0xFFFFC107),
-                Color(0xFFAF52DE),
-                Color(0xFF00AEEF),
-                Color(0xFFFF7043)
-            )
-        }
-
-    val base =
+    val customIcons = remember {
         listOf(
-            HSection(
-                "songs",
-                "All Songs",
-                R.drawable.ic_xmo_songs
-            ),
-            HSection(
-                "albums",
-                "Albums",
-                R.drawable.ic_xmo_album
-            ),
-            HSection(
-                "liked",
-                "Liked Songs",
-                R.drawable.ic_xmo_heart
-            ),
-            HSection(
-                "artists",
-                "Artists",
-                R.drawable.ic_xmo_artist
-            )
+            R.drawable.ic_xmo_star,
+            R.drawable.ic_xmo_spark,
+            R.drawable.ic_xmo_diamond,
+            R.drawable.ic_xmo_bolt
         )
-
-    val custom =
-        categories.map {
-            val i =
-                it.icon.mod(4)
-
-            HSection(
-                it.id,
-                it.name,
-                customIcons[i],
-                customTints[i]
-            )
-        }
-
-    val sectionMap =
-        (base + custom)
-            .associateBy {
-                it.id
-            }
-
-    val resolved =
-        order
-            .filter(
-                sectionMap::containsKey
-            ) +
-            sectionMap.keys
-                .filterNot(
-                    order::contains
-                )
-
-    var visualOrder by
-        remember {
-            mutableStateOf(
-                resolved
-            )
-        }
-
-    LaunchedEffect(
-        resolved
-    ) {
-        visualOrder =
-            resolved
     }
 
-    var selected by
-        remember {
-            mutableStateOf(
-                "all"
+    val customTints = remember {
+        listOf(
+            Color(0xFFFFC107),
+            Color(0xFFAF52DE),
+            Color(0xFF00AEEF),
+            Color(0xFFFF7043)
+        )
+    }
+
+    val base = remember {
+        listOf(
+            HSection("songs", "All Songs", R.drawable.ic_xmo_songs),
+            HSection("albums", "Albums", R.drawable.ic_xmo_album),
+            HSection("liked", "Liked Songs", R.drawable.ic_xmo_heart),
+            HSection("artists", "Artists", R.drawable.ic_xmo_artist)
+        )
+    }
+
+    val custom = remember(categories) {
+        categories.map {
+            val i = it.icon.mod(4)
+
+            HSection(
+                id = it.id,
+                name = it.name,
+                icon = customIcons[i],
+                tint = customTints[i]
             )
         }
+    }
 
-    var addDialog by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    val sectionMap = remember(base, custom) {
+        (base + custom).associateBy { it.id }
+    }
 
-    var newName by
-        remember {
-            mutableStateOf("")
-        }
+    val resolved = remember(order, sectionMap) {
+        order.filter(sectionMap::containsKey) +
+            sectionMap.keys.filterNot(order::contains)
+    }
 
     /*
-     * Smooth header collapse is based ONLY
-     * on real vertical scroll from top.
+     * Committed section order.
      *
-     * It therefore does not vanish merely
-     * because Recently Played moved a few px.
+     * This drives the expensive Home body only after a drop.
+     * CategoryDragRow keeps its own lightweight preview order
+     * while the finger is moving.
      */
-    val profileTarget by remember {
-        derivedStateOf {
-            if (
-                state.firstVisibleItemIndex ==
-                0
-            ) {
-                val max =
-                    with(density) {
-                        78.dp.toPx()
-                    }
+    var visualOrder by remember {
+        mutableStateOf(resolved)
+    }
 
+    LaunchedEffect(resolved) {
+        visualOrder = resolved
+    }
+
+    var selected by remember {
+        mutableStateOf("all")
+    }
+
+    var addDialog by remember {
+        mutableStateOf(false)
+    }
+
+    var newName by remember {
+        mutableStateOf("")
+    }
+
+    /*
+     * Calculate expensive metadata once for a song-list change.
+     */
+    val albumCount = remember(songs) {
+        Library.albums(songs).size
+    }
+
+    /*
+     * Header has 76dp collapsible height.
+     *
+     * No spring is placed between finger-scroll and collapse.
+     * That removes the rubber-band / delayed feeling on device.
+     */
+    val collapseDistancePx = with(density) {
+        76.dp.toPx()
+    }
+
+    val headerProgress by remember {
+        derivedStateOf {
+            if (listState.firstVisibleItemIndex != 0) {
+                0f
+            } else {
                 (
                     1f -
-                        state
-                            .firstVisibleItemScrollOffset /
-                        max
-                    )
-                    .coerceIn(
-                        0f,
-                        1f
-                    )
-            } else {
-                0f
+                        listState.firstVisibleItemScrollOffset /
+                        collapseDistancePx
+                    ).coerceIn(0f, 1f)
             }
         }
     }
 
-    val profile by
-        animateFloatAsState(
-            targetValue =
-                profileTarget,
-            animationSpec =
-                spring(
-                    dampingRatio =
-                        .92f,
-                    stiffness =
-                        420f
-                ),
-            label =
-                "profile"
-        )
-
     /*
-     * Collapsed dock:
-     * status bar + category row.
+     * Category row itself is about 43dp high:
+     * 34dp chip + vertical row padding.
+     *
+     * The list section is positioned below this overlay.
      */
-    val dockPx =
-        with(density) {
-            56.dp.roundToPx()
-        }
+    val pinnedDockHeight = 44.dp
+
+    val pinnedDockPx = with(density) {
+        pinnedDockHeight.roundToPx()
+    }
 
     Box(
         Modifier
@@ -236,308 +184,232 @@ fun Home(
             .background(c.bg)
     ) {
         LazyColumn(
-            state = state,
-            modifier =
-                Modifier.fillMaxSize()
+            state = listState,
+            modifier = Modifier.fillMaxSize()
         ) {
             /*
-             * The overlay HomeDock occupies
-             * this initial vertical space.
+             * Expanded dock occupies:
+             * status-bar inset + 76dp header + 44dp categories.
+             *
+             * While this spacer scrolls away, fixed HomeDock
+             * independently fades/translates its header.
              */
-            item(
-                key = "top"
-            ) {
+            item(key = "top") {
                 Spacer(
                     Modifier
-                        .windowInsetsPadding(
-                            WindowInsets
-                                .statusBars
-                        )
-                        .height(
-                            122.dp
-                        )
+                        .windowInsetsPadding(WindowInsets.statusBars)
+                        .height(120.dp)
                 )
             }
 
-            item(
-                key = "recent"
-            ) {
+            item(key = "recent") {
                 Column(
                     Modifier
                         .fillMaxWidth()
                         .padding(
-                            start =
-                                12.dp,
-                            top =
-                                8.dp,
-                            end =
-                                12.dp,
-                            bottom =
-                                18.dp
+                            start = 12.dp,
+                            top = 8.dp,
+                            end = 12.dp,
+                            bottom = 18.dp
                         )
                 ) {
                     SectionTitle(
-                        title =
-                            "Recently Played",
-                        subtitle =
-                            "0 tracks played",
-                        icon =
-                            R.drawable
-                                .ic_xmo_history,
+                        title = "Recently Played",
+                        subtitle = "0 tracks played",
+                        icon = R.drawable.ic_xmo_history,
                         c = c
                     )
 
                     Box(
                         Modifier
                             .fillMaxWidth()
-                            .height(
-                                110.dp
-                            ),
-                        contentAlignment =
-                            Alignment.Center
+                            .height(110.dp),
+                        contentAlignment = Alignment.Center
                     ) {
                         Text(
                             "Nothing played yet",
-                            color =
-                                c.sub,
-                            fontFamily =
-                                XmoFont.normal,
-                            fontSize =
-                                13.sp
+                            color = c.sub,
+                            fontFamily = XmoFont.normal,
+                            fontSize = 13.sp
                         )
                     }
                 }
             }
 
             items(
-                items =
-                    visualOrder,
-                key = {
-                    "sec_$it"
-                }
+                items = visualOrder,
+                key = { "sec_$it" }
             ) { id ->
 
-                sectionMap[id]
-                    ?.let {
-                            section ->
+                val section = sectionMap[id]
+                    ?: return@items
 
-                        HomeSectionBlock(
-                            section =
-                                section,
+                HomeSectionBlock(
+                    section = section,
+                    subtitle = when (id) {
+                        "songs" ->
+                            "All songs: ${songs.size}"
 
-                            subtitle =
-                                when (id) {
-                                    "songs" ->
-                                        "All songs: ${songs.size}"
+                        "albums" ->
+                            "$albumCount albums"
 
-                                    "albums" ->
-                                        "${Library.albums(songs).size} albums"
+                        "liked" ->
+                            "0 favorites"
 
-                                    "liked" ->
-                                        "0 favorites"
+                        else ->
+                            ""
+                    },
+                    c = c,
+                    action = when (id) {
+                        "albums", "liked" ->
+                            R.drawable.ic_xmo_add
 
-                                    else ->
-                                        ""
-                                },
+                        else ->
+                            null
+                    },
+                    showArrow = id == "songs"
+                ) { arrowRequests ->
 
-                            c = c,
+                    when (id) {
+                        "songs" -> {
+                            SongsGrid(
+                                songs = songs,
+                                allowed = allowed,
+                                c = c,
+                                theme = theme,
+                                arrowRequests = arrowRequests
+                            )
+                        }
 
-                            action =
-                                when (id) {
-                                    "albums",
-                                    "liked" ->
-                                        R.drawable
-                                            .ic_xmo_add
+                        "albums" -> {
+                            AlbumBody(
+                                songs = songs,
+                                c = c
+                            )
+                        }
 
-                                    else ->
-                                        null
-                                },
+                        "liked" -> {
+                            Empty(
+                                "No liked songs yet",
+                                c
+                            )
+                        }
 
-                            arrow =
-                                id ==
-                                    "songs"
-                        ) {
-                            when (id) {
-                                "songs" ->
-                                    SongsGrid(
-                                        songs,
-                                        allowed,
-                                        c,
-                                        theme
-                                    )
+                        "artists" -> {
+                            ArtistBody(
+                                songs = songs,
+                                c = c
+                            )
+                        }
 
-                                "albums" ->
-                                    AlbumBody(
-                                        songs,
-                                        c
-                                    )
+                        else -> {
+                            val ids = categories
+                                .firstOrNull {
+                                    it.id == id
+                                }
+                                ?.songIds
+                                ?: emptySet()
 
-                                "liked" ->
-                                    Empty(
-                                        "No liked songs yet",
-                                        c
-                                    )
-
-                                "artists" ->
-                                    ArtistBody(
-                                        songs,
-                                        c
-                                    )
-
-                                else -> {
-                                    val ids =
-                                        categories
-                                            .firstOrNull {
-                                                it.id ==
-                                                    id
-                                            }
-                                            ?.songIds
-                                            ?: emptySet()
-
-                                    CustomBody(
-                                        songs.filter {
-                                            it.id in ids
-                                        },
-                                        c,
-                                        theme
-                                    )
+                            val customSongs = remember(
+                                songs,
+                                ids
+                            ) {
+                                songs.filter {
+                                    it.id in ids
                                 }
                             }
+
+                            CustomBody(
+                                songs = customSongs,
+                                c = c,
+                                theme = theme
+                            )
                         }
                     }
+                }
             }
 
             /*
-             * One complete viewport.
-             * Last section can therefore
-             * also reach under the dock.
+             * Full trailing viewport intentionally remains.
+             * Therefore the final section can also be aligned
+             * below the pinned category row.
              */
-            item(
-                key = "brand"
-            ) {
+            item(key = "brand") {
                 Box(
                     Modifier
                         .fillMaxWidth()
                         .fillParentMaxHeight(),
-                    contentAlignment =
-                        Alignment.Center
+                    contentAlignment = Alignment.Center
                 ) {
                     Column(
                         horizontalAlignment =
-                            Alignment
-                                .CenterHorizontally
+                            Alignment.CenterHorizontally
                     ) {
                         Text(
                             "XMO",
-                            color =
-                                c.text,
-                            fontFamily =
-                                XmoFont.logo,
-                            fontSize =
-                                18.sp
+                            color = c.text,
+                            fontFamily = XmoFont.logo,
+                            fontSize = 18.sp
                         )
 
                         Text(
                             "lxzrvi  •  copyright © 2026",
-                            color =
-                                c.sub,
-                            fontFamily =
-                                XmoFont.thin,
-                            fontSize =
-                                9.sp,
-                            modifier =
-                                Modifier
-                                    .padding(
-                                        top =
-                                            3.dp
-                                    )
+                            color = c.sub,
+                            fontFamily = XmoFont.thin,
+                            fontSize = 9.sp,
+                            modifier = Modifier.padding(top = 3.dp)
                         )
                     }
                 }
             }
         }
 
-        /*
-         * Fixed overlay:
-         * category row can never jitter or
-         * slip behind status bar.
-         */
         HomeDock(
-            profile = profile,
-            sections =
-                visualOrder
-                    .mapNotNull(
-                        sectionMap::get
-                    ),
-            order =
-                visualOrder,
-            selected =
-                selected,
+            profile = headerProgress,
+            sections = visualOrder.mapNotNull(sectionMap::get),
+            order = visualOrder,
+            selected = selected,
             c = c,
-            theme =
-                theme,
-            setTheme =
-                setTheme,
-            refresh =
-                refresh,
-
+            theme = theme,
+            setTheme = setTheme,
+            refresh = refresh,
             select = { id ->
                 selected = id
 
                 scope.launch {
-                    if (
-                        id == "all"
-                    ) {
-                        state.animateScrollToItem(
-                            index = 0
-                        )
+                    if (id == "all") {
+                        listState.animateScrollToItem(0)
                     } else {
-                        val pos =
-                            visualOrder
-                                .indexOf(
-                                    id
-                                )
+                        /*
+                         * Index:
+                         * 0 = spacer
+                         * 1 = Recently Played
+                         * 2+ = reordered sections
+                         *
+                         * Positive offset leaves room for
+                         * the fixed category overlay.
+                         */
+                        val position = visualOrder.indexOf(id)
 
-                        if (
-                            pos >= 0
-                        ) {
-                            /*
-                             * top = 0
-                             * recent = 1
-                             * sections = 2+
-                             *
-                             * POSITIVE offset puts
-                             * selected label directly
-                             * below overlay dock.
-                             */
-                            state.animateScrollToItem(
-                                index =
-                                    pos + 2,
-                                scrollOffset =
-                                    dockPx
+                        if (position >= 0) {
+                            listState.animateScrollToItem(
+                                index = position + 2,
+                                scrollOffset = pinnedDockPx
                             )
                         }
                     }
                 }
             },
-
-            preview = {
-                visualOrder =
-                    it
+            commit = { next ->
+                /*
+                 * Body and categories switch to identical
+                 * order once, at the actual drop.
+                 */
+                visualOrder = next
+                saveOrder(next)
             },
-
-            commit = {
-                visualOrder =
-                    it
-
-                saveOrder(
-                    it
-                )
-            },
-
             add = {
-                addDialog =
-                    true
+                addDialog = true
             }
         )
     }
@@ -545,109 +417,68 @@ fun Home(
     if (addDialog) {
         AlertDialog(
             onDismissRequest = {
-                addDialog =
-                    false
+                addDialog = false
                 newName = ""
             },
-
-            containerColor =
-                c.surface,
-
+            containerColor = c.surface,
             title = {
                 Text(
                     "New category",
-                    color =
-                        c.text,
-                    fontFamily =
-                        XmoFont.bold
+                    color = c.text,
+                    fontFamily = XmoFont.bold
                 )
             },
-
             text = {
                 OutlinedTextField(
-                    value =
-                        newName,
+                    value = newName,
                     onValueChange = {
-                        newName =
-                            it.take(
-                                24
-                            )
+                        newName = it.take(24)
                     },
-                    singleLine =
-                        true,
+                    singleLine = true,
                     label = {
-                        Text(
-                            "Category name"
-                        )
+                        Text("Category name")
                     }
                 )
             },
-
             confirmButton = {
                 TextButton(
                     onClick = {
-                        val name =
-                            newName
-                                .trim()
+                        val name = newName.trim()
 
-                        if (
-                            name
-                                .isNotEmpty()
-                        ) {
-                            val cat =
-                                UserCategory(
-                                    id =
-                                        "cat_${UUID.randomUUID()}",
-                                    name =
-                                        name,
-                                    icon =
-                                        categories
-                                            .size %
-                                            4
-                                )
-
-                            val next =
-                                visualOrder +
-                                    cat.id
-
-                            saveCategories(
-                                categories +
-                                    cat
+                        if (name.isNotEmpty()) {
+                            val cat = UserCategory(
+                                id = "cat_${UUID.randomUUID()}",
+                                name = name,
+                                icon = categories.size % 4
                             )
 
-                            visualOrder =
-                                next
+                            val next = visualOrder + cat.id
 
-                            saveOrder(
-                                next
-                            )
+                            saveCategories(categories + cat)
+                            visualOrder = next
+                            saveOrder(next)
 
                             newName = ""
-                            addDialog =
-                                false
+                            addDialog = false
                         }
                     }
                 ) {
                     Text(
                         "Add",
-                        color =
-                            XmoRed
+                        color = XmoRed
                     )
                 }
             },
-
             dismissButton = {
                 TextButton(
                     onClick = {
                         newName = ""
-                        addDialog =
-                            false
+                        addDialog = false
                     }
                 ) {
                     Text(
                         "Cancel",
-                        color =
-                            c.sub
+                        color = c.sub
                     )
                 }
             }
@@ -666,89 +497,61 @@ private fun HomeDock(
     setTheme: (XmoTheme) -> Unit,
     refresh: () -> Unit,
     select: (String) -> Unit,
-    preview: (List<String>) -> Unit,
     commit: (List<String>) -> Unit,
     add: () -> Unit
 ) {
     Column(
         Modifier
             .fillMaxWidth()
-            .background(
-                c.bg.copy(
-                    .97f
-                )
-            )
-            .windowInsetsPadding(
-                WindowInsets.statusBars
-            )
-            .padding(
-                top = 3.dp,
-                bottom = 3.dp
-            )
+            .background(c.bg.copy(alpha = .97f))
+            .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         /*
-         * Smooth proportional height +
-         * alpha + upward movement.
+         * The header loses physical height at exactly the same
+         * rate as scroll. Its contents also move upward and fade.
          */
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(
-                    68.dp *
-                        profile
-                )
-                .graphicsLayer {
-                    alpha =
-                        profile
-
-                    translationY =
-                        -18.dp
-                            .toPx() *
-                            (
-                                1f -
-                                    profile
-                                )
-                }
+                .height(76.dp * profile)
         ) {
-            if (
-                profile >
-                .01f
-            ) {
-                HomeHeader(
-                    c,
-                    theme,
-                    setTheme,
-                    refresh
-                )
+            if (profile > 0.001f) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .graphicsLayer {
+                            alpha = profile
+
+                            translationY =
+                                -(1f - profile) *
+                                    24.dp.toPx()
+                        }
+                ) {
+                    HomeHeader(
+                        c = c,
+                        theme = theme,
+                        setTheme = setTheme,
+                        refresh = refresh
+                    )
+                }
             }
         }
 
-        Spacer(
-            Modifier.height(
-                8.dp *
-                    profile
-            )
-        )
-
         CategoryDragRow(
-            sections =
-                sections,
-            order =
-                order,
-            selected =
-                selected,
+            sections = sections,
+            order = order,
+            selected = selected,
             c = c,
-            select =
-                select,
-            preview =
-                preview,
-            commit =
-                commit,
-            add =
-                add
+            select = select,
+            commit = commit,
+            add = add
         )
     }
 }
+
+private data class ChipMeasure(
+    val width: IntSize = IntSize.Zero
+)
 
 @Composable
 private fun CategoryDragRow(
@@ -757,396 +560,397 @@ private fun CategoryDragRow(
     selected: String,
     c: HomeColors,
     select: (String) -> Unit,
-    preview: (List<String>) -> Unit,
     commit: (List<String>) -> Unit,
     add: () -> Unit
 ) {
-    val haptic =
-        LocalHapticFeedback.current
+    val haptic = LocalHapticFeedback.current
+    val scope = rememberCoroutineScope()
+    val scroll = rememberScrollState()
+    val density = LocalDensity.current
 
-    val scope =
-        rememberCoroutineScope()
+    val gapPx = with(density) {
+        8.dp.toPx()
+    }
 
-    val scroll =
-        rememberScrollState()
+    val edgeZonePx = with(density) {
+        72.dp.toPx()
+    }
 
-    var working by
-        remember(order) {
-            mutableStateOf(
-                order
-            )
-        }
+    var rowWidthPx by remember {
+        mutableFloatStateOf(0f)
+    }
 
-    var dragging by
-        remember {
-            mutableStateOf<String?>(
-                null
-            )
-        }
+    var working by remember(order) {
+        mutableStateOf(order)
+    }
 
-    var dragX by
-        remember {
-            mutableFloatStateOf(
-                0f
-            )
-        }
+    var draggingId by remember {
+        mutableStateOf<String?>(null)
+    }
+
+    var dragTranslationX by remember {
+        mutableFloatStateOf(0f)
+    }
+
+    /*
+     * Widths are measured from the real chips.
+     * Reordering no longer assumes every category is 48dp.
+     */
+    val widths = remember {
+        mutableStateMapOf<String, Float>()
+    }
+
+    var autoScrollJob by remember {
+        mutableStateOf<Job?>(null)
+    }
 
     LaunchedEffect(order) {
-        if (
-            dragging ==
-            null
-        ) {
-            working =
-                order
+        if (draggingId == null) {
+            working = order
+        }
+    }
+
+    fun stopAutoScroll() {
+        autoScrollJob?.cancel()
+        autoScrollJob = null
+    }
+
+    /*
+     * Calculates how far the moving item should be translated
+     * back toward its finger after it swaps with a neighbour.
+     */
+    fun widthFor(id: String): Float {
+        return widths[id] ?: with(density) {
+            80.dp.toPx()
         }
     }
 
     Row(
         Modifier
             .fillMaxWidth()
+            .onGloballyPositioned {
+                rowWidthPx = it.size.width.toFloat()
+            }
             .horizontalScroll(
                 state = scroll,
-                enabled =
-                    dragging ==
-                        null
+                enabled = draggingId == null
             )
             .padding(
-                horizontal =
-                    14.dp,
-                vertical =
-                    5.dp
+                horizontal = 14.dp,
+                vertical = 5.dp
             ),
         horizontalArrangement =
-            Arrangement.spacedBy(
-                8.dp
-            )
+            Arrangement.spacedBy(8.dp)
     ) {
-        /*
-         * Fixed: never draggable.
-         */
         CategoryChip(
-            text =
-                "All",
-            active =
-                selected ==
-                    "all",
+            text = "All",
+            active = selected == "all",
             c = c,
-            icon =
-                R.drawable
-                    .ic_xmo_all
+            icon = R.drawable.ic_xmo_all
         ) {
-            select("all")
+            if (draggingId == null) {
+                select("all")
+            }
         }
 
         working.forEach { id ->
-            val section =
-                sections
-                    .firstOrNull {
-                        it.id ==
-                            id
-                    }
-                    ?: return@forEach
+            val section = sections.firstOrNull {
+                it.id == id
+            } ?: return@forEach
 
-            val moving =
-                dragging ==
-                    id
+            val moving = draggingId == id
 
             Box(
                 Modifier
-                    /*
-                     * Held chip draws above all
-                     * its siblings.
-                     */
+                    .onGloballyPositioned {
+                        widths[id] =
+                            it.size.width.toFloat()
+                    }
                     .zIndex(
-                        if (moving)
-                            20f
-                        else
-                            0f
+                        if (moving) 100f else 0f
                     )
                     .graphicsLayer {
                         translationX =
                             if (moving)
-                                dragX
+                                dragTranslationX
                             else
                                 0f
 
-                        scaleX =
-                            if (moving)
-                                1.08f
-                            else
-                                1f
+                        val scale =
+                            if (moving) 1.07f else 1f
 
-                        scaleY =
-                            if (moving)
-                                1.08f
-                            else
-                                1f
+                        scaleX = scale
+                        scaleY = scale
                     }
-                    .pointerInput(
-                        id,
-                        working
-                    ) {
+                    .pointerInput(id) {
                         detectDragGesturesAfterLongPress(
                             onDragStart = {
-                                dragging =
-                                    id
+                                draggingId = id
+                                dragTranslationX = 0f
 
-                                dragX =
-                                    0f
-
-                                haptic
-                                    .performHapticFeedback(
-                                        HapticFeedbackType
-                                            .LongPress
-                                    )
+                                haptic.performHapticFeedback(
+                                    HapticFeedbackType.LongPress
+                                )
                             },
+                            onDrag = { change, amount ->
+                                change.consume()
 
-                            onDrag = {
-                                    change,
-                                    amount ->
+                                dragTranslationX += amount.x
 
-                                change
-                                    .consume()
+                                var current =
+                                    working.indexOf(id)
 
-                                dragX +=
-                                    amount.x
-
-                                var from =
-                                    working
-                                        .indexOf(
-                                            id
-                                        )
-
-                                if (
-                                    from <
-                                    0
-                                ) {
+                                if (current < 0) {
                                     return@detectDragGesturesAfterLongPress
                                 }
 
                                 /*
-                                 * Responsive crossing.
-                                 * Every crossing remaps
-                                 * BOTH chips and sections.
+                                 * Cross the REAL neighbour midpoint.
+                                 *
+                                 * Moving right:
+                                 * half current + gap + half next.
                                  */
-                                val step =
-                                    48.dp
-                                        .toPx()
-
                                 while (
-                                    dragX >
-                                    step &&
-                                    from <
-                                    working
-                                        .lastIndex
+                                    current < working.lastIndex
                                 ) {
+                                    val nextId =
+                                        working[current + 1]
+
+                                    val threshold =
+                                        widthFor(id) / 2f +
+                                            gapPx +
+                                            widthFor(nextId) / 2f
+
+                                    if (
+                                        dragTranslationX <
+                                        threshold
+                                    ) {
+                                        break
+                                    }
+
                                     val next =
-                                        working
-                                            .toMutableList()
+                                        working.toMutableList()
 
                                     next.add(
-                                        from +
-                                            1,
-                                        next
-                                            .removeAt(
-                                                from
-                                            )
+                                        current + 1,
+                                        next.removeAt(current)
                                     )
 
-                                    working =
-                                        next
+                                    working = next
 
-                                    preview(
-                                        next
-                                    )
+                                    /*
+                                     * Layout itself moved the chip by this
+                                     * distance; compensate so it stays
+                                     * beneath the same finger.
+                                     */
+                                    dragTranslationX -=
+                                        widthFor(nextId) +
+                                            gapPx
 
-                                    dragX -=
-                                        step
-
-                                    from++
-                                }
-
-                                while (
-                                    dragX <
-                                    -step &&
-                                    from >
-                                    0
-                                ) {
-                                    val next =
-                                        working
-                                            .toMutableList()
-
-                                    next.add(
-                                        from -
-                                            1,
-                                        next
-                                            .removeAt(
-                                                from
-                                            )
-                                    )
-
-                                    working =
-                                        next
-
-                                    preview(
-                                        next
-                                    )
-
-                                    dragX +=
-                                        step
-
-                                    from--
+                                    current++
                                 }
 
                                 /*
-                                 * Auto-scroll category strip
-                                 * while the SAME finger remains
-                                 * down, so one drag can travel
-                                 * through the whole bar.
+                                 * Moving left.
                                  */
-                                if (
-                                    dragX >
-                                    step *
-                                    .65f &&
-                                    scroll.value <
-                                    scroll.maxValue
-                                ) {
-                                    scope.launch {
-                                        scroll.scrollTo(
-                                            (
-                                                scroll
-                                                    .value +
-                                                    20
-                                                )
-                                                .coerceAtMost(
-                                                    scroll
-                                                        .maxValue
-                                                )
-                                        )
+                                while (current > 0) {
+                                    val previousId =
+                                        working[current - 1]
+
+                                    val threshold =
+                                        widthFor(id) / 2f +
+                                            gapPx +
+                                            widthFor(previousId) / 2f
+
+                                    if (
+                                        dragTranslationX >
+                                        -threshold
+                                    ) {
+                                        break
                                     }
+
+                                    val next =
+                                        working.toMutableList()
+
+                                    next.add(
+                                        current - 1,
+                                        next.removeAt(current)
+                                    )
+
+                                    working = next
+
+                                    dragTranslationX +=
+                                        widthFor(previousId) +
+                                            gapPx
+
+                                    current--
                                 }
 
-                                if (
-                                    dragX <
-                                    -step *
-                                    .65f &&
-                                    scroll.value >
-                                    0
-                                ) {
-                                    scope.launch {
-                                        scroll.scrollTo(
-                                            (
-                                                scroll
-                                                    .value -
-                                                    20
-                                                )
-                                                .coerceAtLeast(
-                                                    0
-                                                )
-                                        )
-                                    }
-                                }
-                            },
-
-                            onDragEnd = {
-                                val final =
+                                /*
+                                 * Determine approximate moving-chip
+                                 * viewport position for edge auto-scroll.
+                                 */
+                                val beforeWidth =
                                     working
+                                        .take(
+                                            working
+                                                .indexOf(id)
+                                                .coerceAtLeast(0)
+                                        )
+                                        .sumOf {
+                                            widthFor(it)
+                                                .toDouble()
+                                        }
+                                        .toFloat() +
+                                        gapPx *
+                                        working
+                                            .indexOf(id)
+                                            .coerceAtLeast(0)
 
-                                dragging =
-                                    null
+                                val viewportX =
+                                    beforeWidth -
+                                        scroll.value +
+                                        dragTranslationX
 
-                                dragX =
-                                    0f
+                                val goLeft =
+                                    viewportX < edgeZonePx &&
+                                        scroll.value > 0
 
-                                commit(
-                                    final
-                                )
+                                val goRight =
+                                    viewportX +
+                                        widthFor(id) >
+                                        rowWidthPx -
+                                            edgeZonePx &&
+                                        scroll.value <
+                                        scroll.maxValue
+
+                                if (goLeft || goRight) {
+                                    if (
+                                        autoScrollJob == null ||
+                                        autoScrollJob?.isActive != true
+                                    ) {
+                                        autoScrollJob =
+                                            scope.launch {
+                                                while (isActive) {
+                                                    val direction =
+                                                        if (goLeft)
+                                                            -1
+                                                        else
+                                                            1
+
+                                                    val before =
+                                                        scroll.value
+
+                                                    scroll.scrollTo(
+                                                        (
+                                                            before +
+                                                                direction *
+                                                                12
+                                                            ).coerceIn(
+                                                            0,
+                                                            scroll.maxValue
+                                                        )
+                                                    )
+
+                                                    /*
+                                                     * Keep visual finger tracking
+                                                     * stable while content itself
+                                                     * scrolls below the pointer.
+                                                     */
+                                                    val moved =
+                                                        scroll.value -
+                                                            before
+
+                                                    dragTranslationX +=
+                                                        moved.toFloat()
+
+                                                    delay(16)
+                                                }
+                                            }
+                                    }
+                                } else {
+                                    stopAutoScroll()
+                                }
                             },
+                            onDragEnd = {
+                                stopAutoScroll()
 
+                                val final =
+                                    working.toList()
+
+                                draggingId = null
+                                dragTranslationX = 0f
+
+                                /*
+                                 * One expensive Home reorder and one
+                                 * persistence call, only on release.
+                                 */
+                                commit(final)
+                            },
                             onDragCancel = {
-                                dragging =
-                                    null
+                                stopAutoScroll()
 
-                                dragX =
-                                    0f
-
-                                working =
-                                    order
-
-                                preview(
-                                    order
-                                )
+                                draggingId = null
+                                dragTranslationX = 0f
+                                working = order
                             }
                         )
                     }
             ) {
                 CategoryChip(
-                    text =
-                        section.name,
-                    active =
-                        selected ==
-                            id,
+                    text = section.name,
+                    active = selected == id,
                     c = c,
-                    icon =
-                        section.icon,
-                    tint =
-                        section.tint,
+                    icon = section.icon,
+                    tint = section.tint,
                     modifier =
-                        Modifier.then(
-                            if (
-                                moving
-                            ) {
-                                Modifier
-                                    .background(
-                                        XmoRed
-                                            .copy(
-                                                .12f
-                                            ),
-                                        RoundedCornerShape(
-                                            18.dp
-                                        )
-                                    )
-                                    .border(
-                                        1.dp,
-                                        XmoRed
-                                            .copy(
-                                                .65f
-                                            ),
-                                        RoundedCornerShape(
-                                            18.dp
-                                        )
-                                    )
-                            } else {
-                                Modifier
-                            }
-                        )
+                        if (moving) {
+                            Modifier
+                                .background(
+                                    XmoRed.copy(alpha = .12f),
+                                    RoundedCornerShape(18.dp)
+                                )
+                                .border(
+                                    1.dp,
+                                    XmoRed.copy(alpha = .65f),
+                                    RoundedCornerShape(18.dp)
+                                )
+                        } else {
+                            Modifier
+                        }
                 ) {
-                    if (
-                        dragging ==
-                        null
-                    ) {
+                    if (draggingId == null) {
                         select(id)
                     }
                 }
             }
         }
 
-        /*
-         * Fixed last element:
-         * never draggable.
-         */
         CategoryChip(
             text = "Add",
             active = false,
             c = c,
-            icon =
-                R.drawable
-                    .ic_xmo_add,
-            tint =
-                XmoRed,
-            onClick =
-                add
+            icon = R.drawable.ic_xmo_add,
+            tint = XmoRed,
+            onClick = {
+                if (draggingId == null) {
+                    add()
+                }
+            }
         )
+    }
+}
+
+/*
+ * Arrow requests now belong to the All Songs section itself.
+ * There is no app-global mutable Arrow singleton.
+ */
+@Stable
+private class SongArrowRequests {
+    var request by mutableIntStateOf(0)
+
+    fun next() {
+        request++
     }
 }
 
@@ -1156,55 +960,45 @@ private fun HomeSectionBlock(
     subtitle: String,
     c: HomeColors,
     action: Int?,
-    arrow: Boolean,
-    body: @Composable () -> Unit
+    showArrow: Boolean,
+    body: @Composable (SongArrowRequests?) -> Unit
 ) {
+    val arrowRequests =
+        if (showArrow) {
+            remember {
+                SongArrowRequests()
+            }
+        } else {
+            null
+        }
+
     Column(
         Modifier
             .fillMaxWidth()
-            .padding(
-                vertical =
-                    10.dp
-            )
+            .padding(vertical = 10.dp)
     ) {
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(
-                    horizontal =
-                        12.dp
-                ),
+                .padding(horizontal = 12.dp),
             verticalAlignment =
-                Alignment
-                    .CenterVertically
+                Alignment.CenterVertically
         ) {
             SectionTitle(
-                title =
-                    section.name,
-                subtitle =
-                    subtitle,
-                icon =
-                    section.icon,
+                title = section.name,
+                subtitle = subtitle,
+                icon = section.icon,
                 c = c,
-                modifier =
-                    Modifier
-                        .weight(
-                            1f
-                        )
+                modifier = Modifier.weight(1f)
             )
 
             action?.let {
                 Box(
                     Modifier
                         .size(28.dp)
-                        .clip(
-                            CircleShape
-                        )
+                        .clip(CircleShape)
                         .background(
-                            XmoRed
-                                .copy(
-                                    .18f
-                                )
+                            XmoRed.copy(alpha = .18f)
                         ),
                     contentAlignment =
                         Alignment.Center
@@ -1212,87 +1006,64 @@ private fun HomeSectionBlock(
                     XmoIcon(
                         it,
                         XmoRed,
-                        Modifier
-                            .size(
-                                14.dp
-                            )
+                        Modifier.size(14.dp)
                     )
                 }
             }
 
-            if (arrow) {
-                SongArrowButton()
+            arrowRequests?.let {
+                SongArrowButton(it)
             }
         }
 
         Spacer(
-            Modifier.height(
-                5.dp
-            )
+            Modifier.height(5.dp)
         )
 
-        body()
+        body(arrowRequests)
     }
 }
 
 @Composable
-private fun SongArrowButton() {
-    val scope =
-        rememberCoroutineScope()
+private fun SongArrowButton(
+    requests: SongArrowRequests
+) {
+    val scope = rememberCoroutineScope()
 
     Box(
         Modifier
-            .padding(
-                start = 7.dp
-            )
+            .padding(start = 7.dp)
             .size(28.dp)
             .clip(CircleShape)
             .background(
-                XmoRed.copy(
-                    .18f
-                )
+                XmoRed.copy(alpha = .18f)
             )
-            .pointerInput(Unit) {
+            .pointerInput(requests) {
                 detectTapGestures(
                     onPress = {
-                        var hold =
-                            false
+                        var repeating = false
 
-                        val job =
+                        val repeatJob =
                             scope.launch {
-                                delay(
-                                    250
-                                )
+                                delay(250)
+                                repeating = true
 
-                                hold =
-                                    true
-
-                                while (
-                                    hold
-                                ) {
-                                    Arrow.tick++
-                                    delay(
-                                        55
-                                    )
+                                while (isActive) {
+                                    requests.next()
+                                    delay(65)
                                 }
                             }
 
                         val released =
                             tryAwaitRelease()
 
-                        val wasHold =
-                            hold
-
-                        hold =
-                            false
-
-                        job.cancel()
+                        repeatJob.cancel()
 
                         if (
                             released &&
-                            !wasHold
+                            !repeating
                         ) {
-                            Arrow.tick++
+                            requests.next()
                         }
                     }
                 )
@@ -1301,8 +1072,7 @@ private fun SongArrowButton() {
             Alignment.Center
     ) {
         XmoIcon(
-            R.drawable
-                .ic_xmo_arrow,
+            R.drawable.ic_xmo_arrow,
             XmoRed,
             Modifier.size(14.dp)
         )
@@ -1314,7 +1084,8 @@ private fun SongsGrid(
     songs: List<Song>,
     allowed: Boolean,
     c: HomeColors,
-    theme: XmoTheme
+    theme: XmoTheme,
+    arrowRequests: SongArrowRequests?
 ) {
     if (!allowed) {
         Empty(
@@ -1332,151 +1103,148 @@ private fun SongsGrid(
         return
     }
 
-    val grid =
+    val gridState =
         rememberLazyGridState()
 
-    val tick =
-        Arrow.tick
+    val request =
+        arrowRequests?.request ?: 0
 
     BoxWithConstraints(
         Modifier.fillMaxWidth()
     ) {
-        val available =
-            this.maxWidth
-
-        val edge =
-            8.dp
-
-        val gap =
-            8.dp
+        val edge = 8.dp
+        val gap = 8.dp
 
         /*
-         * Exactly four cards across.
+         * The viewport contains exactly:
+         *
+         * edge + 4 cards + 3 gaps + edge
          */
         val card =
             (
-                available -
+                maxWidth -
                     edge * 2 -
                     gap * 3
                 ) / 4
 
         val cellHeight =
-            card +
-                37.dp
+            card + 37.dp
 
         val height =
-            cellHeight *
-                3 +
+            cellHeight * 3 +
                 gap * 2
 
         /*
-         * One visual column = 3 items
-         * in LazyHorizontalGrid.
+         * Logical horizontal column count.
          */
-        LaunchedEffect(
-            tick
-        ) {
+        val columnCount =
+            (songs.size + 2) / 3
+
+        LaunchedEffect(request) {
             if (
-                tick >
-                0
+                request > 0 &&
+                columnCount > 1
             ) {
-                grid.animateScrollToItem(
-                    (
-                        grid
-                            .firstVisibleItemIndex +
-                            3
-                        )
+                /*
+                 * LazyHorizontalGrid indexes cells column-major.
+                 * Align to a column first, then advance exactly
+                 * one column = three grid slots.
+                 */
+                val currentColumn =
+                    gridState
+                        .firstVisibleItemIndex / 3
+
+                val targetColumn =
+                    (currentColumn + 1)
                         .coerceAtMost(
-                            songs
-                                .lastIndex
+                            columnCount - 1
                         )
+
+                gridState.animateScrollToItem(
+                    targetColumn * 3,
+                    scrollOffset = 0
                 )
             }
         }
 
         LazyHorizontalGrid(
-            rows =
-                GridCells.Fixed(3),
-            state =
-                grid,
+            rows = GridCells.Fixed(3),
+            state = gridState,
             modifier =
                 Modifier
                     .fillMaxWidth()
                     .height(height),
             contentPadding =
-                PaddingValues(
-                    horizontal =
-                        edge
-                ),
+                PaddingValues(horizontal = edge),
             horizontalArrangement =
-                Arrangement
-                    .spacedBy(
-                        gap
-                    ),
+                Arrangement.spacedBy(gap),
             verticalArrangement =
-                Arrangement
-                    .spacedBy(
-                        gap
-                    )
+                Arrangement.spacedBy(gap)
         ) {
+            /*
+             * Keep complete page slots so row-major mapping
+             * remains valid even on the final partial page.
+             */
+            val pageCount =
+                (songs.size + 11) / 12
+
+            val slots =
+                pageCount * 12
+
             items(
-                count =
-                    songs.size,
-                key = { source ->
-                    /*
-                     * Stable grid slot.
-                     */
-                    source
+                count = slots,
+                key = { slot ->
+                    "song_slot_$slot"
                 }
             ) { slot ->
 
                 /*
-                 * Grid is column-major.
-                 * Convert slot to user's
-                 * required row-major page:
+                 * LazyHorizontalGrid:
+                 *
+                 * slot positions:
+                 * 0 3 6 9
+                 * 1 4 7 10
+                 * 2 5 8 11
+                 *
+                 * Required visible song numbering:
                  *
                  * 1  2  3  4
                  * 5  6  7  8
                  * 9 10 11 12
                  */
-                val page =
-                    slot / 12
+                val page = slot / 12
+                val inside = slot % 12
 
-                val inside =
-                    slot % 12
-
-                val gridRow =
+                val row =
                     inside % 3
 
-                val gridColumn =
+                val column =
                     inside / 3
 
-                val mapped =
+                val sourceIndex =
                     page * 12 +
-                        gridRow * 4 +
-                        gridColumn
+                        row * 4 +
+                        column
 
-                songs
-                    .getOrNull(
-                        mapped
-                    )
-                    ?.let { song ->
-
-                        SongTile(
-                            song =
-                                song,
-                            index =
-                                mapped,
-                            c = c,
-                            theme =
-                                theme,
-                            modifier =
-                                Modifier
-                                    .width(
-                                        card
-                                    )
-                        )
-                    }
+                Box(
+                    Modifier
+                        .width(card)
+                        .fillMaxHeight()
+                ) {
+                    songs
+                        .getOrNull(sourceIndex)
+                        ?.let { song ->
+                            SongTile(
+                                song = song,
+                                index = sourceIndex,
+                                c = c,
+                                theme = theme,
+                                modifier =
+                                    Modifier
+                                        .width(card)
+                            )
+                        }
+                }
             }
         }
     }
@@ -1487,18 +1255,14 @@ private fun AlbumBody(
     songs: List<Song>,
     c: HomeColors
 ) {
-    if (
-        songs.isEmpty()
-    ) {
+    if (songs.isEmpty()) {
         Empty(
             "No albums found",
             c
         )
     } else {
         Spacer(
-            Modifier.height(
-                8.dp
-            )
+            Modifier.height(8.dp)
         )
     }
 }
@@ -1508,14 +1272,11 @@ private fun ArtistBody(
     songs: List<Song>,
     c: HomeColors
 ) {
-    val artists =
-        Library.artists(
-            songs
-        )
+    val artists = remember(songs) {
+        Library.artists(songs)
+    }
 
-    if (
-        artists.isEmpty()
-    ) {
+    if (artists.isEmpty()) {
         Empty(
             "No artists found",
             c
@@ -1529,77 +1290,49 @@ private fun ArtistBody(
             .horizontalScroll(
                 rememberScrollState()
             )
-            .padding(
-                horizontal =
-                    8.dp
-            ),
+            .padding(horizontal = 8.dp),
         horizontalArrangement =
-            Arrangement
-                .spacedBy(
-                    10.dp
-                )
+            Arrangement.spacedBy(10.dp)
     ) {
         artists
             .take(15)
-            .forEach {
-                    artist ->
+            .forEach { artist ->
 
                 Column(
-                    Modifier.width(
-                        66.dp
-                    ),
+                    Modifier.width(66.dp),
                     horizontalAlignment =
-                        Alignment
-                            .CenterHorizontally
+                        Alignment.CenterHorizontally
                 ) {
                     Box(
                         Modifier
-                            .size(
-                                62.dp
-                            )
+                            .size(62.dp)
                             .background(
-                                XmoRed
-                                    .copy(
-                                        .16f
-                                    ),
+                                XmoRed.copy(alpha = .16f),
                                 CircleShape
                             ),
                         contentAlignment =
                             Alignment.Center
                     ) {
                         Text(
-                            artist
-                                .name
+                            artist.name
                                 .firstOrNull()
                                 ?.uppercase()
                                 ?: "?",
-                            color =
-                                XmoRed,
-                            fontFamily =
-                                XmoFont.bold,
-                            fontSize =
-                                17.sp
+                            color = XmoRed,
+                            fontFamily = XmoFont.bold,
+                            fontSize = 17.sp
                         )
                     }
 
                     Text(
                         artist.name,
-                        color =
-                            c.text,
-                        fontFamily =
-                            XmoFont.medium,
-                        fontSize =
-                            9.sp,
-                        lineHeight =
-                            10.sp,
-                        maxLines =
-                            2,
+                        color = c.text,
+                        fontFamily = XmoFont.medium,
+                        fontSize = 9.sp,
+                        lineHeight = 10.sp,
+                        maxLines = 2,
                         modifier =
-                            Modifier
-                                .padding(
-                                    top =
-                                        5.dp
-                                )
+                            Modifier.padding(top = 5.dp)
                     )
                 }
             }
@@ -1612,9 +1345,7 @@ private fun CustomBody(
     c: HomeColors,
     theme: XmoTheme
 ) {
-    if (
-        songs.isEmpty()
-    ) {
+    if (songs.isEmpty()) {
         Empty(
             "No songs in this category",
             c
@@ -1623,60 +1354,35 @@ private fun CustomBody(
     }
 
     Column(
-        Modifier.padding(
-            horizontal =
-                8.dp
-        ),
+        Modifier.padding(horizontal = 8.dp),
         verticalArrangement =
-            Arrangement
-                .spacedBy(
-                    6.dp
-                )
+            Arrangement.spacedBy(6.dp)
     ) {
         songs
             .chunked(6)
-            .forEachIndexed {
-                    row,
-                    items ->
+            .forEachIndexed { row, items ->
 
                 Row(
-                    Modifier
-                        .fillMaxWidth(),
+                    Modifier.fillMaxWidth(),
                     horizontalArrangement =
-                        Arrangement
-                            .spacedBy(
-                                5.dp
-                            )
+                        Arrangement.spacedBy(5.dp)
                 ) {
-                    repeat(6) {
-                            column ->
-
+                    repeat(6) { column ->
                         Box(
-                            Modifier
-                                .weight(
-                                    1f
-                                )
+                            Modifier.weight(1f)
                         ) {
                             items
-                                .getOrNull(
-                                    column
-                                )
-                                ?.let {
-                                        song ->
-
+                                .getOrNull(column)
+                                ?.let { song ->
                                     SongTile(
-                                        song =
-                                            song,
+                                        song = song,
                                         index =
-                                            row *
-                                                6 +
+                                            row * 6 +
                                                 column,
                                         c = c,
-                                        theme =
-                                            theme,
+                                        theme = theme,
                                         modifier =
-                                            Modifier
-                                                .fillMaxWidth()
+                                            Modifier.fillMaxWidth()
                                     )
                                 }
                         }
@@ -1700,12 +1406,9 @@ private fun Empty(
     ) {
         Text(
             text,
-            color =
-                c.sub,
-            fontFamily =
-                XmoFont.normal,
-            fontSize =
-                12.sp
+            color = c.sub,
+            fontFamily = XmoFont.normal,
+            fontSize = 12.sp
         )
     }
 }
