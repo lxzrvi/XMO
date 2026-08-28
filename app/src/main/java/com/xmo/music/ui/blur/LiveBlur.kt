@@ -21,21 +21,39 @@ fun rememberLiveBlurState(): HazeState =
 fun Modifier.liveBlurSource(
     state: HazeState
 ): Modifier =
-    hazeSource(state)
+    this.hazeSource(
+        state
+    )
 
 fun Modifier.liveBlur(
     state: HazeState,
     theme: XmoTheme
 ): Modifier =
-    hazeBlur(
-        input = HazeInput.Sources(state),
-        style = HazeBlurStyle {
-            blurRadius(20.dp)
-        },
-        sampling = HazeSampling.Adaptive
-    )
+    this
+        .hazeBlur(
+            input =
+                HazeInput.Sources(
+                    state
+                ),
+
+            style =
+                HazeBlurStyle {
+                    /*
+                     * Moderate radius.
+                     * No huge 50–100dp blur.
+                     */
+                    blurRadius(
+                        20.dp
+                    )
+                },
+
+            sampling =
+                HazeSampling.Adaptive
+        )
         .background(
-            glassTint(theme)
+            glassTint(
+                theme
+            )
         )
 
 fun glassTint(
@@ -63,13 +81,19 @@ fun glassBorder(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color.Black.copy(.10f)
+            Color.Black.copy(
+                alpha = .10f
+            )
 
         XmoTheme.Dark ->
-            Color.White.copy(.13f)
+            Color.White.copy(
+                alpha = .13f
+            )
 
         XmoTheme.Amoled ->
-            Color.White.copy(.18f)
+            Color.White.copy(
+                alpha = .18f
+            )
     }
 
 fun glassHighlight(
@@ -77,11 +101,17 @@ fun glassHighlight(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color.White.copy(.55f)
+            Color.White.copy(
+                alpha = .55f
+            )
 
         XmoTheme.Dark ->
-            Color.White.copy(.15f)
+            Color.White.copy(
+                alpha = .15f
+            )
 
         XmoTheme.Amoled ->
-            Color.White.copy(.12f)
+            Color.White.copy(
+                alpha = .12f
+            )
     }
