@@ -10,6 +10,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Getting XMO
         uses: actions/checkout@v4
 
@@ -22,9 +23,19 @@ jobs:
       - name: Android kitchen is ready
         uses: android-actions/setup-android@v3
 
-      - name: Show Android SDK
+      - name: Accept Android licenses
         run: |
-          sdkmanager --list | grep -E "platforms;android-3[67]" | head -50
+          yes | sdkmanager --licenses >/dev/null || true
+
+      - name: Install Android API 37
+        run: |
+          sdkmanager "platforms;android-37.1"
+
+      - name: Verify Android API 37
+        run: |
+          echo "Installed Android platforms:"
+          ls -la "$ANDROID_SDK_ROOT/platforms"
+          test -d "$ANDROID_SDK_ROOT/platforms/android-37.1"
 
       - name: Adding ingredients
         uses: gradle/actions/setup-gradle@v4
