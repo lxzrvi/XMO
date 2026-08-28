@@ -7,7 +7,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import dev.chrisbanes.haze.HazeInput
-import dev.chrisbanes.haze.HazeSampling
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
@@ -21,9 +20,7 @@ fun rememberLiveBlurState(): HazeState =
 fun Modifier.liveBlurSource(
     state: HazeState
 ): Modifier =
-    this.hazeSource(
-        state
-    )
+    this.hazeSource(state)
 
 fun Modifier.liveBlur(
     state: HazeState,
@@ -31,29 +28,13 @@ fun Modifier.liveBlur(
 ): Modifier =
     this
         .hazeBlur(
-            input =
-                HazeInput.Sources(
-                    state
-                ),
-
-            style =
-                HazeBlurStyle {
-                    /*
-                     * Moderate radius.
-                     * No huge 50–100dp blur.
-                     */
-                    blurRadius(
-                        20.dp
-                    )
-                },
-
-            sampling =
-                HazeSampling.Adaptive
+            input = HazeInput.Sources(state),
+            style = HazeBlurStyle {
+                blurRadius(20.dp)
+            }
         )
         .background(
-            glassTint(
-                theme
-            )
+            glassTint(theme)
         )
 
 fun glassTint(
@@ -61,19 +42,13 @@ fun glassTint(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color.White.copy(
-                alpha = .22f
-            )
+            Color.White.copy(alpha = .22f)
 
         XmoTheme.Dark ->
-            Color.Black.copy(
-                alpha = .18f
-            )
+            Color.Black.copy(alpha = .18f)
 
         XmoTheme.Amoled ->
-            Color.Black.copy(
-                alpha = .34f
-            )
+            Color.Black.copy(alpha = .34f)
     }
 
 fun glassBorder(
@@ -81,19 +56,13 @@ fun glassBorder(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color.Black.copy(
-                alpha = .10f
-            )
+            Color.Black.copy(alpha = .10f)
 
         XmoTheme.Dark ->
-            Color.White.copy(
-                alpha = .13f
-            )
+            Color.White.copy(alpha = .13f)
 
         XmoTheme.Amoled ->
-            Color.White.copy(
-                alpha = .18f
-            )
+            Color.White.copy(alpha = .18f)
     }
 
 fun glassHighlight(
@@ -101,17 +70,11 @@ fun glassHighlight(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color.White.copy(
-                alpha = .55f
-            )
+            Color.White.copy(alpha = .55f)
 
         XmoTheme.Dark ->
-            Color.White.copy(
-                alpha = .15f
-            )
+            Color.White.copy(alpha = .15f)
 
         XmoTheme.Amoled ->
-            Color.White.copy(
-                alpha = .12f
-            )
+            Color.White.copy(alpha = .12f)
     }
