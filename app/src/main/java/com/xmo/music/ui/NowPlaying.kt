@@ -9,10 +9,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -21,24 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -53,27 +37,15 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -125,11 +97,8 @@ fun NowPlaying(
     val accent = LocalXmoAccent.current
 
     val index =
-        state.currentIndex.takeIf {
-            it in queue.indices
-        } ?: queue.indexOfFirst {
-            it.id == state.currentSongId
-        }
+        state.currentIndex.takeIf { it in queue.indices }
+            ?: queue.indexOfFirst { it.id == state.currentSongId }
 
     val currentSong = queue.getOrNull(index)
     val previousSong = queue.getOrNull(index - 1)
@@ -149,44 +118,37 @@ fun NowPlaying(
 
         dominant =
             Artwork.cached(uri)
-                ?: Artwork.color(
-                    context,
-                    uri
-                )
+                ?: Artwork.color(context, uri)
     }
 
     val liveColor by animateColorAsState(
         targetValue = dominant,
-        animationSpec = tween(400),
-        label = "artColor"
+        animationSpec = tween(420),
+        label = "playerArtworkColor"
     )
 
-    val deep =
-        Artwork.deep(
-            liveColor,
-            theme
-        )
+    val deep = Artwork.deep(liveColor, theme)
 
-    val headerColor =
-        if (liveColor.luminance() > .55f) {
+    val overlayText =
+        if (liveColor.luminance() > .56f) {
             Color(0xFF101010)
         } else {
             Color.White
         }
 
-    val headerSub =
-        headerColor.copy(alpha = .68f)
-
+    /*
+     * Main player is now deliberately much more transparent.
+     */
     val panelBackground =
         when (theme) {
             XmoTheme.Light ->
-                Color.White.copy(alpha = .90f)
+                Color.White.copy(alpha = .22f)
 
             XmoTheme.Dark ->
-                Color.Black.copy(alpha = .90f)
+                Color.Black.copy(alpha = .25f)
 
             XmoTheme.Amoled ->
-                Color.Black.copy(alpha = .80f)
+                Color.Black.copy(alpha = .40f)
         }
 
     val sectionBorder =
@@ -201,6 +163,12 @@ fun NowPlaying(
                 Color.White.copy(alpha = .21f)
         }
 
+    /*
+     * =========================================================
+     * REAL POSITION
+     * =========================================================
+     */
+
     LaunchedEffect(
         state.currentSongId,
         state.isPlaying
@@ -209,11 +177,8 @@ fun NowPlaying(
             refreshPosition()
 
             delay(
-                if (state.isPlaying) {
-                    250L
-                } else {
-                    500L
-                }
+                if (state.isPlaying) 250L
+                else 500L
             )
         }
     }
@@ -224,7 +189,7 @@ fun NowPlaying(
      * =========================================================
      */
 
-    var fileLyrics by remember(
+    var externalLyrics by remember(
         state.currentSongId,
         lyricsUri
     ) {
@@ -235,17 +200,15 @@ fun NowPlaying(
         state.currentSongId,
         lyricsUri
     ) {
-        fileLyrics =
+        externalLyrics =
             lyricsUri?.let {
-                readLyrics(
-                    context,
-                    Uri.parse(it)
-                )
+                readLyrics(context, Uri.parse(it))
             }
     }
 
     val lyrics =
-        fileLyrics ?: currentSong?.embeddedLyrics
+        externalLyrics
+            ?: currentSong?.embeddedLyrics
 
     val lyricPicker =
         rememberLauncherForActivityResult(
@@ -260,43 +223,29 @@ fun NowPlaying(
                         )
                 }
 
-                saveLyricsUri(
-                    uri.toString()
-                )
+                saveLyricsUri(uri.toString())
             }
         }
 
-    var fullLyrics by remember {
-        mutableStateOf(false)
-    }
-
-    var menuOpen by remember {
-        mutableStateOf(false)
-    }
-
-    var queueOpen by remember {
-        mutableStateOf(false)
-    }
-
-    var sleepOpen by remember {
-        mutableStateOf(false)
-    }
-
     /*
      * =========================================================
-     * OPEN / CLOSE
+     * OVERLAYS
      * =========================================================
      */
 
-    val entrance =
-        remember {
-            Animatable(1f)
-        }
+    var fullLyrics by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
+    var queueOpen by remember { mutableStateOf(false) }
+    var sleepOpen by remember { mutableStateOf(false) }
 
-    val dragY =
-        remember {
-            Animatable(0f)
-        }
+    /*
+     * =========================================================
+     * OPEN / DISMISS
+     * =========================================================
+     */
+
+    val entrance = remember { Animatable(1f) }
+    val dragY = remember { Animatable(0f) }
 
     var screenHeight by remember {
         mutableFloatStateOf(1f)
@@ -307,11 +256,7 @@ fun NowPlaying(
     }
 
     LaunchedEffect(Unit) {
-        entrance.animateTo(
-            0f,
-            tween(410)
-        )
-
+        entrance.animateTo(0f, tween(410))
         onOpened()
     }
 
@@ -330,22 +275,14 @@ fun NowPlaying(
 
     BackHandler {
         when {
-            fullLyrics ->
-                fullLyrics = false
+            fullLyrics -> fullLyrics = false
+            menuOpen -> menuOpen = false
+            queueOpen -> queueOpen = false
+            sleepOpen -> sleepOpen = false
 
-            menuOpen ->
-                menuOpen = false
-
-            queueOpen ->
-                queueOpen = false
-
-            sleepOpen ->
-                sleepOpen = false
-
-            else ->
-                scope.launch {
-                    closePlayer()
-                }
+            else -> scope.launch {
+                closePlayer()
+            }
         }
     }
 
@@ -354,8 +291,7 @@ fun NowPlaying(
             .fillMaxSize()
             .onSizeChanged {
                 screenHeight =
-                    it.height
-                        .toFloat()
+                    it.height.toFloat()
                         .coerceAtLeast(1f)
             }
             .graphicsLayer {
@@ -373,7 +309,6 @@ fun NowPlaying(
                                         screenHeight
                                     ).coerceIn(0f, 1f)
                             ).dp,
-
                     topEnd =
                         (
                             42f *
@@ -410,76 +345,17 @@ fun NowPlaying(
                     .fillMaxWidth()
                     .height(68.dp)
                     .padding(horizontal = 14.dp)
-                    .pointerInput(screenHeight) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = {
-                                    change,
-                                    amount ->
-
-                                if (
-                                    amount > 0f ||
-                                    dragY.value > 0f
-                                ) {
-                                    change.consume()
-
-                                    scope.launch {
-                                        dragY.snapTo(
-                                            (
-                                                dragY.value +
-                                                    amount
-                                                ).coerceIn(
-                                                0f,
-                                                screenHeight
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-
-                            onDragEnd = {
-                                scope.launch {
-                                    if (
-                                        dragY.value >
-                                        screenHeight * .13f
-                                    ) {
-                                        dismissing = true
-
-                                        dragY.animateTo(
-                                            screenHeight,
-                                            tween(300)
-                                        )
-
-                                        dismiss()
-                                    } else {
-                                        dragY.animateTo(
-                                            0f,
-                                            spring(
-                                                dampingRatio = .82f,
-                                                stiffness = 390f
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-
-                            onDragCancel = {
-                                scope.launch {
-                                    dragY.animateTo(
-                                        0f,
-                                        spring(
-                                            dampingRatio = .82f,
-                                            stiffness = 390f
-                                        )
-                                    )
-                                }
-                            }
-                        )
-                    }
+                    .playerDownGesture(
+                        dragY = dragY,
+                        screenHeight = screenHeight,
+                        scope = scope,
+                        dismiss = dismiss
+                    )
             ) {
                 PlayerCircle(
                     size = 39.dp,
                     background =
-                        headerColor.copy(alpha = .10f),
+                        overlayText.copy(alpha = .10f),
                     modifier =
                         Modifier.align(
                             Alignment.CenterStart
@@ -493,13 +369,9 @@ fun NowPlaying(
                     Icon(
                         imageVector =
                             Icons.Default.KeyboardArrowDown,
-
                         contentDescription =
                             "Close",
-
-                        tint =
-                            headerColor,
-
+                        tint = overlayText,
                         modifier =
                             Modifier.size(23.dp)
                     )
@@ -509,67 +381,46 @@ fun NowPlaying(
                     Modifier
                         .align(Alignment.Center)
                         .width(180.dp),
-
                     horizontalAlignment =
                         Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text =
-                            if (sourceIsCategory) {
-                                "PLAYING FROM CATEGORY"
-                            } else {
-                                "PLAYING FROM"
-                            },
-
+                        if (sourceIsCategory) {
+                            "PLAYING FROM CATEGORY"
+                        } else {
+                            "PLAYING FROM"
+                        },
                         color =
-                            headerSub,
-
+                            overlayText.copy(alpha = .68f),
                         fontFamily =
                             XmoFont.medium,
-
-                        fontSize =
-                            12.sp,
-
-                        letterSpacing =
-                            1.sp,
-
+                        fontSize = 12.sp,
+                        letterSpacing = 1.sp,
                         textAlign =
                             TextAlign.Center,
-
-                        maxLines =
-                            1
+                        maxLines = 1
                     )
 
                     Text(
-                        text = source,
-
-                        color =
-                            headerColor,
-
+                        source,
+                        color = overlayText,
                         fontFamily =
                             XmoFont.bold,
-
-                        fontSize =
-                            16.sp,
-
+                        fontSize = 16.sp,
                         textAlign =
                             TextAlign.Center,
-
-                        maxLines =
-                            1,
-
+                        maxLines = 1,
                         overflow =
                             TextOverflow.Ellipsis
                     )
                 }
 
+                /*
+                 * No border. No separator.
+                 */
                 XmoCapsule(
                     background =
-                        headerColor.copy(alpha = .10f),
-
-                    border =
-                        headerColor.copy(alpha = .19f),
-
+                        overlayText.copy(alpha = .10f),
                     modifier =
                         Modifier.align(
                             Alignment.CenterEnd
@@ -578,15 +429,12 @@ fun NowPlaying(
                     CapsuleButton(
                         click = {
                             currentSong?.let {
-                                shareSong(
-                                    context,
-                                    it
-                                )
+                                shareSong(context, it)
                             }
                         }
                     ) {
                         ShareIcon(
-                            headerColor,
+                            overlayText,
                             Modifier.size(18.dp)
                         )
                     }
@@ -599,13 +447,9 @@ fun NowPlaying(
                         Icon(
                             imageVector =
                                 Icons.Default.MoreVert,
-
                             contentDescription =
                                 "More",
-
-                            tint =
-                                headerColor,
-
+                            tint = overlayText,
                             modifier =
                                 Modifier.size(20.dp)
                         )
@@ -613,63 +457,43 @@ fun NowPlaying(
                 }
             }
 
-            Spacer(
-                Modifier.height(64.dp)
-            )
-
             /*
-             * =================================================
-             * COVER
-             * =================================================
+             * Cover intentionally lower.
              */
+            Spacer(
+                Modifier.height(68.dp)
+            )
 
             ArtworkCarousel(
                 currentId =
                     state.currentSongId,
-
                 current =
                     currentSong?.artwork
-                        ?: state.artworkUri?.let(
-                            Uri::parse
-                        ),
-
+                        ?: state.artworkUri?.let(Uri::parse),
                 previous =
                     previousSong?.artwork,
-
                 next =
                     nextSong?.artwork,
-
                 canPrevious =
                     state.hasPrevious,
-
                 canNext =
                     state.hasNext,
-
                 previousSong =
                     previousItem,
-
                 nextSong =
-                    next,
-
-                dragY =
-                    dragY,
-
-                screenHeight =
-                    screenHeight,
-
-                dismiss = {
-                    dismissing = true
-                    dismiss()
-                }
+                    next
             )
 
+            /*
+             * Finger-sized separation between artwork and panel.
+             */
             Spacer(
-                Modifier.height(36.dp)
+                Modifier.height(52.dp)
             )
 
             /*
              * =================================================
-             * BORDERLESS PLAYER PANEL
+             * BORDERLESS TRANSPARENT PANEL
              * =================================================
              */
 
@@ -683,19 +507,16 @@ fun NowPlaying(
                             topEnd = 28.dp
                         )
                     )
-                    .background(
-                        panelBackground
-                    )
+                    .background(panelBackground)
                     .padding(
                         start = 18.dp,
-                        top = 24.dp,
+                        top = 25.dp,
                         end = 18.dp,
                         bottom = 24.dp
                     )
             ) {
                 Row(
                     Modifier.fillMaxWidth(),
-
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
@@ -706,18 +527,11 @@ fun NowPlaying(
                             state.title.ifBlank {
                                 "Unknown song"
                             },
-
                             color = c.text,
-
                             fontFamily =
                                 XmoFont.bold,
-
-                            fontSize =
-                                21.sp,
-
-                            maxLines =
-                                1,
-
+                            fontSize = 21.sp,
+                            maxLines = 1,
                             overflow =
                                 TextOverflow.Ellipsis
                         )
@@ -726,42 +540,31 @@ fun NowPlaying(
                             state.artist.ifBlank {
                                 "Unknown artist"
                             },
-
                             color = c.sub,
-
                             fontFamily =
                                 XmoFont.normal,
-
-                            fontSize =
-                                13.sp,
-
-                            maxLines =
-                                1,
-
+                            fontSize = 13.sp,
+                            maxLines = 1,
                             overflow =
                                 TextOverflow.Ellipsis
                         )
                     }
 
+                    /*
+                     * No border, no middle line.
+                     */
                     XmoCapsule(
-                        background = c.button,
-                        border = sectionBorder
+                        background = c.button
                     ) {
                         CapsuleButton(
-                            click =
-                                toggleLike
+                            click = toggleLike
                         ) {
                             XmoIcon(
                                 icon =
                                     R.drawable.ic_xmo_heart,
-
                                 tint =
-                                    if (liked) {
-                                        accent
-                                    } else {
-                                        c.icon
-                                    },
-
+                                    if (liked) accent
+                                    else c.icon,
                                 modifier =
                                     Modifier.size(17.dp)
                             )
@@ -775,10 +578,7 @@ fun NowPlaying(
                             XmoIcon(
                                 icon =
                                     R.drawable.ic_xmo_add,
-
-                                tint =
-                                    accent,
-
+                                tint = accent,
                                 modifier =
                                     Modifier.size(16.dp)
                             )
@@ -786,87 +586,68 @@ fun NowPlaying(
                     }
                 }
 
+                /*
+                 * More space between metadata and seek line.
+                 */
                 Spacer(
-                    Modifier.height(22.dp)
+                    Modifier.height(30.dp)
                 )
 
                 SeekLine(
-                    position =
-                        state.position,
+                    position = state.position,
+                    duration = state.duration,
+                    active = accent,
+                    inactive = sectionBorder,
+                    seekTo = seekTo
+                )
 
-                    duration =
-                        state.duration,
-
-                    active =
-                        accent,
-
-                    inactive =
-                        sectionBorder,
-
-                    seekTo =
-                        seekTo
+                Spacer(
+                    Modifier.height(3.dp)
                 )
 
                 Row(
                     Modifier.fillMaxWidth(),
-
                     horizontalArrangement =
                         Arrangement.SpaceBetween
                 ) {
                     Text(
-                        playerTime(
-                            state.position
-                        ),
-
+                        playerTime(state.position),
                         color = c.sub,
-
                         fontFamily =
                             XmoFont.medium,
-
-                        fontSize =
-                            12.sp
+                        fontSize = 12.sp
                     )
 
                     Text(
-                        playerTime(
-                            state.duration
-                        ),
-
+                        playerTime(state.duration),
                         color = c.sub,
-
                         fontFamily =
                             XmoFont.medium,
-
-                        fontSize =
-                            12.sp
+                        fontSize = 12.sp
                     )
                 }
 
                 Spacer(
-                    Modifier.height(19.dp)
+                    Modifier.height(24.dp)
                 )
 
                 /*
                  * =================================================
-                 * CONTROL ROW
+                 * CONTROLS
                  * =================================================
                  */
 
                 Row(
                     Modifier.fillMaxWidth(),
-
                     horizontalArrangement =
                         Arrangement.SpaceBetween,
-
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
                     SmallControl(
                         active =
                             state.sleepTimerRemainingMs > 0L,
-
                         c = c,
-
                         click = {
                             sleepOpen = true
                         }
@@ -874,12 +655,7 @@ fun NowPlaying(
                         ClockIcon(
                             if (
                                 state.sleepTimerRemainingMs > 0L
-                            ) {
-                                accent
-                            } else {
-                                c.icon
-                            },
-
+                            ) accent else c.icon,
                             Modifier.size(16.dp)
                         )
                     }
@@ -887,21 +663,14 @@ fun NowPlaying(
                     SmallControl(
                         active =
                             state.shuffleEnabled,
-
                         c = c,
-
                         click =
                             toggleShuffle
                     ) {
                         ShuffleIcon(
                             if (
                                 state.shuffleEnabled
-                            ) {
-                                accent
-                            } else {
-                                c.icon
-                            },
-
+                            ) accent else c.icon,
                             Modifier.size(17.dp)
                         )
                     }
@@ -922,9 +691,7 @@ fun NowPlaying(
                         background = accent,
                         click = togglePlay
                     ) {
-                        if (
-                            state.isPlaying
-                        ) {
+                        if (state.isPlaying) {
                             PauseIcon(
                                 Color.White,
                                 Modifier.size(22.dp)
@@ -933,13 +700,9 @@ fun NowPlaying(
                             Icon(
                                 imageVector =
                                     Icons.Default.PlayArrow,
-
                                 contentDescription =
                                     "Play",
-
-                                tint =
-                                    Color.White,
-
+                                tint = Color.White,
                                 modifier =
                                     Modifier.size(25.dp)
                             )
@@ -954,14 +717,11 @@ fun NowPlaying(
                         click = next
                     ) {
                         NextIcon(
-                            if (
-                                state.hasNext
-                            ) {
+                            if (state.hasNext) {
                                 c.text
                             } else {
                                 c.sub.copy(alpha = .35f)
                             },
-
                             Modifier.size(19.dp)
                         )
                     }
@@ -971,9 +731,7 @@ fun NowPlaying(
                             state.repeatMode !=
                                 androidx.media3.common.Player
                                     .REPEAT_MODE_OFF,
-
                         c = c,
-
                         click =
                             cycleRepeat
                     ) {
@@ -983,17 +741,11 @@ fun NowPlaying(
                                     state.repeatMode !=
                                     androidx.media3.common.Player
                                         .REPEAT_MODE_OFF
-                                ) {
-                                    accent
-                                } else {
-                                    c.icon
-                                },
-
+                                ) accent else c.icon,
                             one =
                                 state.repeatMode ==
                                     androidx.media3.common.Player
                                         .REPEAT_MODE_ONE,
-
                             modifier =
                                 Modifier.size(18.dp)
                         )
@@ -1013,8 +765,11 @@ fun NowPlaying(
                     }
                 }
 
+                /*
+                 * Larger controls -> lyrics separation.
+                 */
                 Spacer(
-                    Modifier.height(36.dp)
+                    Modifier.height(48.dp)
                 )
 
                 /*
@@ -1029,15 +784,10 @@ fun NowPlaying(
                     border = sectionBorder,
                     actions = {
                         XmoCapsule(
-                            background = c.button,
-                            border = sectionBorder
+                            background = c.button
                         ) {
                             CapsuleButton(
                                 click = {
-                                    /*
-                                     * LRC MIME varies between
-                                     * document providers.
-                                     */
                                     lyricPicker.launch(
                                         arrayOf("*/*")
                                     )
@@ -1045,15 +795,10 @@ fun NowPlaying(
                             ) {
                                 Text(
                                     "+",
-
                                     color = accent,
-
                                     fontFamily =
                                         XmoFont.medium,
-
-                                    fontSize =
-                                        20.sp,
-
+                                    fontSize = 20.sp,
                                     textAlign =
                                         TextAlign.Center
                                 )
@@ -1072,10 +817,9 @@ fun NowPlaying(
                         }
                     }
                 ) {
-                    CenterLyrics(
+                    MovingLyrics(
                         lyrics = lyrics,
-                        position =
-                            state.position,
+                        position = state.position,
                         c = c,
                         accent = accent
                     )
@@ -1085,12 +829,6 @@ fun NowPlaying(
                     Modifier.height(20.dp)
                 )
 
-                /*
-                 * =================================================
-                 * ARTIST
-                 * =================================================
-                 */
-
                 BorderSection(
                     title = "ARTIST",
                     c = c,
@@ -1098,44 +836,34 @@ fun NowPlaying(
                 ) {
                     Row(
                         Modifier.fillMaxWidth(),
-
                         verticalAlignment =
                             Alignment.CenterVertically
                     ) {
                         AsyncImage(
                             model =
                                 currentSong?.artwork,
-
                             contentDescription =
                                 null,
-
                             modifier =
                                 Modifier
                                     .size(58.dp)
                                     .clip(CircleShape)
                                     .background(c.button),
-
                             contentScale =
                                 ContentScale.Crop
                         )
 
                         Column(
-                            Modifier.padding(
-                                start = 12.dp
-                            )
+                            Modifier.padding(start = 12.dp)
                         ) {
                             Text(
                                 state.artist.ifBlank {
                                     "Unknown artist"
                                 },
-
                                 color = c.text,
-
                                 fontFamily =
                                     XmoFont.bold,
-
-                                fontSize =
-                                    14.sp
+                                fontSize = 14.sp
                             )
 
                             currentSong
@@ -1147,14 +875,10 @@ fun NowPlaying(
                                 ?.let {
                                     Text(
                                         it,
-
                                         color = c.sub,
-
                                         fontFamily =
                                             XmoFont.normal,
-
-                                        fontSize =
-                                            10.sp
+                                        fontSize = 10.sp
                                     )
                                 }
                         }
@@ -1164,12 +888,6 @@ fun NowPlaying(
                 Spacer(
                     Modifier.height(20.dp)
                 )
-
-                /*
-                 * =================================================
-                 * DETAILS
-                 * =================================================
-                 */
 
                 BorderSection(
                     title = "SONG DETAILS",
@@ -1283,32 +1001,23 @@ fun NowPlaying(
 
                 Column(
                     Modifier.fillMaxWidth(),
-
                     horizontalAlignment =
                         Alignment.CenterHorizontally
                 ) {
                     Text(
                         "XMO",
-
                         color = c.text,
-
                         fontFamily =
                             XmoFont.logo,
-
-                        fontSize =
-                            19.sp
+                        fontSize = 19.sp
                     )
 
                     Text(
                         "lxzrvi • copyright © 2026",
-
                         color = c.sub,
-
                         fontFamily =
                             XmoFont.normal,
-
-                        fontSize =
-                            9.sp
+                        fontSize = 9.sp
                     )
                 }
 
@@ -1335,19 +1044,15 @@ fun NowPlaying(
         if (sleepOpen) {
             SleepOverlay(
                 c = c,
-
                 active =
                     state.sleepTimerRemainingMs > 0L,
-
                 close = {
                     sleepOpen = false
                 },
-
                 select = {
                     setSleepTimer(it)
                     sleepOpen = false
                 },
-
                 cancel = {
                     cancelSleepTimer()
                     sleepOpen = false
@@ -1358,33 +1063,21 @@ fun NowPlaying(
         if (menuOpen) {
             MoreOverlay(
                 c = c,
-
-                song =
-                    currentSong,
-
-                liked =
-                    liked,
-
+                song = currentSong,
+                liked = liked,
                 close = {
                     menuOpen = false
                 },
-
                 toggleLike = {
                     toggleLike()
                     menuOpen = false
                 },
-
                 share = {
                     currentSong?.let {
-                        shareSong(
-                            context,
-                            it
-                        )
+                        shareSong(context, it)
                     }
-
                     menuOpen = false
                 },
-
                 removeLyrics = {
                     saveLyricsUri(null)
                     menuOpen = false
@@ -1395,20 +1088,20 @@ fun NowPlaying(
         if (fullLyrics) {
             FullLyrics(
                 lyrics = lyrics,
-                position =
-                    state.position,
-                title =
-                    state.title,
-                artist =
-                    state.artist,
+                position = state.position,
+                title = state.title,
+                artist = state.artist,
                 artwork =
                     currentSong?.artwork,
-                dominant =
-                    liveColor,
+                dominant = liveColor,
                 deep = deep,
                 theme = theme,
                 c = c,
                 accent = accent,
+                isPlaying = state.isPlaying,
+                togglePlay = togglePlay,
+                previous = previous,
+                next = next,
                 close = {
                     fullLyrics = false
                 }
@@ -1416,6 +1109,72 @@ fun NowPlaying(
         }
     }
 }
+
+/*
+ * =============================================================
+ * DOWN GESTURE
+ * =============================================================
+ */
+
+private fun Modifier.playerDownGesture(
+    dragY: Animatable<Float, *>,
+    screenHeight: Float,
+    scope: kotlinx.coroutines.CoroutineScope,
+    dismiss: () -> Unit
+): Modifier =
+    pointerInput(screenHeight) {
+        detectVerticalDragGestures(
+            onVerticalDrag = {
+                    change,
+                    amount ->
+
+                if (
+                    amount > 0f ||
+                    dragY.value > 0f
+                ) {
+                    change.consume()
+
+                    scope.launch {
+                        dragY.snapTo(
+                            (
+                                dragY.value + amount
+                                ).coerceIn(
+                                0f,
+                                screenHeight
+                            )
+                        )
+                    }
+                }
+            },
+            onDragEnd = {
+                scope.launch {
+                    if (
+                        dragY.value >
+                        screenHeight * .13f
+                    ) {
+                        dragY.animateTo(
+                            screenHeight,
+                            tween(300)
+                        )
+                        dismiss()
+                    } else {
+                        dragY.animateTo(
+                            0f,
+                            tween(220)
+                        )
+                    }
+                }
+            },
+            onDragCancel = {
+                scope.launch {
+                    dragY.animateTo(
+                        0f,
+                        tween(220)
+                    )
+                }
+            }
+        )
+    }
 
 /*
  * =============================================================
@@ -1429,16 +1188,16 @@ private fun ArtworkBackground(
     deep: Color,
     theme: XmoTheme
 ) {
-    val bottom =
+    val neutral =
         when (theme) {
             XmoTheme.Light ->
-                Color.White.copy(alpha = .18f)
+                Color.White.copy(alpha = .08f)
 
             XmoTheme.Dark ->
-                Color.Black.copy(alpha = .16f)
+                Color.Black.copy(alpha = .08f)
 
             XmoTheme.Amoled ->
-                Color.Black.copy(alpha = .23f)
+                Color.Black.copy(alpha = .13f)
         }
 
     Canvas(
@@ -1448,87 +1207,69 @@ private fun ArtworkBackground(
     ) {
         drawRect(
             Brush.radialGradient(
-                colors =
-                    listOf(
-                        dominant,
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .04f,
-                        size.height * .10f
-                    ),
-                radius =
-                    size.width * 1.18f
-            )
-        )
-
-        drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        deep.copy(alpha = .68f),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .96f,
-                        size.height * .28f
-                    ),
-                radius =
-                    size.width * 1.13f
-            )
-        )
-
-        drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        dominant.copy(alpha = .78f),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .05f,
-                        size.height * .61f
-                    ),
-                radius =
-                    size.width * 1.12f
-            )
-        )
-
-        drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        deep.copy(alpha = .60f),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .98f,
-                        size.height * .82f
-                    ),
-                radius =
-                    size.width * 1.14f
-            )
-        )
-
-        drawRect(
-            Brush.verticalGradient(
                 listOf(
-                    Color.Transparent,
-                    Color.Transparent,
-                    bottom
-                )
+                    dominant,
+                    Color.Transparent
+                ),
+                Offset(
+                    size.width * .08f,
+                    size.height * .10f
+                ),
+                size.width * 1.20f
             )
+        )
+
+        drawRect(
+            Brush.radialGradient(
+                listOf(
+                    deep.copy(alpha = .64f),
+                    Color.Transparent
+                ),
+                Offset(
+                    size.width * .95f,
+                    size.height * .31f
+                ),
+                size.width * 1.16f
+            )
+        )
+
+        drawRect(
+            Brush.radialGradient(
+                listOf(
+                    dominant.copy(alpha = .78f),
+                    Color.Transparent
+                ),
+                Offset(
+                    size.width * .10f,
+                    size.height * .64f
+                ),
+                size.width * 1.18f
+            )
+        )
+
+        drawRect(
+            Brush.radialGradient(
+                listOf(
+                    deep.copy(alpha = .62f),
+                    Color.Transparent
+                ),
+                Offset(
+                    size.width * .92f,
+                    size.height * .88f
+                ),
+                size.width * 1.17f
+            )
+        )
+
+        drawRect(
+            neutral
         )
     }
 }
 
 /*
  * =============================================================
- * ARTWORK CAROUSEL
+ * COVER CAROUSEL
  * =============================================================
  */
 
@@ -1541,29 +1282,17 @@ private fun ArtworkCarousel(
     canPrevious: Boolean,
     canNext: Boolean,
     previousSong: () -> Unit,
-    nextSong: () -> Unit,
-    dragY: Animatable<Float, *>,
-    screenHeight: Float,
-    dismiss: () -> Unit
+    nextSong: () -> Unit
 ) {
-    val scope =
-        rememberCoroutineScope()
-
-    val x =
-        remember {
-            Animatable(0f)
-        }
-
-    var oldId by remember {
-        mutableStateOf<Long?>(null)
-    }
+    val scope = rememberCoroutineScope()
+    val x = remember { Animatable(0f) }
 
     var pending by remember {
         mutableIntStateOf(0)
     }
 
-    var rawX by remember {
-        mutableFloatStateOf(0f)
+    var oldId by remember {
+        mutableStateOf<Long?>(null)
     }
 
     LaunchedEffect(currentId) {
@@ -1589,19 +1318,12 @@ private fun ArtworkCarousel(
         Box(
             Modifier
                 .fillMaxSize()
-                /*
-                 * Horizontal swipe belongs to carousel.
-                 */
                 .pointerInput(
                     currentId,
                     canPrevious,
                     canNext
                 ) {
                     detectHorizontalDragGestures(
-                        onDragStart = {
-                            rawX = 0f
-                        },
-
                         onHorizontalDrag = {
                                 change,
                                 amount ->
@@ -1611,8 +1333,6 @@ private fun ArtworkCarousel(
                             }
 
                             change.consume()
-
-                            rawX += amount
 
                             scope.launch {
                                 var target =
@@ -1644,7 +1364,6 @@ private fun ArtworkCarousel(
                                 )
                             }
                         },
-
                         onDragEnd = {
                             scope.launch {
                                 when {
@@ -1654,17 +1373,11 @@ private fun ArtworkCarousel(
 
                                         oldId = currentId
                                         pending = 1
-
-                                        /*
-                                         * Request real song first.
-                                         * Background/metadata can begin
-                                         * changing while cover leaves.
-                                         */
                                         nextSong()
 
                                         x.animateTo(
                                             -width,
-                                            tween(235)
+                                            tween(230)
                                         )
                                     }
 
@@ -1674,146 +1387,74 @@ private fun ArtworkCarousel(
 
                                         oldId = currentId
                                         pending = -1
-
                                         previousSong()
 
                                         x.animateTo(
                                             width,
-                                            tween(235)
+                                            tween(230)
                                         )
                                     }
 
-                                    else -> {
+                                    else ->
                                         x.animateTo(
                                             0f,
-                                            spring(
-                                                dampingRatio = .80f,
-                                                stiffness = 430f
-                                            )
+                                            tween(190)
                                         )
-                                    }
                                 }
                             }
                         },
-
                         onDragCancel = {
                             scope.launch {
                                 if (pending == 0) {
-                                    x.animateTo(0f)
-                                }
-                            }
-                        }
-                    )
-                }
-                /*
-                 * Downward drag works from artwork too.
-                 */
-                .pointerInput(screenHeight) {
-                    detectVerticalDragGestures(
-                        onVerticalDrag = {
-                                change,
-                                amount ->
-
-                            if (
-                                amount > 0f ||
-                                dragY.value > 0f
-                            ) {
-                                change.consume()
-
-                                scope.launch {
-                                    dragY.snapTo(
-                                        (
-                                            dragY.value +
-                                                amount
-                                            ).coerceIn(
-                                            0f,
-                                            screenHeight
-                                        )
-                                    )
-                                }
-                            }
-                        },
-
-                        onDragEnd = {
-                            scope.launch {
-                                if (
-                                    dragY.value >
-                                    screenHeight * .13f
-                                ) {
-                                    dragY.animateTo(
-                                        screenHeight,
-                                        tween(300)
-                                    )
-
-                                    dismiss()
-                                } else {
-                                    dragY.animateTo(
+                                    x.animateTo(
                                         0f,
-                                        spring(
-                                            dampingRatio = .82f,
-                                            stiffness = 390f
-                                        )
+                                        tween(180)
                                     )
                                 }
-                            }
-                        },
-
-                        onDragCancel = {
-                            scope.launch {
-                                dragY.animateTo(
-                                    0f,
-                                    spring(
-                                        dampingRatio = .82f,
-                                        stiffness = 390f
-                                    )
-                                )
                             }
                         }
                     )
                 }
         ) {
-            if (previous != null) {
+            previous?.let {
                 Cover(
-                    uri = previous,
-                    modifier =
-                        Modifier
-                            .padding(horizontal = 17.dp)
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .align(Alignment.Center)
-                            .graphicsLayer {
-                                translationX =
-                                    x.value - width
-                            }
-                )
-            }
-
-            Cover(
-                uri = current,
-                modifier =
+                    it,
                     Modifier
                         .padding(horizontal = 17.dp)
                         .fillMaxWidth()
                         .aspectRatio(1f)
                         .align(Alignment.Center)
                         .graphicsLayer {
-                            translationX = x.value
+                            translationX =
+                                x.value - width
                         }
+                )
+            }
+
+            Cover(
+                current,
+                Modifier
+                    .padding(horizontal = 17.dp)
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .align(Alignment.Center)
+                    .graphicsLayer {
+                        translationX = x.value
+                    }
             )
 
-            if (next != null) {
+            next?.let {
                 Cover(
-                    uri = next,
-                    modifier =
-                        Modifier
-                            .padding(horizontal = 17.dp)
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .align(Alignment.Center)
-                            .graphicsLayer {
-                                translationX =
-                                    x.value + width
-                            }
+                    it,
+                    Modifier
+                        .padding(horizontal = 17.dp)
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .align(Alignment.Center)
+                        .graphicsLayer {
+                            translationX =
+                                x.value + width
+                        }
                 )
             }
         }
@@ -1827,11 +1468,9 @@ private fun Cover(
 ) {
     Box(
         modifier
-            .clip(
-                RoundedCornerShape(24.dp)
-            )
+            .clip(RoundedCornerShape(24.dp))
             .background(
-                Color.Black.copy(alpha = .10f)
+                Color.Black.copy(alpha = .08f)
             )
     ) {
         AsyncImage(
@@ -1855,8 +1494,7 @@ private fun Cover(
                         LocalXmoAccent.current,
                     fontFamily =
                         XmoFont.logo,
-                    fontSize =
-                        31.sp
+                    fontSize = 31.sp
                 )
             }
         }
@@ -1865,29 +1503,21 @@ private fun Cover(
 
 /*
  * =============================================================
- * XMO CAPSULE
+ * XMO CAPSULE — NO BORDER / NO DIVIDER
  * =============================================================
  */
 
 @Composable
 private fun XmoCapsule(
     background: Color,
-    border: Color,
     modifier: Modifier = Modifier,
     content:
         @Composable RowScope.() -> Unit
 ) {
     Row(
         modifier
-            .clip(
-                RoundedCornerShape(22.dp)
-            )
+            .clip(RoundedCornerShape(22.dp))
             .background(background)
-            .border(
-                .65.dp,
-                border,
-                RoundedCornerShape(22.dp)
-            )
             .padding(horizontal = 2.dp),
         verticalAlignment =
             Alignment.CenterVertically,
@@ -1904,9 +1534,7 @@ private fun CapsuleButton(
         Modifier
             .size(39.dp)
             .clip(CircleShape)
-            .clickable(
-                onClick = click
-            ),
+            .clickable(onClick = click),
         contentAlignment =
             Alignment.Center
     ) {
@@ -1916,7 +1544,97 @@ private fun CapsuleButton(
 
 /*
  * =============================================================
- * CONTROLS
+ * XMO LONG CAP
+ *
+ * Play/Pause | Next | Previous | Close
+ * =============================================================
+ */
+
+@Composable
+private fun XmoLongCap(
+    isPlaying: Boolean,
+    foreground: Color,
+    background: Color,
+    togglePlay: () -> Unit,
+    next: () -> Unit,
+    previous: () -> Unit,
+    close: () -> Unit
+) {
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(background)
+            .padding(horizontal = 3.dp),
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+        LongCapButton(togglePlay) {
+            if (isPlaying) {
+                PauseIcon(
+                    foreground,
+                    Modifier.size(18.dp)
+                )
+            } else {
+                Icon(
+                    imageVector =
+                        Icons.Default.PlayArrow,
+                    contentDescription =
+                        "Play",
+                    tint = foreground,
+                    modifier =
+                        Modifier.size(21.dp)
+                )
+            }
+        }
+
+        LongCapButton(next) {
+            NextIcon(
+                foreground,
+                Modifier.size(17.dp)
+            )
+        }
+
+        LongCapButton(previous) {
+            PreviousIcon(
+                foreground,
+                Modifier.size(17.dp)
+            )
+        }
+
+        LongCapButton(close) {
+            Icon(
+                imageVector =
+                    Icons.Default.Close,
+                contentDescription =
+                    "Close",
+                tint = foreground,
+                modifier =
+                    Modifier.size(18.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun LongCapButton(
+    click: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    Box(
+        Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .clickable(onClick = click),
+        contentAlignment =
+            Alignment.Center
+    ) {
+        content()
+    }
+}
+
+/*
+ * =============================================================
+ * BASIC CONTROLS
  * =============================================================
  */
 
@@ -1964,21 +1682,13 @@ private fun SmallControl(
                     c.button
                 }
             )
-            .clickable(
-                onClick = click
-            ),
+            .clickable(onClick = click),
         contentAlignment =
             Alignment.Center
     ) {
         content()
     }
 }
-
-/*
- * =============================================================
- * SEEK
- * =============================================================
- */
 
 @Composable
 private fun SeekLine(
@@ -2007,17 +1717,11 @@ private fun SeekLine(
                     if (duration > 0L) {
                         val p =
                             (
-                                it.x /
-                                    size.width
-                                ).coerceIn(
-                                0f,
-                                1f
-                            )
+                                it.x / size.width
+                                ).coerceIn(0f, 1f)
 
                         seekTo(
-                            (
-                                duration * p
-                                ).toLong()
+                            (duration * p).toLong()
                         )
                     }
                 }
@@ -2029,9 +1733,6 @@ private fun SeekLine(
             Modifier
                 .fillMaxWidth()
                 .height(2.dp)
-                .clip(
-                    RoundedCornerShape(1.dp)
-                )
                 .background(inactive)
         )
 
@@ -2039,9 +1740,6 @@ private fun SeekLine(
             Modifier
                 .fillMaxWidth(progress)
                 .height(2.dp)
-                .clip(
-                    RoundedCornerShape(1.dp)
-                )
                 .background(active)
         )
     }
@@ -2049,7 +1747,7 @@ private fun SeekLine(
 
 /*
  * =============================================================
- * BORDER SECTIONS
+ * LYRICS / ARTIST / DETAILS BORDER
  * =============================================================
  */
 
@@ -2085,10 +1783,8 @@ private fun BorderSection(
                     LocalXmoAccent.current,
                 fontFamily =
                     XmoFont.bold,
-                fontSize =
-                    11.sp,
-                letterSpacing =
-                    1.1.sp,
+                fontSize = 11.sp,
+                letterSpacing = 1.1.sp,
                 modifier =
                     Modifier.weight(1f)
             )
@@ -2106,12 +1802,17 @@ private fun BorderSection(
 
 /*
  * =============================================================
- * CENTER-FOLLOW LYRICS
+ * LYRICS
+ *
+ * Previous rises.
+ * Current zooms/focuses at center.
+ * Next enters smoothly from bottom.
+ * Only lyric text area scrolls for plain lyrics.
  * =============================================================
  */
 
 @Composable
-private fun CenterLyrics(
+private fun MovingLyrics(
     lyrics: SongLyrics?,
     position: Long,
     c: HomeColors,
@@ -2124,7 +1825,7 @@ private fun CenterLyrics(
         Box(
             Modifier
                 .fillMaxWidth()
-                .height(230.dp),
+                .height(240.dp),
             contentAlignment =
                 Alignment.Center
         ) {
@@ -2133,10 +1834,8 @@ private fun CenterLyrics(
                 color = c.sub,
                 fontFamily =
                     XmoFont.normal,
-                fontSize =
-                    15.sp,
-                lineHeight =
-                    23.sp,
+                fontSize = 16.sp,
+                lineHeight = 24.sp,
                 textAlign =
                     TextAlign.Center
             )
@@ -2151,12 +1850,10 @@ private fun CenterLyrics(
             position
         )
 
-    /*
-     * Synced LRC:
-     * current line remains physically centered.
-     * Previous and next lines surround it.
-     */
-    if (lyrics.synced && active >= 0) {
+    if (
+        lyrics.synced &&
+        active >= 0
+    ) {
         val previous =
             lyrics.lines
                 .getOrNull(active - 1)
@@ -2175,122 +1872,135 @@ private fun CenterLyrics(
                 ?.text
                 .orEmpty()
 
-        Column(
+        Box(
             Modifier
                 .fillMaxWidth()
-                .height(240.dp),
-            verticalArrangement =
-                Arrangement.Center,
-            horizontalAlignment =
-                Alignment.CenterHorizontally
+                .height(250.dp),
+            contentAlignment =
+                Alignment.Center
         ) {
-            Text(
-                previous,
-                color =
-                    c.text.copy(alpha = .36f),
-                fontFamily =
-                    XmoFont.normal,
-                fontSize =
-                    16.sp,
-                lineHeight =
-                    22.sp,
-                textAlign =
-                    TextAlign.Center,
-                maxLines = 2,
-                overflow =
-                    TextOverflow.Ellipsis,
-                modifier =
-                    Modifier.fillMaxWidth()
-            )
-
-            Spacer(
-                Modifier.height(16.dp)
-            )
-
             AnimatedContent(
-                targetState = current,
+                targetState = active,
                 transitionSpec = {
                     (
-                        fadeIn(
-                            tween(220)
-                        )
+                        slideInVertically(
+                            animationSpec = tween(330)
+                        ) {
+                            it / 3
+                        } +
+                            fadeIn(tween(280))
                         ) togetherWith
-                        fadeOut(
-                            tween(150)
-                        )
+                        (
+                            slideOutVertically(
+                                animationSpec = tween(330)
+                            ) {
+                                -it / 3
+                            } +
+                                fadeOut(tween(210))
+                            )
                 },
-                label =
-                    "activeLyric"
-            ) { line ->
-                Text(
-                    line,
-                    color = accent,
-                    fontFamily =
-                        XmoFont.bold,
-                    fontSize =
-                        22.sp,
-                    lineHeight =
-                        29.sp,
-                    textAlign =
-                        TextAlign.Center,
-                    modifier =
-                        Modifier.fillMaxWidth()
-                )
+                label = "lyricsMotion"
+            ) {
+                Column(
+                    Modifier.fillMaxWidth(),
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally,
+                    verticalArrangement =
+                        Arrangement.Center
+                ) {
+                    Text(
+                        previous,
+                        color =
+                            c.text.copy(alpha = .38f),
+                        fontFamily =
+                            XmoFont.normal,
+                        fontSize = 17.sp,
+                        lineHeight = 24.sp,
+                        textAlign =
+                            TextAlign.Center,
+                        maxLines = 2,
+                        overflow =
+                            TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+
+                    Spacer(
+                        Modifier.height(19.dp)
+                    )
+
+                    /*
+                     * CURRENT — bigger, focused, centered.
+                     */
+                    Text(
+                        current,
+                        color = accent,
+                        fontFamily =
+                            XmoFont.bold,
+                        fontSize = 23.sp,
+                        lineHeight = 30.sp,
+                        textAlign =
+                            TextAlign.Center,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .graphicsLayer {
+                                    scaleX = 1.035f
+                                    scaleY = 1.035f
+                                }
+                    )
+
+                    Spacer(
+                        Modifier.height(19.dp)
+                    )
+
+                    Text(
+                        next,
+                        color =
+                            c.text.copy(alpha = .46f),
+                        fontFamily =
+                            XmoFont.normal,
+                        fontSize = 17.sp,
+                        lineHeight = 24.sp,
+                        textAlign =
+                            TextAlign.Center,
+                        maxLines = 2,
+                        overflow =
+                            TextOverflow.Ellipsis,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                    )
+                }
             }
-
-            Spacer(
-                Modifier.height(16.dp)
-            )
-
-            Text(
-                next,
-                color =
-                    c.text.copy(alpha = .42f),
-                fontFamily =
-                    XmoFont.normal,
-                fontSize =
-                    16.sp,
-                lineHeight =
-                    22.sp,
-                textAlign =
-                    TextAlign.Center,
-                maxLines = 2,
-                overflow =
-                    TextOverflow.Ellipsis,
-                modifier =
-                    Modifier.fillMaxWidth()
-            )
         }
 
         return
     }
 
     /*
-     * Plain untimed lyrics.
+     * Only text body scrolls.
      */
     Column(
         Modifier
             .fillMaxWidth()
-            .height(240.dp)
+            .height(250.dp)
             .verticalScroll(
                 rememberScrollState()
             ),
         horizontalAlignment =
             Alignment.CenterHorizontally,
         verticalArrangement =
-            Arrangement.spacedBy(11.dp)
+            Arrangement.spacedBy(12.dp)
     ) {
         lyrics.lines.forEach {
             Text(
                 it.text,
                 color =
-                    c.text.copy(alpha = .76f),
+                    c.text.copy(alpha = .78f),
                 fontFamily =
                     XmoFont.normal,
-                fontSize =
-                    16.sp,
-                lineHeight =
-                    24.sp,
+                fontSize = 17.sp,
+                lineHeight = 25.sp,
                 textAlign =
                     TextAlign.Center,
                 modifier =
@@ -2302,7 +2012,7 @@ private fun CenterLyrics(
 
 /*
  * =============================================================
- * FULL LYRICS
+ * FULL SCREEN LYRICS
  * =============================================================
  */
 
@@ -2318,8 +2028,22 @@ private fun FullLyrics(
     theme: XmoTheme,
     c: HomeColors,
     accent: Color,
+    isPlaying: Boolean,
+    togglePlay: () -> Unit,
+    previous: () -> Unit,
+    next: () -> Unit,
     close: () -> Unit
 ) {
+    /*
+     * Text contrast follows live artwork background.
+     */
+    val foreground =
+        if (dominant.luminance() > .56f) {
+            Color(0xFF101010)
+        } else {
+            Color.White
+        }
+
     val active =
         lyrics?.let {
             currentLyricIndex(
@@ -2327,21 +2051,6 @@ private fun FullLyrics(
                 position
             )
         } ?: -1
-
-    val list =
-        rememberLazyListState()
-
-    LaunchedEffect(active) {
-        if (
-            active >= 0 &&
-            lyrics != null
-        ) {
-            list.animateScrollToItem(
-                active,
-                scrollOffset = -420
-            )
-        }
-    }
 
     Box(
         Modifier.fillMaxSize()
@@ -2352,161 +2061,242 @@ private fun FullLyrics(
             theme = theme
         )
 
-        Column(
+        /*
+         * Header.
+         */
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .statusBarsPadding()
+                .height(70.dp)
+                .padding(
+                    start = 16.dp,
+                    end = 14.dp
+                ),
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            AsyncImage(
+                model = artwork,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(42.dp)
+                        .clip(
+                            RoundedCornerShape(9.dp)
+                        ),
+                contentScale =
+                    ContentScale.Crop
+            )
+
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = 10.dp)
+            ) {
+                Text(
+                    title,
+                    color = foreground,
+                    fontFamily =
+                        XmoFont.bold,
+                    fontSize = 14.sp,
+                    maxLines = 1,
+                    overflow =
+                        TextOverflow.Ellipsis
+                )
+
+                Text(
+                    artist,
+                    color =
+                        foreground.copy(alpha = .62f),
+                    fontFamily =
+                        XmoFont.normal,
+                    fontSize = 10.sp,
+                    maxLines = 1
+                )
+            }
+
+            /*
+             * XmoLongCap on right.
+             */
+            XmoLongCap(
+                isPlaying = isPlaying,
+                foreground = foreground,
+                background =
+                    foreground.copy(alpha = .10f),
+                togglePlay = togglePlay,
+                next = next,
+                previous = previous,
+                close = close
+            )
+        }
+
+        /*
+         * Main centered lyrics area.
+         */
+        Box(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
                 .navigationBarsPadding()
+                .padding(
+                    start = 24.dp,
+                    top = 100.dp,
+                    end = 24.dp,
+                    bottom = 36.dp
+                ),
+            contentAlignment =
+                Alignment.Center
         ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(68.dp)
-                    .padding(
-                        horizontal = 16.dp
-                    )
-            ) {
-                Row(
-                    Modifier
-                        .align(
-                            Alignment.CenterStart
-                        ),
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-                    AsyncImage(
-                        model = artwork,
-                        contentDescription = null,
-                        modifier =
-                            Modifier
-                                .size(42.dp)
-                                .clip(
-                                    RoundedCornerShape(9.dp)
-                                ),
-                        contentScale =
-                            ContentScale.Crop
-                    )
-
-                    Column(
-                        Modifier
-                            .width(220.dp)
-                            .padding(
-                                start = 11.dp
-                            )
-                    ) {
-                        Text(
-                            title,
-                            color = c.text,
-                            fontFamily =
-                                XmoFont.bold,
-                            fontSize =
-                                15.sp,
-                            maxLines = 1,
-                            overflow =
-                                TextOverflow.Ellipsis
-                        )
-
-                        Text(
-                            artist,
-                            color = c.sub,
-                            fontFamily =
-                                XmoFont.normal,
-                            fontSize =
-                                10.sp,
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                PlayerCircle(
-                    size = 40.dp,
-                    background = c.button,
-                    modifier =
-                        Modifier.align(
-                            Alignment.CenterEnd
-                        ),
-                    click = close
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Default.Close,
-                        contentDescription =
-                            "Close lyrics",
-                        tint = c.text,
-                        modifier =
-                            Modifier.size(19.dp)
-                    )
-                }
-            }
-
             if (
                 lyrics == null ||
                 lyrics.lines.isEmpty()
             ) {
-                Box(
-                    Modifier.fillMaxSize(),
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-                    Text(
-                        "No lyrics",
-                        color = c.sub,
-                        fontFamily =
-                            XmoFont.normal,
-                        fontSize =
-                            16.sp
-                    )
-                }
-            } else {
-                LazyColumn(
-                    state = list,
-                    contentPadding =
-                        PaddingValues(
-                            start = 24.dp,
-                            end = 24.dp,
-                            top = 210.dp,
-                            bottom = 320.dp
-                        ),
-                    verticalArrangement =
-                        Arrangement.spacedBy(20.dp)
-                ) {
-                    itemsIndexed(
-                        lyrics.lines
-                    ) {
-                            index,
-                            line ->
+                Text(
+                    "No lyrics",
+                    color =
+                        foreground.copy(alpha = .60f),
+                    fontFamily =
+                        XmoFont.normal,
+                    fontSize = 17.sp
+                )
+            } else if (
+                lyrics.synced &&
+                active >= 0
+            ) {
+                val previousLine =
+                    lyrics.lines
+                        .getOrNull(active - 1)
+                        ?.text
+                        .orEmpty()
 
-                        val selected =
-                            index == active
+                val currentLine =
+                    lyrics.lines
+                        .getOrNull(active)
+                        ?.text
+                        .orEmpty()
+
+                val nextLine =
+                    lyrics.lines
+                        .getOrNull(active + 1)
+                        ?.text
+                        .orEmpty()
+
+                AnimatedContent(
+                    targetState = active,
+                    transitionSpec = {
+                        (
+                            slideInVertically(
+                                tween(360)
+                            ) {
+                                it / 3
+                            } +
+                                fadeIn(tween(300))
+                            ) togetherWith
+                            (
+                                slideOutVertically(
+                                    tween(360)
+                                ) {
+                                    -it / 3
+                                } +
+                                    fadeOut(tween(230))
+                                )
+                    },
+                    label = "fullscreenLyricMotion"
+                ) {
+                    Column(
+                        Modifier.fillMaxWidth(),
+                        horizontalAlignment =
+                            Alignment.CenterHorizontally,
+                        verticalArrangement =
+                            Arrangement.Center
+                    ) {
+                        Text(
+                            previousLine,
+                            color =
+                                foreground.copy(
+                                    alpha = .38f
+                                ),
+                            fontFamily =
+                                XmoFont.normal,
+                            fontSize = 20.sp,
+                            lineHeight = 28.sp,
+                            textAlign =
+                                TextAlign.Center,
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        )
+
+                        Spacer(
+                            Modifier.height(30.dp)
+                        )
 
                         Text(
-                            line.text,
-                            color =
-                                if (selected) {
-                                    accent
-                                } else {
-                                    c.text.copy(
-                                        alpha = .48f
-                                    )
-                                },
+                            currentLine,
+                            color = foreground,
                             fontFamily =
-                                if (selected) {
-                                    XmoFont.bold
-                                } else {
-                                    XmoFont.normal
-                                },
-                            fontSize =
-                                if (selected) {
-                                    24.sp
-                                } else {
-                                    18.sp
-                                },
-                            lineHeight =
-                                if (selected) {
-                                    31.sp
-                                } else {
-                                    26.sp
-                                },
+                                XmoFont.bold,
+                            fontSize = 29.sp,
+                            lineHeight = 37.sp,
+                            textAlign =
+                                TextAlign.Center,
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .graphicsLayer {
+                                        scaleX = 1.045f
+                                        scaleY = 1.045f
+                                    }
+                        )
+
+                        Spacer(
+                            Modifier.height(30.dp)
+                        )
+
+                        Text(
+                            nextLine,
+                            color =
+                                foreground.copy(
+                                    alpha = .48f
+                                ),
+                            fontFamily =
+                                XmoFont.normal,
+                            fontSize = 20.sp,
+                            lineHeight = 28.sp,
+                            textAlign =
+                                TextAlign.Center,
+                            modifier =
+                                Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            } else {
+                /*
+                 * Untimed full lyrics: only this text body scrolls.
+                 */
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .fillMaxHeight()
+                        .verticalScroll(
+                            rememberScrollState()
+                        ),
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally,
+                    verticalArrangement =
+                        Arrangement.spacedBy(16.dp)
+                ) {
+                    lyrics.lines.forEach {
+                        Text(
+                            it.text,
+                            color =
+                                foreground.copy(
+                                    alpha = .78f
+                                ),
+                            fontFamily =
+                                XmoFont.normal,
+                            fontSize = 20.sp,
+                            lineHeight = 29.sp,
                             textAlign =
                                 TextAlign.Center,
                             modifier =
@@ -2608,8 +2398,7 @@ private fun QueueOverlay(
                     LocalXmoAccent.current,
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 11.sp,
-                letterSpacing = 1.sp
+                fontSize = 11.sp
             )
 
             Spacer(
@@ -2626,7 +2415,6 @@ private fun QueueOverlay(
                         song.id
                     }
                 ) { _, song ->
-
                     Row(
                         Modifier
                             .fillMaxWidth()
@@ -2636,8 +2424,7 @@ private fun QueueOverlay(
                             )
                             .background(
                                 if (
-                                    song.id ==
-                                    currentId
+                                    song.id == currentId
                                 ) {
                                     LocalXmoAccent.current
                                         .copy(alpha = .13f)
@@ -2671,8 +2458,7 @@ private fun QueueOverlay(
                                 song.title,
                                 color =
                                     if (
-                                        song.id ==
-                                        currentId
+                                        song.id == currentId
                                     ) {
                                         LocalXmoAccent.current
                                     } else {
@@ -2726,13 +2512,8 @@ private fun SleepOverlay(
             30L to "30 minutes",
             45L to "45 minutes",
             60L to "1 hour"
-        ).forEach {
-                (minutes, text) ->
-
-            PopupRow(
-                text,
-                c
-            ) {
+        ).forEach { (minutes, label) ->
+            PopupRow(label, c) {
                 select(
                     minutes * 60_000L
                 )
@@ -2743,8 +2524,8 @@ private fun SleepOverlay(
             PopupRow(
                 "Cancel timer",
                 c,
-                true,
-                cancel
+                accent = true,
+                click = cancel
             )
         }
     }
@@ -2773,8 +2554,8 @@ private fun MoreOverlay(
                 "Add to Liked Songs"
             },
             c,
-            liked,
-            toggleLike
+            accent = liked,
+            click = toggleLike
         )
 
         PopupRow(
@@ -2861,9 +2642,6 @@ private fun PopupRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(
-                    RoundedCornerShape(11.dp)
-                )
                 .clickable(onClick = click)
                 .padding(
                     horizontal = 8.dp,
@@ -2883,9 +2661,7 @@ private fun shareSong(
     song: Song
 ) {
     val intent =
-        Intent(
-            Intent.ACTION_SEND
-        ).apply {
+        Intent(Intent.ACTION_SEND).apply {
             type =
                 song.metadata.mimeType
                     ?: "audio/*"
@@ -2915,7 +2691,7 @@ private fun shareSong(
 
 /*
  * =============================================================
- * LRC PARSER
+ * LRC
  * =============================================================
  */
 
@@ -2929,9 +2705,7 @@ private suspend fun readLyrics(
                 context.contentResolver
                     .openInputStream(uri)
                     ?.bufferedReader()
-                    ?.use {
-                        it.readText()
-                    }
+                    ?.use { it.readText() }
                     ?: return@runCatching null
 
             parseLyrics(source)
@@ -2941,7 +2715,7 @@ private suspend fun readLyrics(
 private fun parseLyrics(
     source: String
 ): SongLyrics {
-    val result =
+    val output =
         mutableListOf<LyricLine>()
 
     val timestamp =
@@ -2955,103 +2729,90 @@ private fun parseLyrics(
             RegexOption.IGNORE_CASE
         )
 
-    source.lineSequence()
-        .forEach { raw ->
+    source.lineSequence().forEach { raw ->
+        val stamps =
+            timestamp.findAll(raw).toList()
 
-            val stamps =
+        if (stamps.isNotEmpty()) {
+            val text =
                 timestamp
-                    .findAll(raw)
-                    .toList()
+                    .replace(raw, "")
+                    .trim()
 
-            if (stamps.isNotEmpty()) {
-                val text =
-                    timestamp
-                        .replace(raw, "")
-                        .trim()
+            if (text.isNotEmpty()) {
+                stamps.forEach { match ->
+                    val min =
+                        match.groupValues[1]
+                            .toLongOrNull() ?: 0L
 
-                if (text.isNotEmpty()) {
-                    stamps.forEach { match ->
-                        val minutes =
-                            match.groupValues[1]
-                                .toLongOrNull()
-                                ?: 0L
+                    val sec =
+                        match.groupValues[2]
+                            .toLongOrNull() ?: 0L
 
-                        val seconds =
-                            match.groupValues[2]
-                                .toLongOrNull()
-                                ?: 0L
+                    val fractionRaw =
+                        match.groupValues[3]
 
-                        val rawFraction =
-                            match.groupValues[3]
+                    val fraction =
+                        when (fractionRaw.length) {
+                            1 ->
+                                (
+                                    fractionRaw
+                                        .toLongOrNull() ?: 0L
+                                    ) * 100L
 
-                        val fraction =
-                            when (
-                                rawFraction.length
-                            ) {
-                                1 ->
-                                    (
-                                        rawFraction
-                                            .toLongOrNull()
-                                            ?: 0L
-                                        ) * 100L
+                            2 ->
+                                (
+                                    fractionRaw
+                                        .toLongOrNull() ?: 0L
+                                    ) * 10L
 
-                                2 ->
-                                    (
-                                        rawFraction
-                                            .toLongOrNull()
-                                            ?: 0L
-                                        ) * 10L
+                            3 ->
+                                fractionRaw
+                                    .toLongOrNull() ?: 0L
 
-                                3 ->
-                                    rawFraction
-                                        .toLongOrNull()
-                                        ?: 0L
+                            else -> 0L
+                        }
 
-                                else ->
-                                    0L
-                            }
-
-                        result +=
-                            LyricLine(
-                                timeMs =
-                                    minutes * 60_000L +
-                                        seconds * 1_000L +
-                                        fraction,
-                                text = text
-                            )
-                    }
-                }
-            } else {
-                val text =
-                    raw.trim()
-
-                if (
-                    text.isNotEmpty() &&
-                    !metadata.matches(text)
-                ) {
-                    result +=
+                    output +=
                         LyricLine(
-                            timeMs = null,
+                            timeMs =
+                                min * 60_000L +
+                                    sec * 1_000L +
+                                    fraction,
                             text = text
                         )
                 }
             }
+        } else {
+            val text = raw.trim()
+
+            if (
+                text.isNotEmpty() &&
+                !metadata.matches(text)
+            ) {
+                output +=
+                    LyricLine(
+                        timeMs = null,
+                        text = text
+                    )
+            }
         }
+    }
 
     val synced =
-        result.any {
+        output.any {
             it.timeMs != null
         }
 
     return SongLyrics(
         lines =
             if (synced) {
-                result.sortedBy {
+                output.sortedBy {
                     it.timeMs
                         ?: Long.MAX_VALUE
                 }
             } else {
-                result
+                output
             },
         synced = synced,
         source = "Local"
@@ -3062,11 +2823,9 @@ private fun currentLyricIndex(
     lyrics: SongLyrics,
     position: Long
 ): Int {
-    if (!lyrics.synced) {
-        return -1
-    }
+    if (!lyrics.synced) return -1
 
-    var result = -1
+    var active = -1
 
     lyrics.lines.forEachIndexed {
             index,
@@ -3077,16 +2836,16 @@ private fun currentLyricIndex(
                 ?: return@forEachIndexed
 
         if (time <= position) {
-            result = index
+            active = index
         }
     }
 
-    return result
+    return active
 }
 
 /*
  * =============================================================
- * CANVAS ICONS
+ * ICONS
  * =============================================================
  */
 
@@ -3096,37 +2855,34 @@ private fun PreviousIcon(
     modifier: Modifier
 ) {
     Canvas(modifier) {
-        val p =
-            Path().apply {
-                moveTo(
-                    size.width * .73f,
-                    size.height * .17f
-                )
-                lineTo(
-                    size.width * .32f,
-                    size.height * .50f
-                )
-                lineTo(
-                    size.width * .73f,
-                    size.height * .83f
-                )
-                close()
-            }
+        val p = Path().apply {
+            moveTo(
+                size.width * .73f,
+                size.height * .17f
+            )
+            lineTo(
+                size.width * .32f,
+                size.height * .50f
+            )
+            lineTo(
+                size.width * .73f,
+                size.height * .83f
+            )
+            close()
+        }
 
         drawPath(p, color)
 
         drawRoundRect(
-            color = color,
-            topLeft =
-                Offset(
-                    size.width * .20f,
-                    size.height * .20f
-                ),
-            size =
-                Size(
-                    size.width * .10f,
-                    size.height * .60f
-                )
+            color,
+            Offset(
+                size.width * .20f,
+                size.height * .20f
+            ),
+            Size(
+                size.width * .10f,
+                size.height * .60f
+            )
         )
     }
 }
@@ -3137,37 +2893,34 @@ private fun NextIcon(
     modifier: Modifier
 ) {
     Canvas(modifier) {
-        val p =
-            Path().apply {
-                moveTo(
-                    size.width * .27f,
-                    size.height * .17f
-                )
-                lineTo(
-                    size.width * .68f,
-                    size.height * .50f
-                )
-                lineTo(
-                    size.width * .27f,
-                    size.height * .83f
-                )
-                close()
-            }
+        val p = Path().apply {
+            moveTo(
+                size.width * .27f,
+                size.height * .17f
+            )
+            lineTo(
+                size.width * .68f,
+                size.height * .50f
+            )
+            lineTo(
+                size.width * .27f,
+                size.height * .83f
+            )
+            close()
+        }
 
         drawPath(p, color)
 
         drawRoundRect(
-            color = color,
-            topLeft =
-                Offset(
-                    size.width * .70f,
-                    size.height * .20f
-                ),
-            size =
-                Size(
-                    size.width * .10f,
-                    size.height * .60f
-                )
+            color,
+            Offset(
+                size.width * .70f,
+                size.height * .20f
+            ),
+            Size(
+                size.width * .10f,
+                size.height * .60f
+            )
         )
     }
 }
@@ -3178,14 +2931,9 @@ private fun PauseIcon(
     modifier: Modifier
 ) {
     Canvas(modifier) {
-        val w =
-            size.width * .18f
-
-        val h =
-            size.height * .62f
-
-        val top =
-            (size.height - h) / 2f
+        val w = size.width * .18f
+        val h = size.height * .62f
+        val top = (size.height - h) / 2f
 
         drawRoundRect(
             color,
@@ -3215,8 +2963,7 @@ private fun ShuffleIcon(
     modifier: Modifier
 ) {
     Canvas(modifier) {
-        val stroke =
-            size.width * .08f
+        val s = size.width * .08f
 
         drawLine(
             color,
@@ -3228,7 +2975,7 @@ private fun ShuffleIcon(
                 size.width * .38f,
                 size.height * .28f
             ),
-            stroke,
+            s,
             StrokeCap.Round
         )
 
@@ -3239,10 +2986,10 @@ private fun ShuffleIcon(
                 size.height * .28f
             ),
             Offset(
-                size.width * .78f,
+                size.width * .82f,
                 size.height * .72f
             ),
-            stroke,
+            s,
             StrokeCap.Round
         )
 
@@ -3256,7 +3003,7 @@ private fun ShuffleIcon(
                 size.width * .38f,
                 size.height * .72f
             ),
-            stroke,
+            s,
             StrokeCap.Round
         )
 
@@ -3267,10 +3014,10 @@ private fun ShuffleIcon(
                 size.height * .72f
             ),
             Offset(
-                size.width * .78f,
+                size.width * .82f,
                 size.height * .28f
             ),
-            stroke,
+            s,
             StrokeCap.Round
         )
     }
@@ -3290,34 +3037,33 @@ private fun RepeatIcon(
         Canvas(
             Modifier.fillMaxSize()
         ) {
-            val stroke =
-                size.width * .08f
+            val s = size.width * .08f
 
             drawLine(
                 color,
                 Offset(
-                    size.width * .20f,
+                    size.width * .18f,
                     size.height * .30f
                 ),
                 Offset(
-                    size.width * .80f,
+                    size.width * .82f,
                     size.height * .30f
                 ),
-                stroke,
+                s,
                 StrokeCap.Round
             )
 
             drawLine(
                 color,
                 Offset(
-                    size.width * .80f,
+                    size.width * .82f,
                     size.height * .70f
                 ),
                 Offset(
-                    size.width * .20f,
+                    size.width * .18f,
                     size.height * .70f
                 ),
-                stroke,
+                s,
                 StrokeCap.Round
             )
         }
@@ -3368,16 +3114,12 @@ private fun ClockIcon(
     modifier: Modifier
 ) {
     Canvas(modifier) {
-        val stroke =
-            size.width * .075f
+        val s = size.width * .075f
 
         drawCircle(
             color,
             size.minDimension * .37f,
-            style =
-                androidx.compose.ui.graphics.drawscope.Stroke(
-                    stroke
-                )
+            style = Stroke(s)
         )
 
         drawLine(
@@ -3385,10 +3127,9 @@ private fun ClockIcon(
             center,
             Offset(
                 center.x,
-                center.y -
-                    size.height * .19f
+                center.y - size.height * .19f
             ),
-            stroke,
+            s,
             StrokeCap.Round
         )
 
@@ -3396,11 +3137,10 @@ private fun ClockIcon(
             color,
             center,
             Offset(
-                center.x +
-                    size.width * .15f,
+                center.x + size.width * .15f,
                 center.y
             ),
-            stroke,
+            s,
             StrokeCap.Round
         )
     }
@@ -3412,57 +3152,45 @@ private fun ShareIcon(
     modifier: Modifier
 ) {
     Canvas(modifier) {
-        val stroke =
-            size.width * .07f
+        val s = size.width * .07f
 
-        val left =
+        val a =
             Offset(
                 size.width * .27f,
                 size.height * .50f
             )
 
-        val top =
+        val b =
             Offset(
                 size.width * .70f,
                 size.height * .25f
             )
 
-        val bottom =
+        val d =
             Offset(
                 size.width * .70f,
                 size.height * .75f
             )
 
-        drawLine(
-            color,
-            left,
-            top,
-            stroke
-        )
+        drawLine(color, a, b, s)
+        drawLine(color, a, d, s)
 
-        drawLine(
+        drawCircle(
             color,
-            left,
-            bottom,
-            stroke
+            size.width * .10f,
+            a
         )
 
         drawCircle(
             color,
             size.width * .10f,
-            left
+            b
         )
 
         drawCircle(
             color,
             size.width * .10f,
-            top
-        )
-
-        drawCircle(
-            color,
-            size.width * .10f,
-            bottom
+            d
         )
     }
 }
@@ -3473,150 +3201,60 @@ private fun FullscreenIcon(
     modifier: Modifier
 ) {
     Canvas(modifier) {
-        val stroke =
-            size.width * .075f
+        val s = size.width * .075f
 
-        drawLine(
-            color,
-            Offset(
-                size.width * .18f,
-                size.height * .38f
-            ),
-            Offset(
-                size.width * .18f,
-                size.height * .18f
-            ),
-            stroke
-        )
+        fun line(
+            x1: Float,
+            y1: Float,
+            x2: Float,
+            y2: Float
+        ) {
+            drawLine(
+                color,
+                Offset(
+                    size.width * x1,
+                    size.height * y1
+                ),
+                Offset(
+                    size.width * x2,
+                    size.height * y2
+                ),
+                s,
+                StrokeCap.Round
+            )
+        }
 
-        drawLine(
-            color,
-            Offset(
-                size.width * .18f,
-                size.height * .18f
-            ),
-            Offset(
-                size.width * .38f,
-                size.height * .18f
-            ),
-            stroke
-        )
-
-        drawLine(
-            color,
-            Offset(
-                size.width * .62f,
-                size.height * .18f
-            ),
-            Offset(
-                size.width * .82f,
-                size.height * .18f
-            ),
-            stroke
-        )
-
-        drawLine(
-            color,
-            Offset(
-                size.width * .82f,
-                size.height * .18f
-            ),
-            Offset(
-                size.width * .82f,
-                size.height * .38f
-            ),
-            stroke
-        )
-
-        drawLine(
-            color,
-            Offset(
-                size.width * .18f,
-                size.height * .62f
-            ),
-            Offset(
-                size.width * .18f,
-                size.height * .82f
-            ),
-            stroke
-        )
-
-        drawLine(
-            color,
-            Offset(
-                size.width * .18f,
-                size.height * .82f
-            ),
-            Offset(
-                size.width * .38f,
-                size.height * .82f
-            ),
-            stroke
-        )
-
-        drawLine(
-            color,
-            Offset(
-                size.width * .62f,
-                size.height * .82f
-            ),
-            Offset(
-                size.width * .82f,
-                size.height * .82f
-            ),
-            stroke
-        )
-
-        drawLine(
-            color,
-            Offset(
-                size.width * .82f,
-                size.height * .82f
-            ),
-            Offset(
-                size.width * .82f,
-                size.height * .62f
-            ),
-            stroke
-        )
+        line(.18f, .38f, .18f, .18f)
+        line(.18f, .18f, .38f, .18f)
+        line(.62f, .18f, .82f, .18f)
+        line(.82f, .18f, .82f, .38f)
+        line(.18f, .62f, .18f, .82f)
+        line(.18f, .82f, .38f, .82f)
+        line(.62f, .82f, .82f, .82f)
+        line(.82f, .82f, .82f, .62f)
     }
 }
-
-/*
- * =============================================================
- * FORMAT
- * =============================================================
- */
 
 private fun playerTime(
     milliseconds: Long
 ): String {
     val total =
-        milliseconds
-            .coerceAtLeast(0L) /
+        milliseconds.coerceAtLeast(0L) /
             1000L
 
-    val hours =
-        total / 3600L
-
-    val minutes =
-        (total % 3600L) / 60L
-
-    val seconds =
-        total % 60L
+    val hours = total / 3600L
+    val minutes = (total % 3600L) / 60L
+    val seconds = total % 60L
 
     return if (hours > 0L) {
         "$hours:${
-            minutes.toString()
-                .padStart(2, '0')
+            minutes.toString().padStart(2, '0')
         }:${
-            seconds.toString()
-                .padStart(2, '0')
+            seconds.toString().padStart(2, '0')
         }"
     } else {
         "$minutes:${
-            seconds.toString()
-                .padStart(2, '0')
+            seconds.toString().padStart(2, '0')
         }"
     }
 }
@@ -3625,36 +3263,25 @@ private fun formatBytes(
     bytes: Long
 ): String =
     when {
-        bytes >=
-            1024L * 1024L * 1024L ->
+        bytes >= 1024L * 1024L * 1024L ->
             String.format(
                 "%.2f GB",
                 bytes.toDouble() /
-                    (
-                        1024.0 *
-                            1024.0 *
-                            1024.0
-                        )
+                    (1024.0 * 1024.0 * 1024.0)
             )
 
-        bytes >=
-            1024L * 1024L ->
+        bytes >= 1024L * 1024L ->
             String.format(
                 "%.1f MB",
                 bytes.toDouble() /
-                    (
-                        1024.0 *
-                            1024.0
-                        )
+                    (1024.0 * 1024.0)
             )
 
         bytes >= 1024L ->
             String.format(
                 "%.1f KB",
-                bytes.toDouble() /
-                    1024.0
+                bytes.toDouble() / 1024.0
             )
 
-        else ->
-            "$bytes B"
+        else -> "$bytes B"
     }
