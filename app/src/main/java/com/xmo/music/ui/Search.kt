@@ -1,30 +1,61 @@
 package com.xmo.music.ui
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalTextStyle
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -40,7 +71,7 @@ import com.xmo.music.data.UserCategory
 import kotlinx.coroutines.launch
 
 private enum class SearchFilter(
-    val label: String
+    val title: String
 ) {
     All("All"),
     Songs("Songs"),
@@ -56,10 +87,10 @@ fun Search(
     theme: XmoTheme,
     setTheme: (XmoTheme) -> Unit,
     onPlaySong: (
-        Song,
-        String,
-        Boolean,
-        List<Song>
+        song: Song,
+        source: String,
+        isCategory: Boolean,
+        queue: List<Song>
     ) -> Unit
 ) {
     val context =
@@ -75,7 +106,7 @@ fun Search(
         mutableStateOf("")
     }
 
-    var filter by remember {
+    var selectedFilter by remember {
         mutableStateOf(
             SearchFilter.All
         )
@@ -91,6 +122,9 @@ fun Search(
         mutableStateOf(false)
     }
 
+    /*
+     * Metadata grouping only rebuilds when actual library changes.
+     */
     val artists =
         remember(songs) {
             Library.artists(
@@ -105,6 +139,9 @@ fun Search(
             )
         }
 
+    /*
+     * Load persisted history.
+     */
     LaunchedEffect(Unit) {
         history =
             Store.searchHistory(
@@ -112,91 +149,109 @@ fun Search(
             )
     }
 
-    val trimmed =
+    val cleanQuery =
         query.trim()
 
-    val matchedSongs =
+    /*
+     * Songs match against:
+     *
+     * title
+     * artist
+     * album
+     */
+    val songResults =
         remember(
             songs,
-            trimmed
+            cleanQuery
         ) {
-            if (trimmed.isBlank()) {
+            if (
+                cleanQuery.isBlank()
+            ) {
                 emptyList()
             } else {
-                songs.filter {
-                    it.title.contains(
-                        trimmed,
+                songs.filter { song ->
+
+                    song.title.contains(
+                        cleanQuery,
                         ignoreCase = true
                     ) ||
-                        it.artist.contains(
-                            trimmed,
+                        song.artist.contains(
+                            cleanQuery,
                             ignoreCase = true
                         ) ||
-                        it.album.contains(
-                            trimmed,
+                        song.album.contains(
+                            cleanQuery,
                             ignoreCase = true
                         )
                 }
             }
         }
 
-    val matchedArtists =
+    val artistResults =
         remember(
             artists,
-            trimmed
+            cleanQuery
         ) {
-            if (trimmed.isBlank()) {
+            if (
+                cleanQuery.isBlank()
+            ) {
                 emptyList()
             } else {
                 artists.filter {
                     it.name.contains(
-                        trimmed,
+                        cleanQuery,
                         ignoreCase = true
                     )
                 }
             }
         }
 
-    val matchedAlbums =
+    val albumResults =
         remember(
             albums,
-            trimmed
+            cleanQuery
         ) {
-            if (trimmed.isBlank()) {
+            if (
+                cleanQuery.isBlank()
+            ) {
                 emptyList()
             } else {
                 albums.filter {
                     it.name.contains(
-                        trimmed,
+                        cleanQuery,
                         ignoreCase = true
                     ) ||
                         it.artist.contains(
-                            trimmed,
+                            cleanQuery,
                             ignoreCase = true
                         )
                 }
             }
         }
 
-    val matchedCategories =
+    val categoryResults =
         remember(
             categories,
-            trimmed
+            cleanQuery
         ) {
-            if (trimmed.isBlank()) {
+            if (
+                cleanQuery.isBlank()
+            ) {
                 emptyList()
             } else {
                 categories.filter {
                     it.name.contains(
-                        trimmed,
+                        cleanQuery,
                         ignoreCase = true
                     )
                 }
             }
         }
 
-    fun rememberSearch() {
-        if (trimmed.isBlank()) {
+    fun saveCurrentSearch() {
+        if (
+            cleanQuery.isBlank()
+        ) {
             return
         }
 
@@ -204,7 +259,7 @@ fun Search(
             history =
                 Store.addSearch(
                     context,
-                    trimmed
+                    cleanQuery
                 )
         }
     }
@@ -212,15 +267,24 @@ fun Search(
     Box(
         Modifier
             .fillMaxSize()
-            .background(c.bg)
+            .background(
+                c.bg
+            )
     ) {
         LazyColumn(
-            Modifier.fillMaxSize(),
+            modifier =
+                Modifier.fillMaxSize(),
+
             contentPadding =
                 PaddingValues(
                     bottom = 190.dp
                 )
         ) {
+            /*
+             * =================================================
+             * STICKY SEARCH HEADER
+             * =================================================
+             */
             stickyHeader(
                 key = "search_header"
             ) {
@@ -237,17 +301,19 @@ fun Search(
                         )
                         .padding(
                             start = 14.dp,
-                            end = 14.dp,
                             top = 10.dp,
+                            end = 14.dp,
                             bottom = 10.dp
                         )
                 ) {
-                    SearchBar(
+                    SearchInput(
                         query = query,
                         c = c,
-                        setQuery = {
+
+                        onQueryChange = {
                             query = it
                         },
+
                         clear = {
                             query = ""
                         }
@@ -259,6 +325,9 @@ fun Search(
                         )
                     )
 
+                    /*
+                     * Filters + themes.
+                     */
                     LazyRow(
                         horizontalArrangement =
                             Arrangement.spacedBy(
@@ -266,38 +335,63 @@ fun Search(
                             )
                     ) {
                         items(
-                            SearchFilter.entries
-                        ) { item ->
-                            SearchChip(
-                                text = item.label,
+                            items =
+                                SearchFilter.entries,
+
+                            key = {
+                                "filter_${it.name}"
+                            }
+                        ) { filter ->
+
+                            SearchChoiceChip(
+                                text =
+                                    filter.title,
+
                                 active =
-                                    filter == item,
+                                    selectedFilter ==
+                                        filter,
+
                                 c = c
                             ) {
-                                filter = item
+                                selectedFilter =
+                                    filter
                             }
                         }
 
-                        item {
+                        item(
+                            key =
+                                "filter_divider"
+                        ) {
                             Box(
                                 Modifier
                                     .padding(
-                                        horizontal = 2.dp
+                                        horizontal =
+                                            2.dp,
+                                        vertical =
+                                            7.dp
                                     )
-                                    .width(1.dp)
-                                    .height(18.dp)
+                                    .width(
+                                        1.dp
+                                    )
+                                    .height(
+                                        18.dp
+                                    )
                                     .background(
                                         c.border
                                     )
                             )
                         }
 
-                        item {
-                            ThemeChip(
-                                "Dark",
-                                theme ==
-                                    XmoTheme.Dark,
-                                c
+                        item(
+                            key =
+                                "theme_dark"
+                        ) {
+                            SearchChoiceChip(
+                                text = "Dark",
+                                active =
+                                    theme ==
+                                        XmoTheme.Dark,
+                                c = c
                             ) {
                                 setTheme(
                                     XmoTheme.Dark
@@ -305,12 +399,16 @@ fun Search(
                             }
                         }
 
-                        item {
-                            ThemeChip(
-                                "Light",
-                                theme ==
-                                    XmoTheme.Light,
-                                c
+                        item(
+                            key =
+                                "theme_light"
+                        ) {
+                            SearchChoiceChip(
+                                text = "Light",
+                                active =
+                                    theme ==
+                                        XmoTheme.Light,
+                                c = c
                             ) {
                                 setTheme(
                                     XmoTheme.Light
@@ -318,12 +416,16 @@ fun Search(
                             }
                         }
 
-                        item {
-                            ThemeChip(
-                                "AMOLED",
-                                theme ==
-                                    XmoTheme.Amoled,
-                                c
+                        item(
+                            key =
+                                "theme_amoled"
+                        ) {
+                            SearchChoiceChip(
+                                text = "AMOLED",
+                                active =
+                                    theme ==
+                                        XmoTheme.Amoled,
+                                c = c
                             ) {
                                 setTheme(
                                     XmoTheme.Amoled
@@ -334,19 +436,31 @@ fun Search(
                 }
             }
 
-            if (trimmed.isBlank()) {
+            /*
+             * =================================================
+             * DEFAULT VIEW
+             * =================================================
+             */
+            if (
+                cleanQuery.isBlank()
+            ) {
                 item(
-                    key = "recent"
+                    key =
+                        "recent_searches"
                 ) {
-                    RecentSearches(
-                        history = history,
+                    RecentSearchSection(
+                        history =
+                            history,
+
                         c = c,
 
-                        use = {
+                        select = {
                             query = it
                         },
 
-                        remove = { value ->
+                        remove = {
+                                value ->
+
                             scope.launch {
                                 history =
                                     Store.removeSearch(
@@ -356,7 +470,7 @@ fun Search(
                             }
                         },
 
-                        clear = {
+                        clearAll = {
                             scope.launch {
                                 Store.clearSearchHistory(
                                     context
@@ -375,181 +489,334 @@ fun Search(
                 }
 
                 item(
-                    key = "browse"
+                    key =
+                        "browse_categories"
                 ) {
-                    BrowseCategories(
+                    BrowseCategorySection(
                         categories =
                             categories,
+
                         songs =
                             songs,
+
                         c = c,
-                        onPlaySong =
+
+                        play =
                             onPlaySong
                     )
                 }
             } else {
-                item {
+                /*
+                 * =================================================
+                 * SEARCH RESULTS
+                 * =================================================
+                 */
+                item(
+                    key =
+                        "results_title"
+                ) {
                     Text(
                         "Search Results",
-                        color = c.text,
+
+                        color =
+                            c.text,
+
                         fontFamily =
                             XmoFont.bold,
-                        fontSize = 16.sp,
+
+                        fontSize =
+                            16.sp,
+
                         modifier =
                             Modifier.padding(
                                 start = 16.dp,
                                 top = 18.dp,
+                                end = 16.dp,
                                 bottom = 8.dp
                             )
                     )
                 }
 
+                /*
+                 * SONGS
+                 */
                 if (
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.All ||
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.Songs
                 ) {
+                    if (
+                        selectedFilter ==
+                        SearchFilter.All &&
+                        songResults.isNotEmpty()
+                    ) {
+                        item(
+                            key =
+                                "songs_label"
+                        ) {
+                            ResultLabel(
+                                "Songs",
+                                c
+                            )
+                        }
+                    }
+
                     items(
                         items =
-                            matchedSongs,
+                            songResults,
+
                         key = {
-                            "result_song_${it.id}"
+                            "search_song_${it.id}"
                         }
                     ) { song ->
-                        SongResult(
-                            song = song,
+
+                        SearchSongRow(
+                            song =
+                                song,
+
                             c = c
                         ) {
-                            rememberSearch()
+                            saveCurrentSearch()
 
+                            /*
+                             * Current filtered song list becomes
+                             * actual playback queue.
+                             */
                             onPlaySong(
                                 song,
                                 "Search",
                                 false,
-                                matchedSongs
+                                songResults
                             )
                         }
                     }
                 }
 
+                /*
+                 * ARTISTS
+                 */
                 if (
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.All ||
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.Artists
                 ) {
-                    items(
-                        matchedArtists,
-                        key = {
-                            "artist_${it.name}"
-                        }
+                    if (
+                        selectedFilter ==
+                        SearchFilter.All &&
+                        artistResults.isNotEmpty()
                     ) {
-                        ArtistResult(
-                            artist = it,
+                        item(
+                            key =
+                                "artists_label"
+                        ) {
+                            ResultLabel(
+                                "Artists",
+                                c
+                            )
+                        }
+                    }
+
+                    items(
+                        items =
+                            artistResults,
+
+                        key = {
+                            "search_artist_${it.name}"
+                        }
+                    ) { artist ->
+
+                        SearchArtistRow(
+                            artist =
+                                artist,
+
                             c = c
                         )
                     }
                 }
 
+                /*
+                 * ALBUMS
+                 */
                 if (
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.All ||
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.Albums
                 ) {
-                    items(
-                        matchedAlbums,
-                        key = {
-                            "album_${it.id}"
-                        }
+                    if (
+                        selectedFilter ==
+                        SearchFilter.All &&
+                        albumResults.isNotEmpty()
                     ) {
-                        AlbumResult(
-                            album = it,
+                        item(
+                            key =
+                                "albums_label"
+                        ) {
+                            ResultLabel(
+                                "Albums",
+                                c
+                            )
+                        }
+                    }
+
+                    items(
+                        items =
+                            albumResults,
+
+                        key = {
+                            "search_album_${it.id}"
+                        }
+                    ) { album ->
+
+                        SearchAlbumRow(
+                            album =
+                                album,
+
                             c = c
                         )
                     }
                 }
 
+                /*
+                 * CUSTOM CATEGORIES
+                 */
                 if (
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.All ||
-                    filter ==
+                    selectedFilter ==
                         SearchFilter.Categories
                 ) {
-                    items(
-                        matchedCategories,
-                        key = {
-                            "category_${it.id}"
+                    if (
+                        selectedFilter ==
+                        SearchFilter.All &&
+                        categoryResults.isNotEmpty()
+                    ) {
+                        item(
+                            key =
+                                "categories_label"
+                        ) {
+                            ResultLabel(
+                                "Categories",
+                                c
+                            )
                         }
-                    ) { cat ->
-                        CategoryResult(
+                    }
+
+                    items(
+                        items =
+                            categoryResults,
+
+                        key = {
+                            "search_category_${it.id}"
+                        }
+                    ) { category ->
+
+                        SearchCategoryRow(
                             category =
-                                cat,
+                                category,
+
                             songs =
                                 songs,
+
                             c = c,
-                            onPlaySong =
-                                onPlaySong,
+
                             saveSearch = {
-                                rememberSearch()
-                            }
+                                saveCurrentSearch()
+                            },
+
+                            play =
+                                onPlaySong
                         )
                     }
                 }
 
+                /*
+                 * Empty-state depends on selected filter.
+                 */
                 val empty =
-                    when (filter) {
+                    when (
+                        selectedFilter
+                    ) {
                         SearchFilter.All ->
-                            matchedSongs.isEmpty() &&
-                                matchedArtists.isEmpty() &&
-                                matchedAlbums.isEmpty() &&
-                                matchedCategories.isEmpty()
+                            songResults.isEmpty() &&
+                                artistResults.isEmpty() &&
+                                albumResults.isEmpty() &&
+                                categoryResults.isEmpty()
 
                         SearchFilter.Songs ->
-                            matchedSongs.isEmpty()
+                            songResults.isEmpty()
 
                         SearchFilter.Artists ->
-                            matchedArtists.isEmpty()
+                            artistResults.isEmpty()
 
                         SearchFilter.Categories ->
-                            matchedCategories.isEmpty()
+                            categoryResults.isEmpty()
 
                         SearchFilter.Albums ->
-                            matchedAlbums.isEmpty()
+                            albumResults.isEmpty()
                     }
 
                 if (empty) {
-                    item {
+                    item(
+                        key =
+                            "no_results"
+                    ) {
                         Box(
                             Modifier
                                 .fillMaxWidth()
-                                .height(180.dp),
+                                .height(
+                                    180.dp
+                                ),
+
                             contentAlignment =
                                 Alignment.Center
                         ) {
                             Text(
                                 "No local results",
-                                color = c.sub,
+
+                                color =
+                                    c.sub,
+
                                 fontFamily =
                                     XmoFont.normal,
-                                fontSize = 13.sp
+
+                                fontSize =
+                                    13.sp
                             )
                         }
                     }
                 }
             }
 
+            /*
+             * =================================================
+             * FOOTER
+             * =================================================
+             */
             item(
-                key = "search_footer"
+                key =
+                    "search_footer"
             ) {
-                SearchFooter(c)
+                SearchFooter(
+                    c
+                )
             }
         }
 
-        if (historyExpanded) {
-            RecentHistoryOverlay(
-                history = history,
+        /*
+         * =====================================================
+         * FULLSCREEN RECENT HISTORY
+         * =====================================================
+         */
+        if (
+            historyExpanded
+        ) {
+            FullRecentSearches(
+                history =
+                    history,
+
                 c = c,
 
                 close = {
@@ -557,12 +824,16 @@ fun Search(
                         false
                 },
 
-                use = {
+                select = {
                     query = it
-                    historyExpanded = false
+
+                    historyExpanded =
+                        false
                 },
 
-                remove = { value ->
+                remove = {
+                        value ->
+
                     scope.launch {
                         history =
                             Store.removeSearch(
@@ -576,103 +847,189 @@ fun Search(
     }
 }
 
+/*
+ * =============================================================
+ * SEARCH INPUT
+ * =============================================================
+ */
+
 @Composable
-private fun SearchBar(
+private fun SearchInput(
     query: String,
     c: HomeColors,
-    setQuery: (String) -> Unit,
+    onQueryChange: (String) -> Unit,
     clear: () -> Unit
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(44.dp)
+            .height(
+                44.dp
+            )
             .clip(
                 RoundedCornerShape(
                     22.dp
                 )
             )
-            .background(c.button)
+            .background(
+                c.button
+            )
             .border(
-                1.dp,
-                if (query.isNotEmpty())
-                    XmoRed.copy(.55f)
-                else
-                    c.border,
-                RoundedCornerShape(
-                    22.dp
-                )
+                width =
+                    1.dp,
+
+                color =
+                    if (
+                        query.isNotEmpty()
+                    ) {
+                        XmoRed.copy(
+                            alpha =
+                                .60f
+                        )
+                    } else {
+                        c.border
+                    },
+
+                shape =
+                    RoundedCornerShape(
+                        22.dp
+                    )
             )
             .padding(
-                horizontal = 12.dp
+                horizontal =
+                    12.dp
             ),
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
         Icon(
-            Icons.Default.Search,
-            null,
-            tint = c.sub,
+            imageVector =
+                Icons.Default.Search,
+
+            contentDescription =
+                null,
+
+            tint =
+                c.sub,
+
             modifier =
-                Modifier.size(18.dp)
+                Modifier.size(
+                    18.dp
+                )
         )
 
         BasicTextField(
-            value = query,
-            onValueChange = setQuery,
-            singleLine = true,
+            value =
+                query,
+
+            onValueChange =
+                onQueryChange,
+
+            singleLine =
+                true,
+
             textStyle =
                 LocalTextStyle.current.copy(
-                    color = c.text,
+                    color =
+                        c.text,
+
                     fontFamily =
                         XmoFont.normal,
-                    fontSize = 14.sp
+
+                    fontSize =
+                        14.sp
                 ),
+
             modifier =
                 Modifier
-                    .weight(1f)
-                    .padding(
-                        horizontal = 10.dp
-                    ),
-            decorationBox = {
-                if (query.isEmpty()) {
-                    Text(
-                        "Search songs, artists, albums...",
-                        color = c.sub,
-                        fontFamily =
-                            XmoFont.thin,
-                        fontSize = 13.sp
+                    .weight(
+                        1f
                     )
-                }
+                    .padding(
+                        horizontal =
+                            10.dp
+                    ),
 
-                it()
+            decorationBox = {
+                    innerTextField ->
+
+                Box(
+                    contentAlignment =
+                        Alignment.CenterStart
+                ) {
+                    if (
+                        query.isEmpty()
+                    ) {
+                        Text(
+                            "Search songs, artists, albums...",
+
+                            color =
+                                c.sub,
+
+                            fontFamily =
+                                XmoFont.thin,
+
+                            fontSize =
+                                13.sp,
+
+                            maxLines =
+                                1,
+
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+                    }
+
+                    innerTextField()
+                }
             }
         )
 
-        if (query.isNotEmpty()) {
+        if (
+            query.isNotEmpty()
+        ) {
             IconButton(
-                onClick = clear,
+                onClick =
+                    clear,
+
                 modifier =
-                    Modifier.size(30.dp)
+                    Modifier.size(
+                        30.dp
+                    )
             ) {
                 Icon(
-                    Icons.Default.Close,
-                    null,
-                    tint = c.sub,
+                    imageVector =
+                        Icons.Default.Close,
+
+                    contentDescription =
+                        "Clear search",
+
+                    tint =
+                        c.sub,
+
                     modifier =
-                        Modifier.size(16.dp)
+                        Modifier.size(
+                            16.dp
+                        )
                 )
             }
         }
     }
 }
 
+/*
+ * =============================================================
+ * CHIPS
+ * =============================================================
+ */
+
 @Composable
-private fun SearchChip(
+private fun SearchChoiceChip(
     text: String,
     active: Boolean,
     c: HomeColors,
-    click: () -> Unit
+    onClick: () -> Unit
 ) {
     Box(
         Modifier
@@ -689,58 +1046,60 @@ private fun SearchChip(
             )
             .border(
                 .7.dp,
+
                 if (active)
                     XmoRed
                 else
                     c.border,
+
                 RoundedCornerShape(
                     16.dp
                 )
             )
             .clickable(
-                onClick = click
+                onClick =
+                    onClick
             )
             .padding(
-                horizontal = 14.dp,
-                vertical = 7.dp
+                horizontal =
+                    14.dp,
+
+                vertical =
+                    7.dp
             )
     ) {
         Text(
-            text,
+            text =
+                text,
+
             color =
                 if (active)
                     Color.White
                 else
                     c.sub,
+
             fontFamily =
                 XmoFont.medium,
-            fontSize = 11.sp
+
+            fontSize =
+                11.sp
         )
     }
 }
 
-@Composable
-private fun ThemeChip(
-    text: String,
-    active: Boolean,
-    c: HomeColors,
-    click: () -> Unit
-) {
-    SearchChip(
-        text,
-        active,
-        c,
-        click
-    )
-}
+/*
+ * =============================================================
+ * RECENT SEARCHES
+ * =============================================================
+ */
 
 @Composable
-private fun RecentSearches(
+private fun RecentSearchSection(
     history: List<String>,
     c: HomeColors,
-    use: (String) -> Unit,
+    select: (String) -> Unit,
     remove: (String) -> Unit,
-    clear: () -> Unit,
+    clearAll: () -> Unit,
     expand: () -> Unit
 ) {
     Column(
@@ -754,59 +1113,103 @@ private fun RecentSearches(
             Modifier
                 .fillMaxWidth()
                 .padding(
-                    horizontal = 4.dp,
+                    start = 4.dp,
+                    end = 4.dp,
                     bottom = 8.dp
                 ),
+
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
             Text(
                 "Recent Searches",
-                color = c.text,
+
+                color =
+                    c.text,
+
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 15.sp,
+
+                fontSize =
+                    15.sp,
+
                 modifier =
-                    Modifier.weight(1f)
+                    Modifier.weight(
+                        1f
+                    )
             )
 
-            if (history.isNotEmpty()) {
+            if (
+                history.isNotEmpty()
+            ) {
                 Text(
                     "Clear All",
-                    color = XmoRed,
+
+                    color =
+                        XmoRed,
+
                     fontFamily =
                         XmoFont.medium,
-                    fontSize = 11.sp,
+
+                    fontSize =
+                        11.sp,
+
                     modifier =
                         Modifier
                             .clickable(
-                                onClick = clear
+                                onClick =
+                                    clearAll
                             )
-                            .padding(6.dp)
+                            .padding(
+                                6.dp
+                            )
                 )
 
                 Spacer(
-                    Modifier.width(4.dp)
+                    Modifier.width(
+                        4.dp
+                    )
                 )
 
-                Text(
-                    "↗",
-                    color = c.text,
-                    fontSize = 15.sp,
-                    modifier =
-                        Modifier
-                            .size(28.dp)
-                            .clip(CircleShape)
-                            .background(c.button)
-                            .clickable(
-                                onClick = expand
-                            )
-                            .wrapContentSize()
-                )
+                Box(
+                    Modifier
+                        .size(
+                            28.dp
+                        )
+                        .clip(
+                            CircleShape
+                        )
+                        .background(
+                            c.button
+                        )
+                        .clickable(
+                            onClick =
+                                expand
+                        ),
+
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+                    /*
+                     * Lightweight fullscreen-ish symbol.
+                     */
+                    Text(
+                        "↗",
+
+                        color =
+                            c.text,
+
+                        fontFamily =
+                            XmoFont.medium,
+
+                        fontSize =
+                            14.sp
+                    )
+                }
             }
         }
 
-        Box(
+        Column(
             Modifier
                 .fillMaxWidth()
                 .clip(
@@ -814,7 +1217,9 @@ private fun RecentSearches(
                         16.dp
                     )
                 )
-                .background(c.surface)
+                .background(
+                    c.surface
+                )
                 .border(
                     .7.dp,
                     c.border,
@@ -822,52 +1227,68 @@ private fun RecentSearches(
                         16.dp
                     )
                 )
-                .padding(10.dp)
+                .padding(
+                    10.dp
+                ),
+
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    7.dp
+                )
         ) {
-            if (history.isEmpty()) {
+            if (
+                history.isEmpty()
+            ) {
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .height(68.dp),
+                        .height(
+                            68.dp
+                        ),
+
                     contentAlignment =
                         Alignment.Center
                 ) {
                     Text(
                         "No recent searches",
-                        color = c.sub,
+
+                        color =
+                            c.sub,
+
                         fontFamily =
                             XmoFont.thin,
-                        fontSize = 12.sp
+
+                        fontSize =
+                            12.sp
                     )
                 }
             } else {
-                Column(
-                    verticalArrangement =
-                        Arrangement.spacedBy(
-                            7.dp
-                        )
-                ) {
-                    history
-                        .take(5)
-                        .forEach {
-                            RecentRow(
+                history
+                    .take(5)
+                    .forEach {
+                        RecentSearchRow(
+                            value =
                                 it,
-                                c,
-                                use,
+
+                            c = c,
+
+                            select =
+                                select,
+
+                            remove =
                                 remove
-                            )
-                        }
-                }
+                        )
+                    }
             }
         }
     }
 }
 
 @Composable
-private fun RecentRow(
-    text: String,
+private fun RecentSearchRow(
+    value: String,
     c: HomeColors,
-    use: (String) -> Unit,
+    select: (String) -> Unit,
     remove: (String) -> Unit
 ) {
     Row(
@@ -878,128 +1299,214 @@ private fun RecentRow(
                     12.dp
                 )
             )
-            .background(c.button)
+            .background(
+                c.button
+            )
             .clickable {
-                use(text)
+                select(
+                    value
+                )
             }
             .padding(
-                horizontal = 12.dp,
-                vertical = 10.dp
+                horizontal =
+                    12.dp,
+
+                vertical =
+                    10.dp
             ),
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
         XmoIcon(
-            R.drawable.ic_xmo_history,
-            c.sub,
-            Modifier.size(14.dp)
+            icon =
+                R.drawable.ic_xmo_history,
+
+            tint =
+                c.sub,
+
+            modifier =
+                Modifier.size(
+                    14.dp
+                )
         )
 
         Text(
-            text,
-            color = c.text,
+            text =
+                value,
+
+            color =
+                c.text,
+
             fontFamily =
                 XmoFont.normal,
-            fontSize = 12.sp,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(
-                        start = 10.dp
-                    ),
-            maxLines = 1,
-            overflow =
-                TextOverflow.Ellipsis
-        )
 
-        Text(
-            "×",
-            color = c.sub,
-            fontSize = 18.sp,
+            fontSize =
+                12.sp,
+
+            maxLines =
+                1,
+
+            overflow =
+                TextOverflow.Ellipsis,
+
             modifier =
                 Modifier
-                    .clickable {
-                        remove(text)
-                    }
+                    .weight(
+                        1f
+                    )
                     .padding(
-                        horizontal = 6.dp
+                        start =
+                            10.dp
                     )
         )
+
+        /*
+         * Remove button.
+         */
+        Box(
+            Modifier
+                .size(
+                    28.dp
+                )
+                .clip(
+                    CircleShape
+                )
+                .clickable {
+                    remove(
+                        value
+                    )
+                },
+
+            contentAlignment =
+                Alignment.Center
+        ) {
+            Text(
+                "×",
+
+                color =
+                    c.sub,
+
+                fontFamily =
+                    XmoFont.medium,
+
+                fontSize =
+                    18.sp
+            )
+        }
     }
 }
 
+/*
+ * =============================================================
+ * BROWSE CUSTOM CATEGORIES
+ * =============================================================
+ */
+
 @Composable
-private fun BrowseCategories(
+private fun BrowseCategorySection(
     categories: List<UserCategory>,
     songs: List<Song>,
     c: HomeColors,
-    onPlaySong: (
+    play: (
         Song,
         String,
         Boolean,
         List<Song>
     ) -> Unit
 ) {
-    if (categories.isEmpty()) {
+    if (
+        categories.isEmpty()
+    ) {
         return
     }
 
     Column(
         Modifier.padding(
-            horizontal = 14.dp,
-            vertical = 24.dp
+            start = 14.dp,
+            top = 24.dp,
+            end = 14.dp,
+            bottom = 4.dp
         )
     ) {
         Text(
             "Browse Categories",
-            color = c.text,
+
+            color =
+                c.text,
+
             fontFamily =
                 XmoFont.bold,
-            fontSize = 15.sp,
+
+            fontSize =
+                15.sp,
+
             modifier =
                 Modifier.padding(
-                    bottom = 10.dp
+                    bottom =
+                        10.dp
                 )
         )
 
         categories
             .chunked(2)
-            .forEach { row ->
+            .forEach {
+                    rowCategories ->
 
                 Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            10.dp
-                        )
-                ) {
-                    repeat(2) { i ->
-                        Box(
-                            Modifier.weight(1f)
-                        ) {
-                            row.getOrNull(i)
-                                ?.let { cat ->
-                                    val queue =
-                                        remember(
-                                            cat,
-                                            songs
-                                        ) {
-                                            songs.filter {
-                                                it.id in
-                                                    cat.songIds
-                                            }
-                                        }
+                    Modifier
+                        .fillMaxWidth(),
 
-                                    BrowseCategoryCard(
-                                        cat,
+                    horizontalArrangement =
+                        Arrangement
+                            .spacedBy(
+                                10.dp
+                            )
+                ) {
+                    repeat(2) {
+                            column ->
+
+                        val category =
+                            rowCategories
+                                .getOrNull(
+                                    column
+                                )
+
+                        Box(
+                            Modifier.weight(
+                                1f
+                            )
+                        ) {
+                            if (
+                                category !=
+                                null
+                            ) {
+                                val queue =
+                                    remember(
+                                        category,
+                                        songs
+                                    ) {
+                                        songs.filter {
+                                            it.id in
+                                                category.songIds
+                                        }
+                                    }
+
+                                BrowseCategoryCard(
+                                    category =
+                                        category,
+
+                                    songs =
                                         queue,
-                                        c,
-                                        onPlaySong
-                                    )
-                                }
+
+                                    c = c,
+
+                                    play =
+                                        play
+                                )
+                            }
                         }
                     }
-
                 }
 
                 Spacer(
@@ -1031,7 +1538,9 @@ private fun BrowseCategoryCard(
                     14.dp
                 )
             )
-            .background(c.surface)
+            .background(
+                c.surface
+            )
             .border(
                 .7.dp,
                 c.border,
@@ -1050,43 +1559,74 @@ private fun BrowseCategoryCard(
                     songs
                 )
             }
-            .padding(9.dp)
+            .padding(
+                9.dp
+            )
     ) {
-        Box(
+        /*
+         * Real four-cover mosaic.
+         */
+        Column(
             Modifier
                 .fillMaxWidth()
-                .aspectRatio(1f)
+                .aspectRatio(
+                    1f
+                )
                 .clip(
                     RoundedCornerShape(
                         10.dp
                     )
                 )
-                .background(c.button)
+                .background(
+                    c.button
+                )
         ) {
-            Column {
-                repeat(2) { r ->
-                    Row(
-                        Modifier.weight(1f)
-                    ) {
-                        repeat(2) { col ->
-                            val song =
-                                songs.getOrNull(
-                                    r * 2 +
-                                        col
-                                )
+            repeat(2) {
+                    row ->
 
-                            AsyncImage(
-                                model =
-                                    song?.artwork,
-                                contentDescription =
-                                    null,
-                                modifier =
-                                    Modifier
-                                        .weight(1f)
-                                        .fillMaxHeight(),
-                                contentScale =
-                                    ContentScale.Crop
+                Row(
+                    Modifier
+                        .weight(
+                            1f
+                        )
+                ) {
+                    repeat(2) {
+                            column ->
+
+                        val song =
+                            songs.getOrNull(
+                                row * 2 +
+                                    column
                             )
+
+                        Box(
+                            Modifier
+                                .weight(
+                                    1f
+                                )
+                                .fillMaxHeight()
+                                .background(
+                                    c.button
+                                )
+                        ) {
+                            if (
+                                song != null
+                            ) {
+                                AsyncImage(
+                                    model =
+                                        song.artwork,
+
+                                    contentDescription =
+                                        null,
+
+                                    modifier =
+                                        Modifier
+                                            .fillMaxSize(),
+
+                                    contentScale =
+                                        ContentScale.Crop
+                                )
+                            }
                         }
                     }
                 }
@@ -1095,13 +1635,22 @@ private fun BrowseCategoryCard(
 
         Text(
             category.name,
-            color = c.text,
+
+            color =
+                c.text,
+
             fontFamily =
                 XmoFont.bold,
-            fontSize = 12.sp,
-            maxLines = 1,
+
+            fontSize =
+                12.sp,
+
+            maxLines =
+                1,
+
             overflow =
                 TextOverflow.Ellipsis,
+
             modifier =
                 Modifier.padding(
                     top = 7.dp
@@ -1110,25 +1659,75 @@ private fun BrowseCategoryCard(
 
         Text(
             "${songs.size} tracks",
-            color = c.sub,
+
+            color =
+                c.sub,
+
             fontFamily =
                 XmoFont.thin,
-            fontSize = 9.sp
+
+            fontSize =
+                9.sp
         )
     }
 }
 
+/*
+ * =============================================================
+ * RESULT LABEL
+ * =============================================================
+ */
+
 @Composable
-private fun SongResult(
+private fun ResultLabel(
+    text: String,
+    c: HomeColors
+) {
+    Text(
+        text = text,
+
+        color =
+            XmoRed,
+
+        fontFamily =
+            XmoFont.bold,
+
+        fontSize =
+            10.sp,
+
+        letterSpacing =
+            1.sp,
+
+        modifier =
+            Modifier.padding(
+                start = 16.dp,
+                top = 12.dp,
+                end = 16.dp,
+                bottom = 3.dp
+            )
+    )
+}
+
+/*
+ * =============================================================
+ * SONG RESULT
+ * =============================================================
+ */
+
+@Composable
+private fun SearchSongRow(
     song: Song,
     c: HomeColors,
-    click: () -> Unit
+    onClick: () -> Unit
 ) {
     Row(
         Modifier
             .padding(
-                horizontal = 14.dp,
-                vertical = 4.dp
+                horizontal =
+                    14.dp,
+
+                vertical =
+                    4.dp
             )
             .fillMaxWidth()
             .clip(
@@ -1136,7 +1735,9 @@ private fun SongResult(
                     12.dp
                 )
             )
-            .background(c.surface)
+            .background(
+                c.surface
+            )
             .border(
                 .6.dp,
                 c.border,
@@ -1145,109 +1746,175 @@ private fun SongResult(
                 )
             )
             .clickable(
-                onClick = click
+                onClick =
+                    onClick
             )
-            .padding(7.dp),
+            .padding(
+                7.dp
+            ),
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = song.artwork,
-            contentDescription = null,
+            model =
+                song.artwork,
+
+            contentDescription =
+                null,
+
             modifier =
                 Modifier
-                    .size(46.dp)
+                    .size(
+                        46.dp
+                    )
                     .clip(
                         RoundedCornerShape(
                             8.dp
                         )
                     )
-                    .background(c.button),
+                    .background(
+                        c.button
+                    ),
+
             contentScale =
                 ContentScale.Crop
         )
 
         Column(
             Modifier
-                .weight(1f)
+                .weight(
+                    1f
+                )
                 .padding(
-                    horizontal = 11.dp
+                    horizontal =
+                        11.dp
                 )
         ) {
             Text(
                 song.title,
-                color = c.text,
+
+                color =
+                    c.text,
+
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 12.sp,
-                maxLines = 1,
+
+                fontSize =
+                    12.sp,
+
+                maxLines =
+                    1,
+
                 overflow =
                     TextOverflow.Ellipsis
             )
 
             Text(
                 "${song.artist} • ${song.album}",
-                color = c.sub,
+
+                color =
+                    c.sub,
+
                 fontFamily =
                     XmoFont.thin,
-                fontSize = 9.sp,
-                maxLines = 1,
+
+                fontSize =
+                    9.sp,
+
+                maxLines =
+                    1,
+
                 overflow =
                     TextOverflow.Ellipsis
             )
         }
 
+        /*
+         * Lightweight play circle without extended icons.
+         */
         Box(
             Modifier
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(XmoRed),
+                .size(
+                    32.dp
+                )
+                .clip(
+                    CircleShape
+                )
+                .background(
+                    XmoRed
+                ),
+
             contentAlignment =
                 Alignment.Center
         ) {
             Text(
                 "▶",
-                color = Color.White,
-                fontSize = 11.sp
+
+                color =
+                    Color.White,
+
+                fontSize =
+                    10.sp
             )
         }
     }
 }
 
+/*
+ * =============================================================
+ * ARTIST RESULT
+ * =============================================================
+ */
+
 @Composable
-private fun ArtistResult(
+private fun SearchArtistRow(
     artist: Artist,
     c: HomeColors
 ) {
-    SimpleResult(
-        title = artist.name,
+    SearchMetadataRow(
+        title =
+            artist.name,
+
         subtitle =
             "${artist.songs.size} songs",
+
         artwork =
             artist.songs
                 .firstOrNull()
                 ?.artwork,
+
         c = c
     )
 }
 
+/*
+ * =============================================================
+ * ALBUM RESULT
+ * =============================================================
+ */
+
 @Composable
-private fun AlbumResult(
+private fun SearchAlbumRow(
     album: Album,
     c: HomeColors
 ) {
-    SimpleResult(
-        title = album.name,
+    SearchMetadataRow(
+        title =
+            album.name,
+
         subtitle =
             "${album.artist} • ${album.songs.size} songs",
+
         artwork =
             album.artwork,
+
         c = c
     )
 }
 
 @Composable
-private fun SimpleResult(
+private fun SearchMetadataRow(
     title: String,
     subtitle: String,
     artwork: Uri?,
@@ -1256,8 +1923,11 @@ private fun SimpleResult(
     Row(
         Modifier
             .padding(
-                horizontal = 14.dp,
-                vertical = 4.dp
+                horizontal =
+                    14.dp,
+
+                vertical =
+                    4.dp
             )
             .fillMaxWidth()
             .clip(
@@ -1265,7 +1935,9 @@ private fun SimpleResult(
                     12.dp
                 )
             )
-            .background(c.surface)
+            .background(
+                c.surface
+            )
             .border(
                 .6.dp,
                 c.border,
@@ -1273,65 +1945,107 @@ private fun SimpleResult(
                     12.dp
                 )
             )
-            .padding(7.dp),
+            .padding(
+                7.dp
+            ),
+
         verticalAlignment =
             Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = artwork,
-            contentDescription = null,
+            model =
+                artwork,
+
+            contentDescription =
+                null,
+
             modifier =
                 Modifier
-                    .size(46.dp)
+                    .size(
+                        46.dp
+                    )
                     .clip(
                         RoundedCornerShape(
                             8.dp
                         )
                     )
-                    .background(c.button),
+                    .background(
+                        c.button
+                    ),
+
             contentScale =
                 ContentScale.Crop
         )
 
         Column(
-            Modifier.padding(
-                start = 11.dp
-            )
+            Modifier
+                .weight(
+                    1f
+                )
+                .padding(
+                    horizontal =
+                        11.dp
+                )
         ) {
             Text(
                 title,
-                color = c.text,
+
+                color =
+                    c.text,
+
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 12.sp,
-                maxLines = 1,
+
+                fontSize =
+                    12.sp,
+
+                maxLines =
+                    1,
+
                 overflow =
                     TextOverflow.Ellipsis
             )
 
             Text(
                 subtitle,
-                color = c.sub,
+
+                color =
+                    c.sub,
+
                 fontFamily =
                     XmoFont.thin,
-                fontSize = 9.sp
+
+                fontSize =
+                    9.sp,
+
+                maxLines =
+                    1,
+
+                overflow =
+                    TextOverflow.Ellipsis
             )
         }
     }
 }
 
+/*
+ * =============================================================
+ * CATEGORY SEARCH RESULT
+ * =============================================================
+ */
+
 @Composable
-private fun CategoryResult(
+private fun SearchCategoryRow(
     category: UserCategory,
     songs: List<Song>,
     c: HomeColors,
-    onPlaySong: (
+    saveSearch: () -> Unit,
+    play: (
         Song,
         String,
         Boolean,
         List<Song>
-    ) -> Unit,
-    saveSearch: () -> Unit
+    ) -> Unit
 ) {
     val queue =
         remember(
@@ -1347,8 +2061,11 @@ private fun CategoryResult(
     Row(
         Modifier
             .padding(
-                horizontal = 14.dp,
-                vertical = 4.dp
+                horizontal =
+                    14.dp,
+
+                vertical =
+                    4.dp
             )
             .fillMaxWidth()
             .clip(
@@ -1356,73 +2073,126 @@ private fun CategoryResult(
                     12.dp
                 )
             )
-            .background(c.surface)
+            .background(
+                c.surface
+            )
+            .border(
+                .6.dp,
+                c.border,
+                RoundedCornerShape(
+                    12.dp
+                )
+            )
             .clickable(
                 enabled =
                     queue.isNotEmpty()
             ) {
                 saveSearch()
 
-                onPlaySong(
+                play(
                     queue.first(),
                     category.name,
                     true,
                     queue
                 )
             }
-            .padding(14.dp)
+            .padding(
+                horizontal =
+                    14.dp,
+
+                vertical =
+                    12.dp
+            ),
+
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
         Text(
             category.name,
-            color = c.text,
+
+            color =
+                c.text,
+
             fontFamily =
                 XmoFont.bold,
-            fontSize = 12.sp,
+
+            fontSize =
+                12.sp,
+
+            maxLines =
+                1,
+
+            overflow =
+                TextOverflow.Ellipsis,
+
             modifier =
-                Modifier.weight(1f)
+                Modifier.weight(
+                    1f
+                )
         )
 
         Text(
             "${queue.size} tracks",
-            color = c.sub,
+
+            color =
+                c.sub,
+
             fontFamily =
                 XmoFont.thin,
-            fontSize = 10.sp
+
+            fontSize =
+                10.sp
         )
     }
 }
 
+/*
+ * =============================================================
+ * FULL RECENT SEARCHES
+ * =============================================================
+ */
+
 @Composable
-private fun RecentHistoryOverlay(
+private fun FullRecentSearches(
     history: List<String>,
     c: HomeColors,
     close: () -> Unit,
-    use: (String) -> Unit,
+    select: (String) -> Unit,
     remove: (String) -> Unit
 ) {
     val scope =
         rememberCoroutineScope()
 
-    val y =
+    val offset =
         remember {
-            Animatable(0f)
+            Animatable(
+                0f
+            )
         }
 
     var height by remember {
-        mutableFloatStateOf(1f)
+        mutableFloatStateOf(
+            1f
+        )
     }
 
     Box(
         Modifier
             .fillMaxSize()
-            .background(c.bg)
+            .background(
+                c.bg
+            )
             .onSizeChanged {
                 height =
-                    it.height.toFloat()
+                    it.height
+                        .toFloat()
+                        .coerceAtLeast(
+                            1f
+                        )
             }
             .graphicsLayer {
                 translationY =
-                    y.value
+                    offset.value
             }
     ) {
         Column(
@@ -1435,8 +2205,12 @@ private fun RecentHistoryOverlay(
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
-                    .pointerInput(height) {
+                    .height(
+                        58.dp
+                    )
+                    .pointerInput(
+                        height
+                    ) {
                         detectVerticalDragGestures(
                             onVerticalDrag = {
                                     change,
@@ -1445,9 +2219,9 @@ private fun RecentHistoryOverlay(
                                 change.consume()
 
                                 scope.launch {
-                                    y.snapTo(
+                                    offset.snapTo(
                                         (
-                                            y.value +
+                                            offset.value +
                                                 amount
                                             )
                                             .coerceIn(
@@ -1461,91 +2235,186 @@ private fun RecentHistoryOverlay(
                             onDragEnd = {
                                 scope.launch {
                                     if (
-                                        y.value >
-                                        height * .15f
+                                        offset.value >
+                                        height *
+                                            .15f
                                     ) {
-                                        y.animateTo(
+                                        offset.animateTo(
                                             height,
-                                            tween(260)
+
+                                            tween(
+                                                durationMillis =
+                                                    260
+                                            )
                                         )
 
                                         close()
                                     } else {
-                                        y.animateTo(0f)
+                                        offset.animateTo(
+                                            0f,
+
+                                            spring(
+                                                dampingRatio =
+                                                    .85f,
+
+                                                stiffness =
+                                                    380f
+                                            )
+                                        )
                                     }
+                                }
+                            },
+
+                            onDragCancel = {
+                                scope.launch {
+                                    offset.animateTo(
+                                        0f
+                                    )
                                 }
                             }
                         )
                     },
+
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
                 Spacer(
-                    Modifier.width(48.dp)
+                    Modifier.width(
+                        48.dp
+                    )
                 )
 
                 Box(
                     Modifier
-                        .weight(1f),
+                        .weight(
+                            1f
+                        ),
+
                     contentAlignment =
                         Alignment.Center
                 ) {
                     Box(
                         Modifier
-                            .width(42.dp)
-                            .height(5.dp)
-                            .background(
-                                c.sub,
+                            .width(
+                                42.dp
+                            )
+                            .height(
+                                5.dp
+                            )
+                            .clip(
                                 RoundedCornerShape(
                                     3.dp
+                                )
+                            )
+                            .background(
+                                c.sub.copy(
+                                    alpha =
+                                        .65f
                                 )
                             )
                     )
                 }
 
                 IconButton(
-                    onClick = close,
+                    onClick =
+                        close,
+
                     modifier =
-                        Modifier.size(48.dp)
+                        Modifier.size(
+                            48.dp
+                        )
                 ) {
                     Icon(
-                        Icons.Default.Close,
-                        null,
-                        tint = c.text
+                        imageVector =
+                            Icons.Default.Close,
+
+                        contentDescription =
+                            "Close",
+
+                        tint =
+                            c.text
                     )
                 }
             }
 
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding =
-                    PaddingValues(
-                        start = 14.dp,
-                        end = 14.dp,
-                        bottom = 40.dp
-                    ),
-                verticalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    )
+            if (
+                history.isEmpty()
             ) {
-                items(
-                    history,
-                    key = {
-                        it
-                    }
+                Box(
+                    Modifier
+                        .fillMaxSize(),
+
+                    contentAlignment =
+                        Alignment.Center
                 ) {
-                    RecentRow(
-                        it,
-                        c,
-                        use,
-                        remove
+                    Text(
+                        "No recent searches",
+
+                        color =
+                            c.sub,
+
+                        fontFamily =
+                            XmoFont.normal,
+
+                        fontSize =
+                            13.sp
                     )
+                }
+            } else {
+                LazyColumn(
+                    Modifier
+                        .fillMaxSize(),
+
+                    contentPadding =
+                        PaddingValues(
+                            start =
+                                14.dp,
+
+                            end =
+                                14.dp,
+
+                            bottom =
+                                40.dp
+                        ),
+
+                    verticalArrangement =
+                        Arrangement
+                            .spacedBy(
+                                8.dp
+                            )
+                ) {
+                    items(
+                        items =
+                            history,
+
+                        key = {
+                            it
+                        }
+                    ) {
+                        RecentSearchRow(
+                            value =
+                                it,
+
+                            c = c,
+
+                            select =
+                                select,
+
+                            remove =
+                                remove
+                        )
+                    }
                 }
             }
         }
     }
 }
+
+/*
+ * =============================================================
+ * FOOTER
+ * =============================================================
+ */
 
 @Composable
 private fun SearchFooter(
@@ -1558,23 +2427,40 @@ private fun SearchFooter(
                 top = 70.dp,
                 bottom = 35.dp
             ),
+
         horizontalAlignment =
             Alignment.CenterHorizontally
     ) {
         Text(
             "XMO",
-            color = c.text,
+
+            color =
+                c.text,
+
             fontFamily =
                 XmoFont.logo,
-            fontSize = 19.sp
+
+            fontSize =
+                19.sp
+        )
+
+        Spacer(
+            Modifier.height(
+                3.dp
+            )
         )
 
         Text(
             "lxzrvi • copyright © 2026",
-            color = c.sub,
+
+            color =
+                c.sub,
+
             fontFamily =
                 XmoFont.thin,
-            fontSize = 9.sp
+
+            fontSize =
+                9.sp
         )
     }
 }
