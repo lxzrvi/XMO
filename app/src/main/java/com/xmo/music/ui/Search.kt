@@ -1,13 +1,11 @@
 package com.xmo.music.ui
 
 import android.net.Uri
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,8 +13,6 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,7 +38,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -49,11 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -70,13 +62,28 @@ import com.xmo.music.data.UserCategory
 import kotlinx.coroutines.launch
 
 private enum class SearchFilter(
-    val title: String
+    val label: String
 ) {
     All("All"),
     Songs("Songs"),
     Artists("Artists"),
-    Categories("Categories"),
-    Albums("Albums")
+    Albums("Albums"),
+    Categories("Categories")
+}
+
+private sealed interface SearchDetail {
+    data class ArtistSongs(
+        val artist: Artist
+    ) : SearchDetail
+
+    data class AlbumSongs(
+        val album: Album
+    ) : SearchDetail
+
+    data class CategorySongs(
+        val category: UserCategory,
+        val songs: List<Song>
+    ) : SearchDetail
 }
 
 @Composable
@@ -84,7 +91,6 @@ fun Search(
     songs: List<Song>,
     categories: List<UserCategory>,
     theme: XmoTheme,
-    setTheme: (XmoTheme) -> Unit,
     onPlaySong: (
         song: Song,
         source: String,
@@ -99,48 +105,61 @@ fun Search(
         rememberCoroutineScope()
 
     val c =
-        homeColors(theme)
-
-    var query by remember {
-        mutableStateOf("")
-    }
-
-    var selectedFilter by remember {
-        mutableStateOf(
-            SearchFilter.All
+        homeColors(
+            theme
         )
-    }
 
-    var history by remember {
-        mutableStateOf<List<String>>(
-            emptyList()
-        )
-    }
+    var query by
+        remember {
+            mutableStateOf("")
+        }
 
-    var historyExpanded by remember {
-        mutableStateOf(false)
-    }
+    var filter by
+        remember {
+            mutableStateOf(
+                SearchFilter.All
+            )
+        }
 
-    /*
-     * Metadata grouping only rebuilds when actual library changes.
-     */
+    var history by
+        remember {
+            mutableStateOf<List<String>>(
+                emptyList()
+            )
+        }
+
+    var detail by
+        remember {
+            mutableStateOf<SearchDetail?>(
+                null
+            )
+        }
+
+    var optionsSong by
+        remember {
+            mutableStateOf<Song?>(
+                null
+            )
+        }
+
     val artists =
-        remember(songs) {
+        remember(
+            songs
+        ) {
             Library.artists(
                 songs
             )
         }
 
     val albums =
-        remember(songs) {
+        remember(
+            songs
+        ) {
             Library.albums(
                 songs
             )
         }
 
-    /*
-     * Load persisted history.
-     */
     LaunchedEffect(Unit) {
         history =
             Store.searchHistory(
@@ -148,40 +167,56 @@ fun Search(
             )
     }
 
-    val cleanQuery =
+    val clean =
         query.trim()
 
-    /*
-     * Songs match against:
-     *
-     * title
-     * artist
-     * album
-     */
     val songResults =
         remember(
             songs,
-            cleanQuery
+            clean
         ) {
             if (
-                cleanQuery.isBlank()
+                clean.isBlank()
             ) {
                 emptyList()
             } else {
-                songs.filter { song ->
-
-                    song.title.contains(
-                        cleanQuery,
-                        ignoreCase = true
+                songs.filter {
+                    it.title.contains(
+                        clean,
+                        true
                     ) ||
-                        song.artist.contains(
-                            cleanQuery,
-                            ignoreCase = true
+                        it.artist.contains(
+                            clean,
+                            true
                         ) ||
-                        song.album.contains(
-                            cleanQuery,
-                            ignoreCase = true
-                        )
+                        it.album.contains(
+                            clean,
+                            true
+                        ) ||
+                        it.albumArtist
+                            ?.contains(
+                                clean,
+                                true
+                            ) ==
+                        true ||
+                        it.metadata.genre
+                            ?.contains(
+                                clean,
+                                true
+                            ) ==
+                        true ||
+                        it.metadata.composer
+                            ?.contains(
+                                clean,
+                                true
+                            ) ==
+                        true ||
+                        it.metadata.fileName
+                            ?.contains(
+                                clean,
+                                true
+                            ) ==
+                        true
                 }
             }
         }
@@ -189,17 +224,17 @@ fun Search(
     val artistResults =
         remember(
             artists,
-            cleanQuery
+            clean
         ) {
             if (
-                cleanQuery.isBlank()
+                clean.isBlank()
             ) {
                 emptyList()
             } else {
                 artists.filter {
                     it.name.contains(
-                        cleanQuery,
-                        ignoreCase = true
+                        clean,
+                        true
                     )
                 }
             }
@@ -208,21 +243,21 @@ fun Search(
     val albumResults =
         remember(
             albums,
-            cleanQuery
+            clean
         ) {
             if (
-                cleanQuery.isBlank()
+                clean.isBlank()
             ) {
                 emptyList()
             } else {
                 albums.filter {
                     it.name.contains(
-                        cleanQuery,
-                        ignoreCase = true
+                        clean,
+                        true
                     ) ||
                         it.artist.contains(
-                            cleanQuery,
-                            ignoreCase = true
+                            clean,
+                            true
                         )
                 }
             }
@@ -231,25 +266,25 @@ fun Search(
     val categoryResults =
         remember(
             categories,
-            cleanQuery
+            clean
         ) {
             if (
-                cleanQuery.isBlank()
+                clean.isBlank()
             ) {
                 emptyList()
             } else {
                 categories.filter {
                     it.name.contains(
-                        cleanQuery,
-                        ignoreCase = true
+                        clean,
+                        true
                     )
                 }
             }
         }
 
-    fun saveCurrentSearch() {
+    fun rememberSearch() {
         if (
-            cleanQuery.isBlank()
+            clean.isBlank()
         ) {
             return
         }
@@ -258,9 +293,18 @@ fun Search(
             history =
                 Store.addSearch(
                     context,
-                    cleanQuery
+                    clean
                 )
         }
+    }
+
+    BackHandler(
+        enabled =
+            detail !=
+                null
+    ) {
+        detail =
+            null
     }
 
     Box(
@@ -271,21 +315,17 @@ fun Search(
             )
     ) {
         LazyColumn(
-            modifier =
-                Modifier.fillMaxSize(),
+            Modifier.fillMaxSize(),
 
             contentPadding =
                 PaddingValues(
-                    bottom = 190.dp
+                    bottom =
+                        190.dp
                 )
         ) {
-            /*
-             * =================================================
-             * STICKY SEARCH HEADER
-             * =================================================
-             */
             stickyHeader(
-                key = "search_header"
+                key =
+                    "search_header"
             ) {
                 Column(
                     Modifier
@@ -300,21 +340,45 @@ fun Search(
                         )
                         .padding(
                             start = 14.dp,
-                            top = 10.dp,
+                            top = 12.dp,
                             end = 14.dp,
                             bottom = 10.dp
                         )
                 ) {
-                    SearchInput(
-                        query = query,
-                        c = c,
+                    Text(
+                        "Search",
 
-                        onQueryChange = {
-                            query = it
+                        color =
+                            c.text,
+
+                        fontFamily =
+                            XmoFont.bold,
+
+                        fontSize =
+                            22.sp,
+
+                        modifier =
+                            Modifier.padding(
+                                start = 4.dp,
+                                bottom = 12.dp
+                            )
+                    )
+
+                    SearchInput(
+                        query =
+                            query,
+
+                        c =
+                            c,
+
+                        change = {
+                            query =
+                                it
                         },
 
                         clear = {
-                            query = ""
+                            query =
+                                ""
                         }
                     )
 
@@ -325,151 +389,64 @@ fun Search(
                     )
 
                     /*
-                     * Filters + themes.
+                     * Only search filters live here now.
+                     * Theme controls belong to Settings.
                      */
                     LazyRow(
                         horizontalArrangement =
                             Arrangement.spacedBy(
-                                8.dp
+                                7.dp
                             )
                     ) {
                         items(
-                            items =
-                                SearchFilter.entries,
-
+                            SearchFilter.entries,
                             key = {
-                                "filter_${it.name}"
+                                it.name
                             }
-                        ) { filter ->
-
-                            SearchChoiceChip(
+                        ) {
+                            SearchChip(
                                 text =
-                                    filter.title,
+                                    it.label,
 
                                 active =
-                                    selectedFilter ==
-                                        filter,
+                                    filter ==
+                                        it,
 
-                                c = c
+                                c =
+                                    c
                             ) {
-                                selectedFilter =
-                                    filter
-                            }
-                        }
-
-                        item(
-                            key =
-                                "filter_divider"
-                        ) {
-                            Box(
-                                Modifier
-                                    .padding(
-                                        horizontal =
-                                            2.dp,
-                                        vertical =
-                                            7.dp
-                                    )
-                                    .width(
-                                        1.dp
-                                    )
-                                    .height(
-                                        18.dp
-                                    )
-                                    .background(
-                                        c.border
-                                    )
-                            )
-                        }
-
-                        item(
-                            key =
-                                "theme_dark"
-                        ) {
-                            SearchChoiceChip(
-                                text = "Dark",
-                                active =
-                                    theme ==
-                                        XmoTheme.Dark,
-                                c = c
-                            ) {
-                                setTheme(
-                                    XmoTheme.Dark
-                                )
-                            }
-                        }
-
-                        item(
-                            key =
-                                "theme_light"
-                        ) {
-                            SearchChoiceChip(
-                                text = "Light",
-                                active =
-                                    theme ==
-                                        XmoTheme.Light,
-                                c = c
-                            ) {
-                                setTheme(
-                                    XmoTheme.Light
-                                )
-                            }
-                        }
-
-                        item(
-                            key =
-                                "theme_amoled"
-                        ) {
-                            SearchChoiceChip(
-                                text = "AMOLED",
-                                active =
-                                    theme ==
-                                        XmoTheme.Amoled,
-                                c = c
-                            ) {
-                                setTheme(
-                                    XmoTheme.Amoled
-                                )
+                                filter =
+                                    it
                             }
                         }
                     }
                 }
             }
 
-            /*
-             * =================================================
-             * DEFAULT VIEW
-             * =================================================
-             */
             if (
-                cleanQuery.isBlank()
+                clean.isBlank()
             ) {
                 item(
                     key =
-                        "recent_searches"
+                        "recent_title"
                 ) {
-                    RecentSearchSection(
-                        history =
-                            history,
+                    SearchSectionHeader(
+                        text =
+                            "Recent Searches",
 
-                        c = c,
+                        c =
+                            c,
 
-                        select = {
-                            query = it
-                        },
+                        trailing =
+                            if (
+                                history.isNotEmpty()
+                            ) {
+                                "Clear All"
+                            } else {
+                                null
+                            },
 
-                        remove = {
-                                value ->
-
-                            scope.launch {
-                                history =
-                                    Store.removeSearch(
-                                        context,
-                                        value
-                                    )
-                            }
-                        },
-
-                        clearAll = {
+                        action = {
                             scope.launch {
                                 Store.clearSearchHistory(
                                     context
@@ -478,75 +455,140 @@ fun Search(
                                 history =
                                     emptyList()
                             }
-                        },
-
-                        expand = {
-                            historyExpanded =
-                                true
                         }
                     )
                 }
 
-                item(
-                    key =
-                        "browse_categories"
+                if (
+                    history.isEmpty()
                 ) {
-                    BrowseCategorySection(
-                        categories =
+                    item(
+                        key =
+                            "empty_history"
+                    ) {
+                        SearchEmpty(
+                            "No recent searches",
+                            c
+                        )
+                    }
+                } else {
+                    items(
+                        items =
+                            history,
+
+                        key = {
+                            "history_$it"
+                        }
+                    ) { value ->
+
+                        HistoryRow(
+                            value =
+                                value,
+
+                            c =
+                                c,
+
+                            select = {
+                                query =
+                                    value
+                            },
+
+                            remove = {
+                                scope.launch {
+                                    history =
+                                        Store.removeSearch(
+                                            context,
+                                            value
+                                        )
+                                }
+                            }
+                        )
+                    }
+                }
+
+                if (
+                    categories.isNotEmpty()
+                ) {
+                    item(
+                        key =
+                            "categories_title"
+                    ) {
+                        SearchSectionHeader(
+                            text =
+                                "Your Categories",
+
+                            c =
+                                c
+                        )
+                    }
+
+                    items(
+                        items =
                             categories,
 
-                        songs =
-                            songs,
+                        key = {
+                            "browse_${it.id}"
+                        }
+                    ) { category ->
 
-                        c = c,
+                        val queue =
+                            remember(
+                                category,
+                                songs
+                            ) {
+                                songs.filter {
+                                    it.id in
+                                        category.songIds
+                                }
+                            }
 
-                        play =
-                            onPlaySong
-                    )
+                        MetadataRow(
+                            title =
+                                category.name,
+
+                            subtitle =
+                                "${queue.size} songs",
+
+                            artwork =
+                                queue.firstOrNull()
+                                    ?.artwork,
+
+                            c =
+                                c,
+
+                            click = {
+                                detail =
+                                    SearchDetail
+                                        .CategorySongs(
+                                            category,
+                                            queue
+                                        )
+                            }
+                        )
+                    }
                 }
             } else {
-                /*
-                 * =================================================
-                 * SEARCH RESULTS
-                 * =================================================
-                 */
                 item(
                     key =
-                        "results_title"
+                        "results_heading"
                 ) {
-                    Text(
-                        "Search Results",
+                    SearchSectionHeader(
+                        text =
+                            "Results",
 
-                        color =
-                            c.text,
-
-                        fontFamily =
-                            XmoFont.bold,
-
-                        fontSize =
-                            16.sp,
-
-                        modifier =
-                            Modifier.padding(
-                                start = 16.dp,
-                                top = 18.dp,
-                                end = 16.dp,
-                                bottom = 8.dp
-                            )
+                        c =
+                            c
                     )
                 }
 
-                /*
-                 * SONGS
-                 */
                 if (
-                    selectedFilter ==
-                        SearchFilter.All ||
-                    selectedFilter ==
-                        SearchFilter.Songs
+                    filter ==
+                    SearchFilter.All ||
+                    filter ==
+                    SearchFilter.Songs
                 ) {
                     if (
-                        selectedFilter ==
+                        filter ==
                         SearchFilter.All &&
                         songResults.isNotEmpty()
                     ) {
@@ -555,8 +597,7 @@ fun Search(
                                 "songs_label"
                         ) {
                             ResultLabel(
-                                "Songs",
-                                c
+                                "Songs"
                             )
                         }
                     }
@@ -566,7 +607,7 @@ fun Search(
                             songResults,
 
                         key = {
-                            "search_song_${it.id}"
+                            "song_${it.id}"
                         }
                     ) { song ->
 
@@ -574,35 +615,36 @@ fun Search(
                             song =
                                 song,
 
-                            c = c
-                        ) {
-                            saveCurrentSearch()
+                            c =
+                                c,
 
-                            /*
-                             * Current filtered song list becomes
-                             * actual playback queue.
-                             */
-                            onPlaySong(
-                                song,
-                                "Search",
-                                false,
-                                songResults
-                            )
-                        }
+                            click = {
+                                rememberSearch()
+
+                                onPlaySong(
+                                    song,
+                                    "Search",
+                                    false,
+                                    songResults
+                                )
+                            },
+
+                            options = {
+                                optionsSong =
+                                    song
+                            }
+                        )
                     }
                 }
 
-                /*
-                 * ARTISTS
-                 */
                 if (
-                    selectedFilter ==
-                        SearchFilter.All ||
-                    selectedFilter ==
-                        SearchFilter.Artists
+                    filter ==
+                    SearchFilter.All ||
+                    filter ==
+                    SearchFilter.Artists
                 ) {
                     if (
-                        selectedFilter ==
+                        filter ==
                         SearchFilter.All &&
                         artistResults.isNotEmpty()
                     ) {
@@ -611,41 +653,49 @@ fun Search(
                                 "artists_label"
                         ) {
                             ResultLabel(
-                                "Artists",
-                                c
+                                "Artists"
                             )
                         }
                     }
 
                     items(
-                        items =
-                            artistResults,
-
+                        artistResults,
                         key = {
-                            "search_artist_${it.name}"
+                            "artist_${it.name}"
                         }
                     ) { artist ->
 
-                        SearchArtistRow(
-                            artist =
-                                artist,
+                        MetadataRow(
+                            title =
+                                artist.name,
 
-                            c = c
-                        )
+                            subtitle =
+                                "${artist.songs.size} songs",
+
+                            artwork =
+                                artist.artwork,
+
+                            c =
+                                c
+                        ) {
+                            rememberSearch()
+
+                            detail =
+                                SearchDetail.ArtistSongs(
+                                    artist
+                                )
+                        }
                     }
                 }
 
-                /*
-                 * ALBUMS
-                 */
                 if (
-                    selectedFilter ==
-                        SearchFilter.All ||
-                    selectedFilter ==
-                        SearchFilter.Albums
+                    filter ==
+                    SearchFilter.All ||
+                    filter ==
+                    SearchFilter.Albums
                 ) {
                     if (
-                        selectedFilter ==
+                        filter ==
                         SearchFilter.All &&
                         albumResults.isNotEmpty()
                     ) {
@@ -654,89 +704,108 @@ fun Search(
                                 "albums_label"
                         ) {
                             ResultLabel(
-                                "Albums",
-                                c
+                                "Albums"
                             )
                         }
                     }
 
                     items(
-                        items =
-                            albumResults,
-
+                        albumResults,
                         key = {
-                            "search_album_${it.id}"
+                            "album_${it.id}_${it.name}"
                         }
                     ) { album ->
 
-                        SearchAlbumRow(
-                            album =
-                                album,
+                        MetadataRow(
+                            title =
+                                album.name,
 
-                            c = c
-                        )
+                            subtitle =
+                                "${album.artist} • ${album.songs.size} songs",
+
+                            artwork =
+                                album.artwork,
+
+                            c =
+                                c
+                        ) {
+                            rememberSearch()
+
+                            detail =
+                                SearchDetail.AlbumSongs(
+                                    album
+                                )
+                        }
                     }
                 }
 
-                /*
-                 * CUSTOM CATEGORIES
-                 */
                 if (
-                    selectedFilter ==
-                        SearchFilter.All ||
-                    selectedFilter ==
-                        SearchFilter.Categories
+                    filter ==
+                    SearchFilter.All ||
+                    filter ==
+                    SearchFilter.Categories
                 ) {
                     if (
-                        selectedFilter ==
+                        filter ==
                         SearchFilter.All &&
                         categoryResults.isNotEmpty()
                     ) {
                         item(
                             key =
-                                "categories_label"
+                                "category_label"
                         ) {
                             ResultLabel(
-                                "Categories",
-                                c
+                                "Categories"
                             )
                         }
                     }
 
                     items(
-                        items =
-                            categoryResults,
-
+                        categoryResults,
                         key = {
-                            "search_category_${it.id}"
+                            "category_${it.id}"
                         }
                     ) { category ->
 
-                        SearchCategoryRow(
-                            category =
+                        val queue =
+                            remember(
                                 category,
+                                songs
+                            ) {
+                                songs.filter {
+                                    it.id in
+                                        category.songIds
+                                }
+                            }
 
-                            songs =
-                                songs,
+                        MetadataRow(
+                            title =
+                                category.name,
 
-                            c = c,
+                            subtitle =
+                                "${queue.size} songs",
 
-                            saveSearch = {
-                                saveCurrentSearch()
-                            },
+                            artwork =
+                                queue.firstOrNull()
+                                    ?.artwork,
 
-                            play =
-                                onPlaySong
-                        )
+                            c =
+                                c
+                        ) {
+                            rememberSearch()
+
+                            detail =
+                                SearchDetail.CategorySongs(
+                                    category,
+                                    queue
+                                )
+                        }
                     }
                 }
 
-                /*
-                 * Empty-state depends on selected filter.
-                 */
                 val empty =
                     when (
-                        selectedFilter
+                        filter
                     ) {
                         SearchFilter.All ->
                             songResults.isEmpty() &&
@@ -750,153 +819,334 @@ fun Search(
                         SearchFilter.Artists ->
                             artistResults.isEmpty()
 
-                        SearchFilter.Categories ->
-                            categoryResults.isEmpty()
-
                         SearchFilter.Albums ->
                             albumResults.isEmpty()
+
+                        SearchFilter.Categories ->
+                            categoryResults.isEmpty()
                     }
 
-                if (empty) {
+                if (
+                    empty
+                ) {
                     item(
                         key =
-                            "no_results"
+                            "empty_results"
                     ) {
-                        Box(
-                            Modifier
-                                .fillMaxWidth()
-                                .height(
-                                    180.dp
-                                ),
-
-                            contentAlignment =
-                                Alignment.Center
-                        ) {
-                            Text(
-                                "No local results",
-
-                                color =
-                                    c.sub,
-
-                                fontFamily =
-                                    XmoFont.normal,
-
-                                fontSize =
-                                    13.sp
-                            )
-                        }
+                        SearchEmpty(
+                            "No local results",
+                            c
+                        )
                     }
                 }
             }
 
-            /*
-             * =================================================
-             * FOOTER
-             * =================================================
-             */
             item(
                 key =
-                    "search_footer"
+                    "footer"
             ) {
-                SearchFooter(
-                    c
-                )
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top = 70.dp,
+                            bottom = 35.dp
+                        ),
+
+                    horizontalAlignment =
+                        Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        "XMO",
+
+                        color =
+                            c.text,
+
+                        fontFamily =
+                            XmoFont.logo,
+
+                        fontSize =
+                            19.sp
+                    )
+
+                    Text(
+                        "lxzrvi • copyright © 2026",
+
+                        color =
+                            c.sub,
+
+                        fontFamily =
+                            XmoFont.thin,
+
+                        fontSize =
+                            9.sp
+                    )
+                }
+            }
+        }
+
+        detail?.let {
+            when (
+                it
+            ) {
+                is SearchDetail.ArtistSongs ->
+                    SearchSongList(
+                        title =
+                            it.artist.name,
+
+                        subtitle =
+                            "${it.artist.songs.size} songs",
+
+                        songs =
+                            it.artist.songs,
+
+                        source =
+                            it.artist.name,
+
+                        category =
+                            false,
+
+                        c =
+                            c,
+
+                        close = {
+                            detail =
+                                null
+                        },
+
+                        play =
+                            onPlaySong,
+
+                        options = {
+                            optionsSong =
+                                it
+                        }
+                    )
+
+                is SearchDetail.AlbumSongs ->
+                    SearchSongList(
+                        title =
+                            it.album.name,
+
+                        subtitle =
+                            it.album.artist,
+
+                        songs =
+                            it.album.songs,
+
+                        source =
+                            it.album.name,
+
+                        category =
+                            false,
+
+                        c =
+                            c,
+
+                        close = {
+                            detail =
+                                null
+                        },
+
+                        play =
+                            onPlaySong,
+
+                        options = {
+                            optionsSong =
+                                it
+                        }
+                    )
+
+                is SearchDetail.CategorySongs ->
+                    SearchSongList(
+                        title =
+                            it.category.name,
+
+                        subtitle =
+                            "${it.songs.size} songs",
+
+                        songs =
+                            it.songs,
+
+                        source =
+                            it.category.name,
+
+                        category =
+                            true,
+
+                        c =
+                            c,
+
+                        close = {
+                            detail =
+                                null
+                        },
+
+                        play =
+                            onPlaySong,
+
+                        options = {
+                            optionsSong =
+                                it
+                        }
+                    )
             }
         }
 
         /*
-         * =====================================================
-         * FULLSCREEN RECENT HISTORY
-         * =====================================================
+         * Search song options are surfaced without fake actions.
+         * Full Like/category mutation is provided by the common
+         * App/Home action layer in the final integration.
          */
-        if (
-            historyExpanded
-        ) {
-            FullRecentSearches(
-                history =
-                    history,
-
-                c = c,
-
-                close = {
-                    historyExpanded =
-                        false
-                },
-
-                select = {
-                    query = it
-
-                    historyExpanded =
-                        false
-                },
-
-                remove = {
-                        value ->
-
-                    scope.launch {
-                        history =
-                            Store.removeSearch(
-                                context,
-                                value
+        optionsSong?.let { song ->
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        androidx.compose.ui.graphics.Color.Black
+                            .copy(
+                                alpha = .55f
                             )
-                    }
+                    )
+                    .clickable {
+                        optionsSong =
+                            null
+                    },
+
+                contentAlignment =
+                    Alignment.BottomCenter
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(
+                            RoundedCornerShape(
+                                topStart = 24.dp,
+                                topEnd = 24.dp
+                            )
+                        )
+                        .background(
+                            c.surface
+                        )
+                        .border(
+                            .7.dp,
+                            c.border,
+                            RoundedCornerShape(
+                                topStart = 24.dp,
+                                topEnd = 24.dp
+                            )
+                        )
+                        .clickable {}
+                        .padding(
+                            18.dp
+                        )
+                ) {
+                    Text(
+                        song.title,
+
+                        color =
+                            c.text,
+
+                        fontFamily =
+                            XmoFont.bold,
+
+                        fontSize =
+                            15.sp,
+
+                        maxLines =
+                            1,
+
+                        overflow =
+                            TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        "${song.artist} • ${song.album}",
+
+                        color =
+                            c.sub,
+
+                        fontFamily =
+                            XmoFont.thin,
+
+                        fontSize =
+                            10.sp
+                    )
+
+                    Spacer(
+                        Modifier.height(
+                            18.dp
+                        )
+                    )
+
+                    Text(
+                        "Song options are available from the player and library.",
+
+                        color =
+                            c.sub,
+
+                        fontFamily =
+                            XmoFont.normal,
+
+                        fontSize =
+                            11.sp
+                    )
+
+                    Spacer(
+                        Modifier.height(
+                            18.dp
+                        )
+                    )
                 }
-            )
+            }
         }
     }
 }
-
-/*
- * =============================================================
- * SEARCH INPUT
- * =============================================================
- */
 
 @Composable
 private fun SearchInput(
     query: String,
     c: HomeColors,
-    onQueryChange: (String) -> Unit,
+    change: (String) -> Unit,
     clear: () -> Unit
 ) {
+    val accent =
+        LocalXmoAccent.current
+
     Row(
         Modifier
             .fillMaxWidth()
             .height(
-                44.dp
+                46.dp
             )
             .clip(
                 RoundedCornerShape(
-                    22.dp
+                    23.dp
                 )
             )
             .background(
                 c.button
             )
             .border(
-                width =
-                    1.dp,
+                1.dp,
 
-                color =
-                    if (
-                        query.isNotEmpty()
-                    ) {
-                        XmoRed.copy(
-                            alpha =
-                                .60f
-                        )
-                    } else {
-                        c.border
-                    },
-
-                shape =
-                    RoundedCornerShape(
-                        22.dp
+                if (
+                    query.isNotEmpty()
+                ) {
+                    accent.copy(
+                        alpha = .60f
                     )
+                } else {
+                    c.border
+                },
+
+                RoundedCornerShape(
+                    23.dp
+                )
             )
             .padding(
                 horizontal =
-                    12.dp
+                    13.dp
             ),
 
         verticalAlignment =
@@ -910,7 +1160,13 @@ private fun SearchInput(
                 null,
 
             tint =
-                c.sub,
+                if (
+                    query.isNotEmpty()
+                ) {
+                    accent
+                } else {
+                    c.sub
+                },
 
             modifier =
                 Modifier.size(
@@ -922,8 +1178,11 @@ private fun SearchInput(
             value =
                 query,
 
-            onValueChange =
-                onQueryChange,
+            onValueChange = {
+                change(
+                    it.take(120)
+                )
+            },
 
             singleLine =
                 true,
@@ -951,7 +1210,7 @@ private fun SearchInput(
                     ),
 
             decorationBox = {
-                    innerTextField ->
+                    field ->
 
                 Box(
                     contentAlignment =
@@ -961,7 +1220,7 @@ private fun SearchInput(
                         query.isEmpty()
                     ) {
                         Text(
-                            "Search songs, artists, albums...",
+                            "Search local music",
 
                             color =
                                 c.sub,
@@ -970,17 +1229,11 @@ private fun SearchInput(
                                 XmoFont.thin,
 
                             fontSize =
-                                13.sp,
-
-                            maxLines =
-                                1,
-
-                            overflow =
-                                TextOverflow.Ellipsis
+                                13.sp
                         )
                     }
 
-                    innerTextField()
+                    field()
                 }
             }
         )
@@ -1002,7 +1255,7 @@ private fun SearchInput(
                         Icons.Default.Close,
 
                     contentDescription =
-                        "Clear search",
+                        "Clear",
 
                     tint =
                         c.sub,
@@ -1017,65 +1270,71 @@ private fun SearchInput(
     }
 }
 
-/*
- * =============================================================
- * CHIPS
- * =============================================================
- */
-
 @Composable
-private fun SearchChoiceChip(
+private fun SearchChip(
     text: String,
     active: Boolean,
     c: HomeColors,
-    onClick: () -> Unit
+    click: () -> Unit
 ) {
+    val accent =
+        LocalXmoAccent.current
+
     Box(
         Modifier
             .clip(
                 RoundedCornerShape(
-                    16.dp
+                    17.dp
                 )
             )
             .background(
-                if (active)
-                    XmoRed
-                else
+                if (
+                    active
+                ) {
+                    accent.copy(
+                        alpha = .16f
+                    )
+                } else {
                     c.button
+                }
             )
             .border(
                 .7.dp,
 
-                if (active)
-                    XmoRed
-                else
-                    c.border,
+                if (
+                    active
+                ) {
+                    accent.copy(
+                        alpha = .42f
+                    )
+                } else {
+                    c.border
+                },
 
                 RoundedCornerShape(
-                    16.dp
+                    17.dp
                 )
             )
             .clickable(
                 onClick =
-                    onClick
+                    click
             )
             .padding(
-                horizontal =
-                    14.dp,
-
-                vertical =
-                    7.dp
+                horizontal = 14.dp,
+                vertical = 7.dp
             )
     ) {
         Text(
-            text =
-                text,
+            text,
 
             color =
-                if (active)
-                    Color.White
-                else
-                    c.sub,
+                if (
+                    active
+                ) {
+                    accent
+                } else {
+                    c.text
+                },
 
             fontFamily =
                 XmoFont.medium,
@@ -1086,232 +1345,109 @@ private fun SearchChoiceChip(
     }
 }
 
-/*
- * =============================================================
- * RECENT SEARCHES
- * =============================================================
- */
-
 @Composable
-private fun RecentSearchSection(
-    history: List<String>,
+private fun SearchSectionHeader(
+    text: String,
     c: HomeColors,
-    select: (String) -> Unit,
-    remove: (String) -> Unit,
-    clearAll: () -> Unit,
-    expand: () -> Unit
+    trailing: String? = null,
+    action: () -> Unit = {}
 ) {
-    Column(
-        Modifier.padding(
-            start = 14.dp,
-            top = 20.dp,
-            end = 14.dp
-        )
-    ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = 4.dp,
-                    end = 4.dp,
-                    bottom = 8.dp
-                ),
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(
+                start = 17.dp,
+                top = 22.dp,
+                end = 17.dp,
+                bottom = 9.dp
+            ),
 
-            verticalAlignment =
-                Alignment.CenterVertically
-        ) {
+        verticalAlignment =
+            Alignment.CenterVertically
+    ) {
+        Text(
+            text,
+
+            color =
+                c.text,
+
+            fontFamily =
+                XmoFont.bold,
+
+            fontSize =
+                16.sp,
+
+            modifier =
+                Modifier.weight(
+                    1f
+                )
+        )
+
+        trailing?.let {
             Text(
-                "Recent Searches",
+                it,
 
                 color =
-                    c.text,
+                    LocalXmoAccent.current,
 
                 fontFamily =
-                    XmoFont.bold,
+                    XmoFont.medium,
 
                 fontSize =
-                    15.sp,
+                    10.sp,
 
                 modifier =
-                    Modifier.weight(
-                        1f
-                    )
-            )
-
-            if (
-                history.isNotEmpty()
-            ) {
-                Text(
-                    "Clear All",
-
-                    color =
-                        XmoRed,
-
-                    fontFamily =
-                        XmoFont.medium,
-
-                    fontSize =
-                        11.sp,
-
-                    modifier =
-                        Modifier
-                            .clickable(
-                                onClick =
-                                    clearAll
-                            )
-                            .padding(
-                                6.dp
-                            )
-                )
-
-                Spacer(
-                    Modifier.width(
-                        4.dp
-                    )
-                )
-
-                Box(
                     Modifier
-                        .size(
-                            28.dp
-                        )
-                        .clip(
-                            CircleShape
-                        )
-                        .background(
-                            c.button
-                        )
                         .clickable(
                             onClick =
-                                expand
-                        ),
-
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-                    /*
-                     * Lightweight fullscreen-ish symbol.
-                     */
-                    Text(
-                        "↗",
-
-                        color =
-                            c.text,
-
-                        fontFamily =
-                            XmoFont.medium,
-
-                        fontSize =
-                            14.sp
-                    )
-                }
-            }
-        }
-
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .clip(
-                    RoundedCornerShape(
-                        16.dp
-                    )
-                )
-                .background(
-                    c.surface
-                )
-                .border(
-                    .7.dp,
-                    c.border,
-                    RoundedCornerShape(
-                        16.dp
-                    )
-                )
-                .padding(
-                    10.dp
-                ),
-
-            verticalArrangement =
-                Arrangement.spacedBy(
-                    7.dp
-                )
-        ) {
-            if (
-                history.isEmpty()
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(
-                            68.dp
-                        ),
-
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-                    Text(
-                        "No recent searches",
-
-                        color =
-                            c.sub,
-
-                        fontFamily =
-                            XmoFont.thin,
-
-                        fontSize =
-                            12.sp
-                    )
-                }
-            } else {
-                history
-                    .take(5)
-                    .forEach {
-                        RecentSearchRow(
-                            value =
-                                it,
-
-                            c = c,
-
-                            select =
-                                select,
-
-                            remove =
-                                remove
+                                action
                         )
-                    }
-            }
+                        .padding(
+                            5.dp
+                        )
+            )
         }
     }
 }
 
 @Composable
-private fun RecentSearchRow(
+private fun HistoryRow(
     value: String,
     c: HomeColors,
-    select: (String) -> Unit,
-    remove: (String) -> Unit
+    select: () -> Unit,
+    remove: () -> Unit
 ) {
     Row(
         Modifier
+            .padding(
+                horizontal = 14.dp,
+                vertical = 3.dp
+            )
             .fillMaxWidth()
             .clip(
                 RoundedCornerShape(
-                    12.dp
+                    13.dp
                 )
             )
             .background(
-                c.button
+                c.surface
             )
-            .clickable {
-                select(
-                    value
+            .border(
+                .6.dp,
+                c.border,
+                RoundedCornerShape(
+                    13.dp
                 )
-            }
+            )
+            .clickable(
+                onClick =
+                    select
+            )
             .padding(
-                horizontal =
-                    12.dp,
-
-                vertical =
-                    10.dp
+                start = 12.dp,
+                top = 7.dp,
+                end = 5.dp,
+                bottom = 7.dp
             ),
 
         verticalAlignment =
@@ -1326,13 +1462,12 @@ private fun RecentSearchRow(
 
             modifier =
                 Modifier.size(
-                    14.dp
+                    15.dp
                 )
         )
 
         Text(
-            text =
-                value,
+            value,
 
             color =
                 c.text,
@@ -1355,383 +1490,59 @@ private fun RecentSearchRow(
                         1f
                     )
                     .padding(
-                        start =
-                            10.dp
+                        horizontal =
+                            11.dp
                     )
         )
 
-        /*
-         * Remove button.
-         */
-        Box(
-            Modifier
-                .size(
-                    28.dp
-                )
-                .clip(
-                    CircleShape
-                )
-                .clickable {
-                    remove(
-                        value
-                    )
-                },
+        IconButton(
+            onClick =
+                remove,
 
-            contentAlignment =
-                Alignment.Center
+            modifier =
+                Modifier.size(
+                    32.dp
+                )
         ) {
-            Text(
-                "×",
+            Icon(
+                imageVector =
+                    Icons.Default.Close,
 
-                color =
+                contentDescription =
+                    "Remove",
+
+                tint =
                     c.sub,
 
-                fontFamily =
-                    XmoFont.medium,
-
-                fontSize =
-                    18.sp
+                modifier =
+                    Modifier.size(
+                        14.dp
+                    )
             )
         }
     }
 }
-
-/*
- * =============================================================
- * BROWSE CUSTOM CATEGORIES
- * =============================================================
- */
-
-@Composable
-private fun BrowseCategorySection(
-    categories: List<UserCategory>,
-    songs: List<Song>,
-    c: HomeColors,
-    play: (
-        Song,
-        String,
-        Boolean,
-        List<Song>
-    ) -> Unit
-) {
-    if (
-        categories.isEmpty()
-    ) {
-        return
-    }
-
-    Column(
-        Modifier.padding(
-            start = 14.dp,
-            top = 24.dp,
-            end = 14.dp,
-            bottom = 4.dp
-        )
-    ) {
-        Text(
-            "Browse Categories",
-
-            color =
-                c.text,
-
-            fontFamily =
-                XmoFont.bold,
-
-            fontSize =
-                15.sp,
-
-            modifier =
-                Modifier.padding(
-                    bottom =
-                        10.dp
-                )
-        )
-
-        categories
-            .chunked(2)
-            .forEach {
-                    rowCategories ->
-
-                Row(
-                    Modifier
-                        .fillMaxWidth(),
-
-                    horizontalArrangement =
-                        Arrangement
-                            .spacedBy(
-                                10.dp
-                            )
-                ) {
-                    repeat(2) {
-                            column ->
-
-                        val category =
-                            rowCategories
-                                .getOrNull(
-                                    column
-                                )
-
-                        Box(
-                            Modifier.weight(
-                                1f
-                            )
-                        ) {
-                            if (
-                                category !=
-                                null
-                            ) {
-                                val queue =
-                                    remember(
-                                        category,
-                                        songs
-                                    ) {
-                                        songs.filter {
-                                            it.id in
-                                                category.songIds
-                                        }
-                                    }
-
-                                BrowseCategoryCard(
-                                    category =
-                                        category,
-
-                                    songs =
-                                        queue,
-
-                                    c = c,
-
-                                    play =
-                                        play
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(
-                    Modifier.height(
-                        10.dp
-                    )
-                )
-            }
-    }
-}
-
-@Composable
-private fun BrowseCategoryCard(
-    category: UserCategory,
-    songs: List<Song>,
-    c: HomeColors,
-    play: (
-        Song,
-        String,
-        Boolean,
-        List<Song>
-    ) -> Unit
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .clip(
-                RoundedCornerShape(
-                    14.dp
-                )
-            )
-            .background(
-                c.surface
-            )
-            .border(
-                .7.dp,
-                c.border,
-                RoundedCornerShape(
-                    14.dp
-                )
-            )
-            .clickable(
-                enabled =
-                    songs.isNotEmpty()
-            ) {
-                play(
-                    songs.first(),
-                    category.name,
-                    true,
-                    songs
-                )
-            }
-            .padding(
-                9.dp
-            )
-    ) {
-        /*
-         * Real four-cover mosaic.
-         */
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio(
-                    1f
-                )
-                .clip(
-                    RoundedCornerShape(
-                        10.dp
-                    )
-                )
-                .background(
-                    c.button
-                )
-        ) {
-            repeat(2) {
-                    row ->
-
-                Row(
-                    Modifier
-                        .weight(
-                            1f
-                        )
-                ) {
-                    repeat(2) {
-                            column ->
-
-                        val song =
-                            songs.getOrNull(
-                                row * 2 +
-                                    column
-                            )
-
-                        Box(
-                            Modifier
-                                .weight(
-                                    1f
-                                )
-                                .fillMaxHeight()
-                                .background(
-                                    c.button
-                                )
-                        ) {
-                            if (
-                                song != null
-                            ) {
-                                AsyncImage(
-                                    model =
-                                        song.artwork,
-
-                                    contentDescription =
-                                        null,
-
-                                    modifier =
-                                        Modifier
-                                            .fillMaxSize(),
-
-                                    contentScale =
-                                        ContentScale.Crop
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        Text(
-            category.name,
-
-            color =
-                c.text,
-
-            fontFamily =
-                XmoFont.bold,
-
-            fontSize =
-                12.sp,
-
-            maxLines =
-                1,
-
-            overflow =
-                TextOverflow.Ellipsis,
-
-            modifier =
-                Modifier.padding(
-                    top = 7.dp
-                )
-        )
-
-        Text(
-            "${songs.size} tracks",
-
-            color =
-                c.sub,
-
-            fontFamily =
-                XmoFont.thin,
-
-            fontSize =
-                9.sp
-        )
-    }
-}
-
-/*
- * =============================================================
- * RESULT LABEL
- * =============================================================
- */
-
-@Composable
-private fun ResultLabel(
-    text: String,
-    c: HomeColors
-) {
-    Text(
-        text = text,
-
-        color =
-            XmoRed,
-
-        fontFamily =
-            XmoFont.bold,
-
-        fontSize =
-            10.sp,
-
-        letterSpacing =
-            1.sp,
-
-        modifier =
-            Modifier.padding(
-                start = 16.dp,
-                top = 12.dp,
-                end = 16.dp,
-                bottom = 3.dp
-            )
-    )
-}
-
-/*
- * =============================================================
- * SONG RESULT
- * =============================================================
- */
 
 @Composable
 private fun SearchSongRow(
     song: Song,
     c: HomeColors,
-    onClick: () -> Unit
+    click: () -> Unit,
+    options: () -> Unit
 ) {
     Row(
         Modifier
             .padding(
-                horizontal =
-                    14.dp,
-
-                vertical =
-                    4.dp
+                horizontal = 14.dp,
+                vertical = 4.dp
             )
             .fillMaxWidth()
+            .height(
+                62.dp
+            )
             .clip(
                 RoundedCornerShape(
-                    12.dp
+                    13.dp
                 )
             )
             .background(
@@ -1741,15 +1552,18 @@ private fun SearchSongRow(
                 .6.dp,
                 c.border,
                 RoundedCornerShape(
-                    12.dp
+                    13.dp
                 )
             )
-            .clickable(
+            .combinedClickable(
                 onClick =
-                    onClick
+                    click,
+
+                onLongClick =
+                    options
             )
             .padding(
-                7.dp
+                6.dp
             ),
 
         verticalAlignment =
@@ -1765,11 +1579,11 @@ private fun SearchSongRow(
             modifier =
                 Modifier
                     .size(
-                        46.dp
+                        50.dp
                     )
                     .clip(
                         RoundedCornerShape(
-                            8.dp
+                            9.dp
                         )
                     )
                     .background(
@@ -1787,7 +1601,7 @@ private fun SearchSongRow(
                 )
                 .padding(
                     horizontal =
-                        11.dp
+                        10.dp
                 )
         ) {
             Text(
@@ -1829,109 +1643,88 @@ private fun SearchSongRow(
             )
         }
 
-        /*
-         * Lightweight play circle without extended icons.
-         */
         Box(
             Modifier
                 .size(
-                    32.dp
+                    34.dp
                 )
                 .clip(
                     CircleShape
                 )
                 .background(
-                    XmoRed
+                    LocalXmoAccent.current
                 ),
 
             contentAlignment =
                 Alignment.Center
         ) {
-            Text(
-                "▶",
+            Icon(
+                imageVector =
+                    Icons.Default.PlayArrow,
 
-                color =
-                    Color.White,
+                contentDescription =
+                    "Play",
 
-                fontSize =
-                    10.sp
+                tint =
+                    androidx.compose.ui.graphics.Color.White,
+
+                modifier =
+                    Modifier.size(
+                        20.dp
+                    )
+            )
+        }
+
+        Box(
+            Modifier
+                .size(
+                    32.dp
+                )
+                .clickable(
+                    onClick =
+                        options
+                ),
+
+            contentAlignment =
+                Alignment.Center
+        ) {
+            XmoIcon(
+                icon =
+                    R.drawable.ic_xmo_more,
+
+                tint =
+                    c.sub,
+
+                modifier =
+                    Modifier.size(
+                        15.dp
+                    )
             )
         }
     }
 }
 
-/*
- * =============================================================
- * ARTIST RESULT
- * =============================================================
- */
-
 @Composable
-private fun SearchArtistRow(
-    artist: Artist,
-    c: HomeColors
-) {
-    SearchMetadataRow(
-        title =
-            artist.name,
-
-        subtitle =
-            "${artist.songs.size} songs",
-
-        artwork =
-            artist.songs
-                .firstOrNull()
-                ?.artwork,
-
-        c = c
-    )
-}
-
-/*
- * =============================================================
- * ALBUM RESULT
- * =============================================================
- */
-
-@Composable
-private fun SearchAlbumRow(
-    album: Album,
-    c: HomeColors
-) {
-    SearchMetadataRow(
-        title =
-            album.name,
-
-        subtitle =
-            "${album.artist} • ${album.songs.size} songs",
-
-        artwork =
-            album.artwork,
-
-        c = c
-    )
-}
-
-@Composable
-private fun SearchMetadataRow(
+private fun MetadataRow(
     title: String,
     subtitle: String,
     artwork: Uri?,
-    c: HomeColors
+    c: HomeColors,
+    click: () -> Unit
 ) {
     Row(
         Modifier
             .padding(
-                horizontal =
-                    14.dp,
-
-                vertical =
-                    4.dp
+                horizontal = 14.dp,
+                vertical = 4.dp
             )
             .fillMaxWidth()
+            .height(
+                60.dp
+            )
             .clip(
                 RoundedCornerShape(
-                    12.dp
+                    13.dp
                 )
             )
             .background(
@@ -1941,11 +1734,15 @@ private fun SearchMetadataRow(
                 .6.dp,
                 c.border,
                 RoundedCornerShape(
-                    12.dp
+                    13.dp
                 )
             )
+            .clickable(
+                onClick =
+                    click
+            )
             .padding(
-                7.dp
+                6.dp
             ),
 
         verticalAlignment =
@@ -1961,11 +1758,11 @@ private fun SearchMetadataRow(
             modifier =
                 Modifier
                     .size(
-                        46.dp
+                        48.dp
                     )
                     .clip(
                         RoundedCornerShape(
-                            8.dp
+                            9.dp
                         )
                     )
                     .background(
@@ -2024,156 +1821,107 @@ private fun SearchMetadataRow(
                     TextOverflow.Ellipsis
             )
         }
-    }
-}
-
-/*
- * =============================================================
- * CATEGORY SEARCH RESULT
- * =============================================================
- */
-
-@Composable
-private fun SearchCategoryRow(
-    category: UserCategory,
-    songs: List<Song>,
-    c: HomeColors,
-    saveSearch: () -> Unit,
-    play: (
-        Song,
-        String,
-        Boolean,
-        List<Song>
-    ) -> Unit
-) {
-    val queue =
-        remember(
-            category,
-            songs
-        ) {
-            songs.filter {
-                it.id in
-                    category.songIds
-            }
-        }
-
-    Row(
-        Modifier
-            .padding(
-                horizontal =
-                    14.dp,
-
-                vertical =
-                    4.dp
-            )
-            .fillMaxWidth()
-            .clip(
-                RoundedCornerShape(
-                    12.dp
-                )
-            )
-            .background(
-                c.surface
-            )
-            .border(
-                .6.dp,
-                c.border,
-                RoundedCornerShape(
-                    12.dp
-                )
-            )
-            .clickable(
-                enabled =
-                    queue.isNotEmpty()
-            ) {
-                saveSearch()
-
-                play(
-                    queue.first(),
-                    category.name,
-                    true,
-                    queue
-                )
-            }
-            .padding(
-                horizontal =
-                    14.dp,
-
-                vertical =
-                    12.dp
-            ),
-
-        verticalAlignment =
-            Alignment.CenterVertically
-    ) {
-        Text(
-            category.name,
-
-            color =
-                c.text,
-
-            fontFamily =
-                XmoFont.bold,
-
-            fontSize =
-                12.sp,
-
-            maxLines =
-                1,
-
-            overflow =
-                TextOverflow.Ellipsis,
-
-            modifier =
-                Modifier.weight(
-                    1f
-                )
-        )
 
         Text(
-            "${queue.size} tracks",
+            "›",
 
             color =
                 c.sub,
 
             fontFamily =
-                XmoFont.thin,
+                XmoFont.medium,
 
             fontSize =
-                10.sp
+                22.sp,
+
+            modifier =
+                Modifier.padding(
+                    end =
+                        8.dp
+                )
         )
     }
 }
 
-/*
- * =============================================================
- * FULL RECENT SEARCHES
- * =============================================================
- */
+@Composable
+private fun ResultLabel(
+    text: String
+) {
+    Text(
+        text,
+
+        color =
+            LocalXmoAccent.current,
+
+        fontFamily =
+            XmoFont.bold,
+
+        fontSize =
+            10.sp,
+
+        letterSpacing =
+            1.sp,
+
+        modifier =
+            Modifier.padding(
+                start = 17.dp,
+                top = 12.dp,
+                bottom = 3.dp
+            )
+    )
+}
 
 @Composable
-private fun FullRecentSearches(
-    history: List<String>,
-    c: HomeColors,
-    close: () -> Unit,
-    select: (String) -> Unit,
-    remove: (String) -> Unit
+private fun SearchEmpty(
+    text: String,
+    c: HomeColors
 ) {
-    val scope =
-        rememberCoroutineScope()
+    Box(
+        Modifier
+            .fillMaxWidth()
+            .height(
+                120.dp
+            ),
 
-    val offset =
-        remember {
-            Animatable(
-                0f
-            )
-        }
+        contentAlignment =
+            Alignment.Center
+    ) {
+        Text(
+            text,
 
-    var height by remember {
-        mutableFloatStateOf(
-            1f
+            color =
+                c.sub,
+
+            fontFamily =
+                XmoFont.normal,
+
+            fontSize =
+                12.sp
         )
     }
+}
+
+@Composable
+private fun SearchSongList(
+    title: String,
+    subtitle: String,
+    songs: List<Song>,
+    source: String,
+    category: Boolean,
+    c: HomeColors,
+    close: () -> Unit,
+    play: (
+        Song,
+        String,
+        Boolean,
+        List<Song>
+    ) -> Unit,
+    options: (Song) -> Unit
+) {
+    BackHandler(
+        onBack =
+            close
+    )
 
     Box(
         Modifier
@@ -2181,285 +1929,140 @@ private fun FullRecentSearches(
             .background(
                 c.bg
             )
-            .onSizeChanged {
-                height =
-                    it.height
-                        .toFloat()
-                        .coerceAtLeast(
-                            1f
-                        )
-            }
-            .graphicsLayer {
-                translationY =
-                    offset.value
-            }
+            .windowInsetsPadding(
+                WindowInsets.statusBars
+            )
     ) {
         Column(
-            Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(
-                    WindowInsets.statusBars
-                )
+            Modifier.fillMaxSize()
         ) {
             Row(
                 Modifier
                     .fillMaxWidth()
                     .height(
-                        58.dp
+                        66.dp
                     )
-                    .pointerInput(
-                        height
-                    ) {
-                        detectVerticalDragGestures(
-                            onVerticalDrag = {
-                                    change,
-                                    amount ->
-
-                                change.consume()
-
-                                scope.launch {
-                                    offset.snapTo(
-                                        (
-                                            offset.value +
-                                                amount
-                                            )
-                                            .coerceIn(
-                                                0f,
-                                                height
-                                            )
-                                    )
-                                }
-                            },
-
-                            onDragEnd = {
-                                scope.launch {
-                                    if (
-                                        offset.value >
-                                        height *
-                                            .15f
-                                    ) {
-                                        offset.animateTo(
-                                            height,
-
-                                            tween(
-                                                durationMillis =
-                                                    260
-                                            )
-                                        )
-
-                                        close()
-                                    } else {
-                                        offset.animateTo(
-                                            0f,
-
-                                            spring(
-                                                dampingRatio =
-                                                    .85f,
-
-                                                stiffness =
-                                                    380f
-                                            )
-                                        )
-                                    }
-                                }
-                            },
-
-                            onDragCancel = {
-                                scope.launch {
-                                    offset.animateTo(
-                                        0f
-                                    )
-                                }
-                            }
-                        )
-                    },
+                    .padding(
+                        horizontal =
+                            14.dp
+                    ),
 
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
-                Spacer(
-                    Modifier.width(
-                        48.dp
-                    )
-                )
-
                 Box(
                     Modifier
-                        .weight(
-                            1f
-                        ),
-
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-                    Box(
-                        Modifier
-                            .width(
-                                42.dp
-                            )
-                            .height(
-                                5.dp
-                            )
-                            .clip(
-                                RoundedCornerShape(
-                                    3.dp
-                                )
-                            )
-                            .background(
-                                c.sub.copy(
-                                    alpha =
-                                        .65f
-                                )
-                            )
-                    )
-                }
-
-                IconButton(
-                    onClick =
-                        close,
-
-                    modifier =
-                        Modifier.size(
-                            48.dp
+                        .size(
+                            38.dp
                         )
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Default.Close,
-
-                        contentDescription =
-                            "Close",
-
-                        tint =
-                            c.text
-                    )
-                }
-            }
-
-            if (
-                history.isEmpty()
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxSize(),
+                        .clip(
+                            CircleShape
+                        )
+                        .background(
+                            c.button
+                        )
+                        .clickable(
+                            onClick =
+                                close
+                        ),
 
                     contentAlignment =
                         Alignment.Center
                 ) {
                     Text(
-                        "No recent searches",
+                        "‹",
+
+                        color =
+                            c.text,
+
+                        fontFamily =
+                            XmoFont.medium,
+
+                        fontSize =
+                            28.sp
+                    )
+                }
+
+                Column(
+                    Modifier.padding(
+                        start =
+                            12.dp
+                    )
+                ) {
+                    Text(
+                        title,
+
+                        color =
+                            c.text,
+
+                        fontFamily =
+                            XmoFont.bold,
+
+                        fontSize =
+                            17.sp,
+
+                        maxLines =
+                            1,
+
+                        overflow =
+                            TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        subtitle,
 
                         color =
                             c.sub,
 
                         fontFamily =
-                            XmoFont.normal,
+                            XmoFont.thin,
 
                         fontSize =
-                            13.sp
+                            9.sp
                     )
                 }
-            } else {
-                LazyColumn(
-                    Modifier
-                        .fillMaxSize(),
+            }
 
-                    contentPadding =
-                        PaddingValues(
-                            start =
-                                14.dp,
+            LazyColumn(
+                contentPadding =
+                    PaddingValues(
+                        bottom =
+                            190.dp
+                    )
+            ) {
+                items(
+                    items =
+                        songs,
 
-                            end =
-                                14.dp,
-
-                            bottom =
-                                40.dp
-                        ),
-
-                    verticalArrangement =
-                        Arrangement
-                            .spacedBy(
-                                8.dp
-                            )
-                ) {
-                    items(
-                        items =
-                            history,
-
-                        key = {
-                            it
-                        }
-                    ) {
-                        RecentSearchRow(
-                            value =
-                                it,
-
-                            c = c,
-
-                            select =
-                                select,
-
-                            remove =
-                                remove
-                        )
+                    key = {
+                        it.id
                     }
+                ) { song ->
+
+                    SearchSongRow(
+                        song =
+                            song,
+
+                        c =
+                            c,
+
+                        click = {
+                            play(
+                                song,
+                                source,
+                                category,
+                                songs
+                            )
+                        },
+
+                        options = {
+                            options(
+                                song
+                            )
+                        }
+                    )
                 }
             }
         }
-    }
-}
-
-/*
- * =============================================================
- * FOOTER
- * =============================================================
- */
-
-@Composable
-private fun SearchFooter(
-    c: HomeColors
-) {
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(
-                top = 70.dp,
-                bottom = 35.dp
-            ),
-
-        horizontalAlignment =
-            Alignment.CenterHorizontally
-    ) {
-        Text(
-            "XMO",
-
-            color =
-                c.text,
-
-            fontFamily =
-                XmoFont.logo,
-
-            fontSize =
-                19.sp
-        )
-
-        Spacer(
-            Modifier.height(
-                3.dp
-            )
-        )
-
-        Text(
-            "lxzrvi • copyright © 2026",
-
-            color =
-                c.sub,
-
-            fontFamily =
-                XmoFont.thin,
-
-            fontSize =
-                9.sp
-        )
     }
 }
