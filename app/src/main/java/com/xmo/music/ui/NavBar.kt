@@ -37,33 +37,27 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
-import com.xmo.music.ui.blur.glassBorder
-import com.xmo.music.ui.blur.glassHighlight
-import com.xmo.music.ui.blur.liveBlur
-import dev.chrisbanes.haze.HazeState
+import top.yukonga.miuix.kmp.blur.LayerBackdrop
+import top.yukonga.miuix.kmp.blur.blur
+import top.yukonga.miuix.kmp.blur.drawBackdrop
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
+private val BarWidth = 246.dp
+private val BarHeight = 64.dp
+private val RestWidth = 78.dp
+private val RestHeight = 56.dp
+
 /*
- * Approved XMO geometry.
+ * backdrop comes from App's rememberLayerBackdrop().
+ *
+ * Approved XMO geometry is preserved.
  */
-private val BarW =
-    246.dp
-
-private val BarH =
-    64.dp
-
-private val RestW =
-    78.dp
-
-private val RestH =
-    56.dp
-
 @Composable
 fun BoxScope.NavBar(
     selected: Int,
     theme: XmoTheme,
-    hazeState: HazeState,
+    backdrop: LayerBackdrop,
     select: (Int) -> Unit
 ) {
     val accent =
@@ -90,9 +84,6 @@ fun BoxScope.NavBar(
             )
         }
 
-    /*
-     * Keep selector synchronized with programmatic/back navigation.
-     */
     LaunchedEffect(
         selected
     ) {
@@ -109,22 +100,19 @@ fun BoxScope.NavBar(
         }
     }
 
-    val animatedPosition by
+    val x by
         animateFloatAsState(
             targetValue =
                 position,
 
             animationSpec =
                 spring(
-                    dampingRatio =
-                        .72f,
-
-                    stiffness =
-                        900f
+                    dampingRatio = .72f,
+                    stiffness = 900f
                 ),
 
             label =
-                "xmoNavPosition"
+                "navPosition"
         )
 
     val grow by
@@ -140,15 +128,12 @@ fun BoxScope.NavBar(
 
             animationSpec =
                 spring(
-                    dampingRatio =
-                        .78f,
-
-                    stiffness =
-                        850f
+                    dampingRatio = .76f,
+                    stiffness = 820f
                 ),
 
             label =
-                "xmoNavGrow"
+                "navGrow"
         )
 
     val parentScale by
@@ -157,57 +142,31 @@ fun BoxScope.NavBar(
                 if (
                     pressed
                 ) {
-                    1.04f
+                    1.035f
                 } else {
                     1f
                 },
 
             animationSpec =
                 spring(
-                    dampingRatio =
-                        .78f,
-
-                    stiffness =
-                        900f
+                    dampingRatio = .78f,
+                    stiffness = 900f
                 ),
 
             label =
-                "xmoNavParent"
+                "navScale"
         )
 
-    val parentBorder =
-        accent.copy(
-            alpha =
-                when (
-                    theme
-                ) {
-                    XmoTheme.Light ->
-                        .28f
-
-                    XmoTheme.Dark ->
-                        .30f
-
-                    XmoTheme.Amoled ->
-                        .35f
-                }
-        )
-
-    val inactive =
-        when (
-            theme
-        ) {
-            XmoTheme.Light ->
-                Color.Black.copy(
-                    alpha = .50f
-                )
-
-            else ->
-                Color.White.copy(
-                    alpha = .44f
-                )
+    val icons =
+        remember {
+            listOf(
+                Icons.Rounded.Home,
+                Icons.Rounded.Search,
+                Icons.Rounded.Settings
+            )
         }
 
-    val active =
+    val textColor =
         when (
             theme
         ) {
@@ -220,22 +179,64 @@ fun BoxScope.NavBar(
                 Color.White
         }
 
-    val icons =
-        remember {
-            listOf(
-                Icons.Rounded.Home,
-                Icons.Rounded.Search,
-                Icons.Rounded.Settings
-            )
+    val inactive =
+        when (
+            theme
+        ) {
+            XmoTheme.Light ->
+                Color.Black.copy(
+                    alpha = .46f
+                )
+
+            else ->
+                Color.White.copy(
+                    alpha = .42f
+                )
+        }
+
+    val liquidTint =
+        when (
+            theme
+        ) {
+            XmoTheme.Light ->
+                Color.White.copy(
+                    alpha = .20f
+                )
+
+            XmoTheme.Dark ->
+                Color(
+                    0xFF111318
+                ).copy(
+                    alpha = .23f
+                )
+
+            XmoTheme.Amoled ->
+                Color.Black.copy(
+                    alpha = .31f
+                )
+        }
+
+    val edge =
+        when (
+            theme
+        ) {
+            XmoTheme.Light ->
+                Color.White.copy(
+                    alpha = .72f
+                )
+
+            else ->
+                Color.White.copy(
+                    alpha = .17f
+                )
         }
 
     /*
      * =========================================================
-     * 96dp INVISIBLE OVERFLOW / GESTURE HOST
-     *
-     * Approved positioning is intentionally retained.
+     * APPROVED 96dp OVERFLOW / GESTURE HOST
      * =========================================================
      */
+
     Box(
         Modifier
             .align(
@@ -243,11 +244,10 @@ fun BoxScope.NavBar(
             )
             .navigationBarsPadding()
             .padding(
-                bottom =
-                    35.dp
+                bottom = 35.dp
             )
             .size(
-                BarW,
+                BarWidth,
                 96.dp
             )
             .pointerInput(
@@ -297,53 +297,47 @@ fun BoxScope.NavBar(
                                 .first()
 
                         if (
-                            !change.pressed
+                            change.pressed
                         ) {
-                            continue
-                        }
+                            val current =
+                                change.position.x
 
-                        val currentX =
-                            change.position.x
+                            val dx =
+                                current -
+                                    lastX
 
-                        val dx =
-                            currentX -
-                                lastX
+                            total =
+                                current -
+                                    startX
 
-                        total =
-                            currentX -
-                                startX
+                            lastX =
+                                current
 
-                        lastX =
-                            currentX
+                            velocity =
+                                velocity *
+                                    .64f +
+                                    dx *
+                                    .36f
 
-                        /*
-                         * Low-pass velocity gives selector stretch
-                         * without noisy single-frame spikes.
-                         */
-                        velocity =
-                            velocity *
-                                .64f +
-                                dx *
-                                .36f
+                            position =
+                                (
+                                    start +
+                                        total /
+                                        slot
+                                    )
+                                    .coerceIn(
+                                        0f,
+                                        2f
+                                    )
 
-                        position =
-                            (
-                                start +
-                                    total /
-                                    slot
-                                )
-                                .coerceIn(
-                                    0f,
-                                    2f
-                                )
-
-                        if (
-                            abs(
-                                total
-                            ) >
-                            2f
-                        ) {
-                            change.consume()
+                            if (
+                                abs(
+                                    total
+                                ) >
+                                2f
+                            ) {
+                                change.consume()
+                            }
                         }
                     }
 
@@ -372,10 +366,6 @@ fun BoxScope.NavBar(
                                 )
                         }
 
-                    /*
-                     * Settle selector first; selected tab updates
-                     * immediately through App.
-                     */
                     position =
                         target.toFloat()
 
@@ -398,17 +388,18 @@ fun BoxScope.NavBar(
     ) {
         /*
          * =====================================================
-         * PARENT GLASS — 246 × 64
+         * MIUIX REAL LIQUID BACKDROP
          * =====================================================
          */
+
         Box(
             Modifier
                 .align(
                     Alignment.Center
                 )
                 .size(
-                    BarW,
-                    BarH
+                    BarWidth,
+                    BarHeight
                 )
                 .graphicsLayer {
                     scaleX =
@@ -416,47 +407,63 @@ fun BoxScope.NavBar(
 
                     scaleY =
                         parentScale
+                }
+                .drawBackdrop(
+                    backdrop =
+                        backdrop,
 
-                    shape =
+                    shape = {
                         RoundedCornerShape(
                             33.dp
                         )
+                    },
 
-                    clip =
-                        true
-                }
-                .liveBlur(
-                    state =
-                        hazeState,
-
-                    theme =
-                        theme
+                    effects = {
+                        blur(
+                            22.dp
+                        )
+                    }
+                )
+                /*
+                 * Transparent color material above the real
+                 * captured backdrop.
+                 */
+                .background(
+                    liquidTint,
+                    RoundedCornerShape(
+                        33.dp
+                    )
                 )
                 .drawBehind {
                     val radius =
                         33.dp.toPx()
 
                     /*
-                     * Subtle top reflection.
+                     * Liquid highlight concentrated along top.
                      */
                     drawRoundRect(
                         brush =
                             Brush.verticalGradient(
                                 colors =
                                     listOf(
-                                        glassHighlight(
-                                            theme
+                                        Color.White.copy(
+                                            alpha =
+                                                if (
+                                                    theme ==
+                                                    XmoTheme.Light
+                                                ) {
+                                                    .54f
+                                                } else {
+                                                    .15f
+                                                }
                                         ),
-                                        Color.Transparent,
+
+                                        Color.White.copy(
+                                            alpha = .035f
+                                        ),
+
                                         Color.Transparent
-                                    ),
-
-                                startY =
-                                    0f,
-
-                                endY =
-                                    size.height *
-                                        .72f
+                                    )
                             ),
 
                         cornerRadius =
@@ -466,61 +473,64 @@ fun BoxScope.NavBar(
                     )
 
                     /*
-                     * Neutral glass edge.
+                     * Soft lateral light.
                      */
                     drawRoundRect(
-                        color =
-                            glassBorder(
-                                theme
+                        brush =
+                            Brush.horizontalGradient(
+                                colors =
+                                    listOf(
+                                        Color.White.copy(
+                                            alpha = .08f
+                                        ),
+                                        Color.Transparent,
+                                        accent.copy(
+                                            alpha = .055f
+                                        )
+                                    )
                             ),
 
                         cornerRadius =
                             CornerRadius(
                                 radius
-                            ),
-
-                        style =
-                            androidx.compose.ui.graphics
-                                .drawscope
-                                .Stroke(
-                                    width =
-                                        .35.dp.toPx()
-                                )
+                            )
                     )
                 }
                 .border(
-                    width =
-                        .6.dp,
-
-                    color =
-                        parentBorder,
-
-                    shape =
-                        RoundedCornerShape(
-                            33.dp
-                        )
+                    .65.dp,
+                    accent.copy(
+                        alpha = .30f
+                    ),
+                    RoundedCornerShape(
+                        33.dp
+                    )
+                )
+                .border(
+                    .35.dp,
+                    edge,
+                    RoundedCornerShape(
+                        33.dp
+                    )
                 )
         )
 
         /*
          * =====================================================
-         * MOVING SELECTOR
-         *
-         * Rest     78 × 56
-         * Expanded 110 × 80
+         * LIQUID SELECTOR
          * =====================================================
          */
+
         val selectorWidth =
-            RestW +
+            RestWidth +
                 32.dp *
                 grow
 
         val selectorHeight =
-            RestH +
+            RestHeight +
                 24.dp *
                 grow
 
-        val selectorRadius =
+        val radius =
             29.dp +
                 13.dp *
                 grow
@@ -543,23 +553,6 @@ fun BoxScope.NavBar(
                 0f
             }
 
-        val selectorColor =
-            accent.copy(
-                alpha =
-                    when (
-                        theme
-                    ) {
-                        XmoTheme.Light ->
-                            .24f
-
-                        XmoTheme.Dark ->
-                            .26f
-
-                        XmoTheme.Amoled ->
-                            .30f
-                    }
-            )
-
         Box(
             Modifier
                 .align(
@@ -570,7 +563,7 @@ fun BoxScope.NavBar(
                         4.dp +
                             160.dp *
                             (
-                                animatedPosition /
+                                x /
                                     2f
                                 ) -
                             16.dp *
@@ -581,16 +574,6 @@ fun BoxScope.NavBar(
                     selectorHeight
                 )
                 .graphicsLayer {
-                    val skew =
-                        (
-                            velocity *
-                                .32f
-                            )
-                            .coerceIn(
-                                -6f,
-                                6f
-                            )
-
                     scaleX =
                         1f +
                             stretch *
@@ -599,45 +582,106 @@ fun BoxScope.NavBar(
                     scaleY =
                         1f -
                             stretch *
-                            .09f
+                            .08f
 
                     rotationZ =
                         (
                             velocity *
-                                .09f
+                                .085f
                             )
                             .coerceIn(
-                                -1.7f,
-                                1.7f
+                                -1.6f,
+                                1.6f
                             )
 
                     cameraDistance =
-                        16f *
-                            density
+                        density *
+                            16f
 
                     rotationY =
-                        skew *
-                            .20f
+                        (
+                            velocity *
+                                .055f
+                            )
+                            .coerceIn(
+                                -1.5f,
+                                1.5f
+                            )
                 }
-                .graphicsLayer {
-                    shape =
-                        RoundedCornerShape(
-                            selectorRadius
-                        )
-
-                    clip =
-                        true
-                }
-                .background(
-                    selectorColor
+                .clip(
+                    RoundedCornerShape(
+                        radius
+                    )
                 )
-                .border(
-                    .65.dp,
+                /*
+                 * Selector samples the backdrop too. It produces
+                 * the thicker refractive-glass region instead of
+                 * a flat red blob.
+                 */
+                .drawBackdrop(
+                    backdrop =
+                        backdrop,
+
+                    shape = {
+                        RoundedCornerShape(
+                            radius
+                        )
+                    },
+
+                    effects = {
+                        blur(
+                            15.dp
+                        )
+                    }
+                )
+                .background(
                     accent.copy(
-                        alpha = .44f
+                        alpha =
+                            when (
+                                theme
+                            ) {
+                                XmoTheme.Light ->
+                                    .18f
+
+                                XmoTheme.Dark ->
+                                    .22f
+
+                                XmoTheme.Amoled ->
+                                    .25f
+                            }
+                    )
+                )
+                .drawBehind {
+                    val corner =
+                        radius.toPx()
+
+                    drawRoundRect(
+                        brush =
+                            Brush.verticalGradient(
+                                listOf(
+                                    Color.White.copy(
+                                        alpha = .18f
+                                    ),
+                                    Color.Transparent,
+                                    accent.copy(
+                                        alpha = .06f
+                                    )
+                                )
+                            ),
+
+                        cornerRadius =
+                            CornerRadius(
+                                corner
+                            )
+                    )
+                }
+                .border(
+                    .7.dp,
+                    accent.copy(
+                        alpha = .48f
                     ),
                     RoundedCornerShape(
-                        selectorRadius
+                        radius
                     )
                 )
         )
@@ -647,14 +691,15 @@ fun BoxScope.NavBar(
          * ICONS
          * =====================================================
          */
+
         Row(
             Modifier
                 .align(
                     Alignment.Center
                 )
                 .size(
-                    BarW,
-                    BarH
+                    BarWidth,
+                    BarHeight
                 )
                 .padding(
                     horizontal =
@@ -668,18 +713,18 @@ fun BoxScope.NavBar(
                     index,
                     icon ->
 
-                val selectedVisual =
+                val chosen =
                     abs(
-                        animatedPosition -
+                        x -
                             index
                     ) <
                         .5f
 
-                val scale by
+                val iconScale by
                     animateFloatAsState(
                         targetValue =
                             if (
-                                selectedVisual &&
+                                chosen &&
                                 pressed
                             ) {
                                 1.10f
@@ -690,14 +735,14 @@ fun BoxScope.NavBar(
                         animationSpec =
                             spring(
                                 dampingRatio =
-                                    .75f,
+                                    .74f,
 
                                 stiffness =
                                     900f
                             ),
 
                         label =
-                            "xmoNavIcon$index"
+                            "liquidIcon$index"
                     )
 
                 Box(
@@ -730,9 +775,9 @@ fun BoxScope.NavBar(
 
                         tint =
                             if (
-                                selectedVisual
+                                chosen
                             ) {
-                                active
+                                textColor
                             } else {
                                 inactive
                             },
@@ -755,10 +800,10 @@ fun BoxScope.NavBar(
                                 )
                                 .graphicsLayer {
                                     scaleX =
-                                        scale
+                                        iconScale
 
                                     scaleY =
-                                        scale
+                                        iconScale
                                 }
                     )
                 }
