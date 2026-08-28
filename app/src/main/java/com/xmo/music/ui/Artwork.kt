@@ -17,17 +17,27 @@ import java.util.concurrent.ConcurrentHashMap
 object Artwork {
 
     private val fallback =
-        Color(0xFF35353A)
+        Color(
+            0xFF35353A
+        )
 
     /*
-     * Finished colours.
+     * =========================================================
+     * MEMORY CACHE
+     * =========================================================
+     *
+     * Palette extraction is artwork-based, not Song-based.
+     * Multiple songs sharing one album therefore share one result.
      */
-    private val cache =
+
+    private val colors =
         ConcurrentHashMap<String, Color>()
 
     /*
-     * Prevent multiple tiles requesting the SAME album art
-     * from decoding/palette-processing it simultaneously.
+     * One decode at a time per URI.
+     *
+     * If twelve visible cards share the same album, only the first
+     * coroutine performs bitmap decode/Palette extraction.
      */
     private val locks =
         ConcurrentHashMap<String, Mutex>()
@@ -36,145 +46,271 @@ object Artwork {
         context: Context,
         uri: Uri?
     ): Color {
-        if (uri == null) {
+        if (
+            uri ==
+            null
+        ) {
             return fallback
         }
 
         val key =
             uri.toString()
 
-        cache[key]?.let {
-            return it
-        }
+        colors[key]
+            ?.let {
+                return it
+            }
 
         val mutex =
-            locks.getOrPut(key) {
+            locks.getOrPut(
+                key
+            ) {
                 Mutex()
             }
 
-        return mutex.withLock {
-
-            /*
-             * Another coroutine may have filled the cache
-             * while this request waited for the mutex.
-             */
-            cache[key]?.let {
-                return@withLock it
-            }
-
-            val result =
-                withContext(
-                    Dispatchers.IO
-                ) {
-                    runCatching {
-
-                        context
-                            .contentResolver
-                            .openInputStream(uri)
-                            ?.use { stream ->
-
-                                val bitmap =
-                                    BitmapFactory
-                                        .decodeStream(
-                                            stream
-                                        )
-                                        ?: return@use null
-
-                                /*
-                                 * Generate Palette ONCE.
-                                 *
-                                 * Previous implementation could
-                                 * generate it twice for one bitmap.
-                                 */
-                                val palette =
-                                    Palette
-                                        .from(bitmap)
-                                        .generate()
-
-                                val rgb =
-                                    palette
-                                        .vibrantSwatch
-                                        ?.rgb
-                                        ?: palette
-                                            .dominantSwatch
-                                            ?.rgb
-
-                                /*
-                                 * Palette is finished with bitmap.
-                                 */
-                                bitmap.recycle()
-
-                                rgb
-                            }
-
+        return try {
+            mutex.withLock {
+                colors[key]
+                    ?.let {
+                        return@withLock it
                     }
-                        .getOrNull()
-                        ?.let {
-                            Color(it)
-                        }
-                        ?: fallback
-                }
 
-            cache[key] =
-                result
+                val extracted =
+                    withContext(
+                        Dispatchers.IO
+                    ) {
+                        extract(
+                            context,
+                            uri
+                        )
+                    }
 
+                colors[key] =
+                    extracted
+
+                extracted
+            }
+        } finally {
+            /*
+             * Remove only our own lock. A later request can safely
+             * create another one, but will hit the color cache first.
+             */
             locks.remove(
                 key,
                 mutex
             )
-
-            result
         }
     }
 
     /*
-     * Allows SongTile to obtain an already computed colour
-     * synchronously without launching unnecessary work.
+     * Synchronous lookup for Compose hot paths.
      */
     fun cached(
         uri: Uri?
     ): Color? {
-        if (uri == null) {
+        if (
+            uri ==
+            null
+        ) {
             return fallback
         }
 
-        return cache[
+        return colors[
             uri.toString()
         ]
     }
 
+    /*
+     * Optional cache invalidation for a changed local artwork URI.
+     */
+    fun invalidate(
+        uri: Uri?
+    ) {
+        if (
+            uri ==
+            null
+        ) {
+            return
+        }
+
+        colors.remove(
+            uri.toString()
+        )
+    }
+
+    fun clear() {
+        colors.clear()
+        locks.clear()
+    }
+
+    /*
+     * =========================================================
+     * THEME-AWARE GRADIENT DESTINATION
+     * =========================================================
+     */
+
     fun end(
         color: Color,
         theme: XmoTheme
-    ): Color {
-        return when (theme) {
-
+    ): Color =
+        when (
+            theme
+        ) {
             XmoTheme.Dark ->
-                Color(
-                    ColorUtils.blendARGB(
-                        color.toArgb(),
-                        0xFF16161A.toInt(),
-                        .72f
-                    )
+                blend(
+                    color,
+                    Color(
+                        0xFF121216
+                    ),
+                    .72f
                 )
 
             XmoTheme.Light ->
-                Color(
-                    ColorUtils.blendARGB(
-                        color.toArgb(),
-                        0xFFFFFFFF.toInt(),
-                        .72f
-                    )
+                blend(
+                    color,
+                    Color(
+                        0xFFF7F8FA
+                    ),
+                    .74f
                 )
 
             XmoTheme.Amoled ->
-                Color(
-                    ColorUtils.blendARGB(
-                        color.toArgb(),
-                        0xFF050505.toInt(),
-                        .78f
-                    )
+                blend(
+                    color,
+                    Color.Black,
+                    .80f
                 )
         }
+
+    /*
+     * Darker companion used by artwork-driven large backgrounds.
+     */
+    fun deep(
+        color: Color,
+        theme: XmoTheme
+    ): Color =
+        when (
+            theme
+        ) {
+            XmoTheme.Light ->
+                blend(
+                    color,
+                    Color(
+                        0xFFE6E8EC
+                    ),
+                    .60f
+                )
+
+            XmoTheme.Dark ->
+                blend(
+                    color,
+                    Color(
+                        0xFF08090C
+                    ),
+                    .76f
+                )
+
+            XmoTheme.Amoled ->
+                blend(
+                    color,
+                    Color.Black,
+                    .88f
+                )
+        }
+
+    /*
+     * =========================================================
+     * EXTRACTION
+     * =========================================================
+     */
+
+    private fun extract(
+        context: Context,
+        uri: Uri
+    ): Color {
+        val bitmap =
+            runCatching {
+                context
+                    .contentResolver
+                    .openInputStream(
+                        uri
+                    )
+                    ?.use { stream ->
+
+                        BitmapFactory
+                            .decodeStream(
+                                stream
+                            )
+                    }
+            }
+                .getOrNull()
+                ?: return fallback
+
+        return try {
+            val palette =
+                Palette
+                    .from(
+                        bitmap
+                    )
+                    /*
+                     * Palette does not need every source pixel.
+                     * Resizing analysis keeps large embedded covers
+                     * from creating unnecessary CPU work.
+                     */
+                    .resizeBitmapArea(
+                        112 *
+                            112
+                    )
+                    .maximumColorCount(
+                        16
+                    )
+                    .generate()
+
+            val rgb =
+                palette
+                    .vibrantSwatch
+                    ?.rgb
+                    ?: palette
+                        .lightVibrantSwatch
+                        ?.rgb
+                    ?: palette
+                        .darkVibrantSwatch
+                        ?.rgb
+                    ?: palette
+                        .dominantSwatch
+                        ?.rgb
+
+            rgb?.let {
+                Color(
+                    it
+                )
+            } ?: fallback
+        } catch (
+            _: Throwable
+        ) {
+            fallback
+        } finally {
+            if (
+                !bitmap.isRecycled
+            ) {
+                bitmap.recycle()
+            }
+        }
     }
+
+    private fun blend(
+        from: Color,
+        to: Color,
+        ratio: Float
+    ): Color =
+        Color(
+            ColorUtils.blendARGB(
+                from.toArgb(),
+                to.toArgb(),
+                ratio.coerceIn(
+                    0f,
+                    1f
+                )
+            )
+        )
 }
