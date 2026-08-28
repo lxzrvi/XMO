@@ -25,18 +25,21 @@ jobs:
       - name: Update Android SDK
         run: |
           sdkmanager --update
-
+      
       - name: Accept Android licenses
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-
-      - name: Install Android API 37
+      
+      - name: Show available Android 17 packages
         run: |
-          sdkmanager --channel=3 "platforms;android-37"
-
-      - name: Verify Android API 37
+          sdkmanager --list | grep -i -E "android-37|cinnamon|platforms" | head -100
+      
+      - name: Install Android 17 SDK
         run: |
-          sdkmanager --list --channel=3 | grep -E "platforms;android-37" || true
+          sdkmanager "platforms;android-37"
+      
+      - name: Verify Android 17
+        run: |
           ls -la "$ANDROID_SDK_ROOT/platforms"
 
       - name: Adding ingredients
