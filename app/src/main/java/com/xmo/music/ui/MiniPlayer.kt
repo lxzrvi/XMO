@@ -3,17 +3,39 @@ package com.xmo.music.ui
 import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.*
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -37,42 +59,42 @@ private enum class MiniAxis {
     Vertical
 }
 
-private fun resistHorizontal(
-    value: Float
+private fun miniHorizontalResistance(
+    raw: Float
 ): Float {
-    val free = 76f
-    val distance = abs(value)
+    val free = 68f
+    val amount = abs(raw)
 
-    if (distance <= free) {
-        return value
+    if (amount <= free) {
+        return raw
     }
 
-    return sign(value) *
+    return sign(raw) *
         (
             free +
-                (distance - free) * .10f
+                (amount - free) * .08f
             )
 }
 
-private fun resistUp(
-    value: Float
+private fun miniUpResistance(
+    raw: Float
 ): Float {
     /*
-     * MiniPlayer cannot be pulled downward.
+     * Down drag MiniPlayer par allow nahi.
      */
-    if (value >= 0f) {
+    if (raw >= 0f) {
         return 0f
     }
 
-    val distance = -value
-    val free = 46f
+    val amount = -raw
+    val free = 42f
 
-    return if (distance <= free) {
-        -distance
+    return if (amount <= free) {
+        -amount
     } else {
         -(
             free +
-                (distance - free) * .09f
+                (amount - free) * .075f
             )
     }
 }
@@ -81,7 +103,15 @@ private fun resistUp(
 fun MiniPlayer(
     state: PlaybackState,
     theme: XmoTheme,
-    enterFromBottom: Boolean,
+
+    /*
+     * Increment hone par MiniPlayer NavBar ke neeche se
+     * apni resting position tak rise karega.
+     *
+     * 0 = no entrance animation.
+     */
+    riseKey: Int,
+
     openPlayer: () -> Unit,
     togglePlay: () -> Unit,
     previous: () -> Unit,
@@ -94,57 +124,21 @@ fun MiniPlayer(
     val c = homeColors(theme)
     val scope = rememberCoroutineScope()
 
-    val x = remember {
-        Animatable(0f)
-    }
-
-    val y = remember {
+    /*
+     * Entire MiniPlayer only Y axis par move hota hai for
+     * swipe-up interaction / initial rise.
+     *
+     * Horizontal song change outer box ko move nahi karta.
+     */
+    val cardY = remember {
         Animatable(0f)
     }
 
     /*
-     * Used ONLY when MiniPlayer reappears after closing the
-     * full player.
-     *
-     * Tapping MiniPlayer does not play an exit animation;
-     * App removes it immediately.
+     * Sirf internal content horizontal slide karta hai.
      */
-    val entranceY = remember {
-        Animatable(
-            if (enterFromBottom)
-                100f
-            else
-                0f
-        )
-    }
-
-    val entranceAlpha = remember {
-        Animatable(
-            if (enterFromBottom)
-                0f
-            else
-                1f
-        )
-    }
-
-    LaunchedEffect(Unit) {
-        if (enterFromBottom) {
-            launch {
-                entranceY.animateTo(
-                    0f,
-                    spring(
-                        dampingRatio = .86f,
-                        stiffness = 360f
-                    )
-                )
-            }
-
-            launch {
-                entranceAlpha.animateTo(
-                    1f
-                )
-            }
-        }
+    val contentX = remember {
+        Animatable(0f)
     }
 
     var axis by remember {
@@ -153,19 +147,51 @@ fun MiniPlayer(
         )
     }
 
-    var totalX by remember {
+    var rawX by remember {
         mutableFloatStateOf(0f)
     }
 
-    var totalY by remember {
+    var rawY by remember {
         mutableFloatStateOf(0f)
+    }
+
+    var dragged by remember {
+        mutableStateOf(false)
     }
 
     /*
-     * Distinguishes a tap from actual drag.
+     * MiniPlayer post-NowPlaying close entrance.
+     *
+     * 120px bottom offset roughly NavBar ke peeche se start
+     * karata hai, actual final position NavBar ke upar hai.
      */
-    var didDrag by remember {
-        mutableStateOf(false)
+    val entranceY = remember {
+        Animatable(0f)
+    }
+
+    var lastRiseKey by remember {
+        mutableStateOf(riseKey)
+    }
+
+    LaunchedEffect(riseKey) {
+        if (
+            riseKey > 0 &&
+            riseKey != lastRiseKey
+        ) {
+            lastRiseKey = riseKey
+
+            entranceY.snapTo(
+                120f
+            )
+
+            entranceY.animateTo(
+                0f,
+                spring(
+                    dampingRatio = .86f,
+                    stiffness = 340f
+                )
+            )
+        }
     }
 
     val progress =
@@ -191,7 +217,7 @@ fun MiniPlayer(
                 end = 14.dp,
 
                 /*
-                 * Safe above approved expanding NavBar.
+                 * Approved NavBar expanded selector se clear.
                  */
                 bottom = 128.dp
             ),
@@ -208,34 +234,20 @@ fun MiniPlayer(
             Box(
                 Modifier
                     .fillMaxWidth()
-
-                    /*
-                     * 4dp lower than old 64dp.
-                     */
                     .height(60.dp)
-
                     .graphicsLayer {
-                        translationX =
-                            x.value
-
                         translationY =
-                            y.value +
+                            cardY.value +
                                 entranceY.value
-
-                        alpha =
-                            entranceAlpha.value
                     }
-
                     .clip(
                         RoundedCornerShape(
                             14.dp
                         )
                     )
-
                     .background(
                         c.surface
                     )
-
                     .border(
                         .7.dp,
                         c.border,
@@ -243,19 +255,6 @@ fun MiniPlayer(
                             14.dp
                         )
                     )
-
-                    /*
-                     * Tap is handled separately.
-                     */
-                    .clickable {
-                        if (!didDrag) {
-                            /*
-                             * No MiniPlayer exit animation.
-                             */
-                            openPlayer()
-                        }
-                    }
-
                     .pointerInput(
                         state.currentSongId
                     ) {
@@ -264,9 +263,9 @@ fun MiniPlayer(
                                 axis =
                                     MiniAxis.None
 
-                                totalX = 0f
-                                totalY = 0f
-                                didDrag = false
+                                rawX = 0f
+                                rawY = 0f
+                                dragged = false
                             },
 
                             onDrag = {
@@ -275,57 +274,57 @@ fun MiniPlayer(
 
                                 change.consume()
 
-                                totalX += amount.x
-                                totalY += amount.y
+                                rawX += amount.x
+                                rawY += amount.y
 
+                                /*
+                                 * Direction lock only after small slop.
+                                 */
                                 if (
                                     axis ==
-                                    MiniAxis.None
+                                    MiniAxis.None &&
+                                    (
+                                        abs(rawX) > 10f ||
+                                            abs(rawY) > 10f
+                                        )
                                 ) {
-                                    if (
-                                        abs(totalX) > 10f ||
-                                        abs(totalY) > 10f
-                                    ) {
-                                        didDrag = true
+                                    dragged = true
 
-                                        axis =
-                                            if (
-                                                abs(totalX) >
-                                                abs(totalY)
-                                            ) {
-                                                MiniAxis.Horizontal
-                                            } else {
-                                                MiniAxis.Vertical
-                                            }
-                                    }
+                                    axis =
+                                        if (
+                                            abs(rawX) >
+                                            abs(rawY)
+                                        ) {
+                                            MiniAxis.Horizontal
+                                        } else {
+                                            MiniAxis.Vertical
+                                        }
                                 }
 
                                 scope.launch {
                                     when (axis) {
                                         MiniAxis.Horizontal -> {
                                             /*
-                                             * HORIZONTAL LOCK:
-                                             * Y never moves.
+                                             * Outer card remains stationary.
                                              */
-                                            y.snapTo(0f)
+                                            cardY.snapTo(0f)
 
-                                            x.snapTo(
-                                                resistHorizontal(
-                                                    totalX
+                                            contentX.snapTo(
+                                                miniHorizontalResistance(
+                                                    rawX
                                                 )
                                             )
                                         }
 
                                         MiniAxis.Vertical -> {
                                             /*
-                                             * VERTICAL LOCK:
-                                             * X never moves.
+                                             * Horizontal content stays fixed.
                                              */
-                                            x.snapTo(0f)
+                                            contentX.snapTo(0f)
 
-                                            y.snapTo(
-                                                resistUp(
-                                                    totalY
+                                            cardY.snapTo(
+                                                miniUpResistance(
+                                                    rawY
                                                 )
                                             )
                                         }
@@ -337,23 +336,22 @@ fun MiniPlayer(
                             },
 
                             onDragEnd = {
-                                val finalAxis =
-                                    axis
-
-                                val dx = totalX
-                                val dy = totalY
+                                val finalAxis = axis
+                                val dx = rawX
+                                val dy = rawY
 
                                 scope.launch {
                                     when (finalAxis) {
                                         MiniAxis.Horizontal -> {
+                                            cardY.snapTo(0f)
 
                                             /*
-                                             * User requirement:
+                                             * XMO requested mapping:
                                              *
                                              * LEFT -> PREVIOUS
                                              */
-                                            if (dx < -45f) {
-                                                x.animateTo(
+                                            if (dx < -42f) {
+                                                contentX.animateTo(
                                                     -widthPx,
                                                     spring(
                                                         dampingRatio = 1f,
@@ -364,17 +362,18 @@ fun MiniPlayer(
                                                 previous()
 
                                                 /*
-                                                 * New song enters from right.
+                                                 * New internal content comes
+                                                 * from opposite side.
                                                  */
-                                                x.snapTo(
+                                                contentX.snapTo(
                                                     widthPx
                                                 )
 
-                                                x.animateTo(
+                                                contentX.animateTo(
                                                     0f,
                                                     spring(
                                                         dampingRatio = .88f,
-                                                        stiffness = 430f
+                                                        stiffness = 420f
                                                     )
                                                 )
 
@@ -382,9 +381,9 @@ fun MiniPlayer(
                                              * RIGHT -> NEXT
                                              */
                                             } else if (
-                                                dx > 45f
+                                                dx > 42f
                                             ) {
-                                                x.animateTo(
+                                                contentX.animateTo(
                                                     widthPx,
                                                     spring(
                                                         dampingRatio = 1f,
@@ -394,42 +393,38 @@ fun MiniPlayer(
 
                                                 next()
 
-                                                /*
-                                                 * New song enters from left.
-                                                 */
-                                                x.snapTo(
+                                                contentX.snapTo(
                                                     -widthPx
                                                 )
 
-                                                x.animateTo(
+                                                contentX.animateTo(
                                                     0f,
                                                     spring(
                                                         dampingRatio = .88f,
-                                                        stiffness = 430f
+                                                        stiffness = 420f
                                                     )
                                                 )
                                             } else {
-                                                x.animateTo(
+                                                contentX.animateTo(
                                                     0f,
                                                     spring(
-                                                        dampingRatio = .8f,
+                                                        dampingRatio = .80f,
                                                         stiffness = 450f
                                                     )
                                                 )
                                             }
-
-                                            y.snapTo(0f)
                                         }
 
                                         MiniAxis.Vertical -> {
-                                            x.snapTo(0f)
+                                            contentX.snapTo(0f)
 
-                                            if (dy < -36f) {
-                                                /*
-                                                 * First settle exactly back into
-                                                 * its normal location.
-                                                 */
-                                                y.animateTo(
+                                            /*
+                                             * Enough upward intent:
+                                             * first MiniPlayer settles,
+                                             * THEN NowPlaying is requested.
+                                             */
+                                            if (dy < -34f) {
+                                                cardY.animateTo(
                                                     0f,
                                                     spring(
                                                         dampingRatio = .76f,
@@ -437,15 +432,12 @@ fun MiniPlayer(
                                                     )
                                                 )
 
-                                                /*
-                                                 * Only AFTER release + settle.
-                                                 */
                                                 openPlayer()
                                             } else {
-                                                y.animateTo(
+                                                cardY.animateTo(
                                                     0f,
                                                     spring(
-                                                        dampingRatio = .78f,
+                                                        dampingRatio = .80f,
                                                         stiffness = 450f
                                                     )
                                                 )
@@ -453,42 +445,42 @@ fun MiniPlayer(
                                         }
 
                                         MiniAxis.None -> {
-                                            x.snapTo(0f)
-                                            y.snapTo(0f)
+                                            /*
+                                             * No drag = tap.
+                                             *
+                                             * MiniPlayer itself does not animate.
+                                             */
+                                            openPlayer()
                                         }
                                     }
 
-                                    totalX = 0f
-                                    totalY = 0f
+                                    rawX = 0f
+                                    rawY = 0f
                                     axis = MiniAxis.None
 
-                                    /*
-                                     * Delay reset one frame so the pointer-up
-                                     * isn't interpreted as a click after drag.
-                                     */
                                     withFrameNanos { }
-                                    didDrag = false
+                                    dragged = false
                                 }
                             },
 
                             onDragCancel = {
                                 scope.launch {
-                                    x.animateTo(0f)
-                                    y.animateTo(0f)
+                                    contentX.animateTo(0f)
+                                    cardY.animateTo(0f)
 
-                                    totalX = 0f
-                                    totalY = 0f
+                                    rawX = 0f
+                                    rawY = 0f
                                     axis = MiniAxis.None
 
                                     withFrameNanos { }
-                                    didDrag = false
+                                    dragged = false
                                 }
                             }
                         )
                     }
             ) {
                 /*
-                 * Thin real progress line.
+                 * Real playback progress line.
                  */
                 Canvas(
                     Modifier
@@ -501,20 +493,26 @@ fun MiniPlayer(
                     drawRect(
                         color =
                             XmoRed,
-
                         size =
                             Size(
                                 size.width *
                                     progress,
-
                                 size.height
                             )
                     )
                 }
 
+                /*
+                 * Only THIS content translates horizontally.
+                 * Outer MiniPlayer frame stays fixed.
+                 */
                 Row(
                     Modifier
                         .fillMaxSize()
+                        .graphicsLayer {
+                            translationX =
+                                contentX.value
+                        }
                         .padding(
                             start = 4.dp,
                             top = 4.dp,
@@ -524,19 +522,14 @@ fun MiniPlayer(
                     verticalAlignment =
                         Alignment.CenterVertically
                 ) {
-                    /*
-                     * 50dp artwork for 60dp player.
-                     */
                     AsyncImage(
                         model =
                             state.artworkUri
                                 ?.let(
                                     Uri::parse
                                 ),
-
                         contentDescription =
                             null,
-
                         modifier =
                             Modifier
                                 .size(50.dp)
@@ -548,7 +541,6 @@ fun MiniPlayer(
                                 .background(
                                     c.button
                                 ),
-
                         contentScale =
                             ContentScale.Crop
                     )
@@ -557,7 +549,8 @@ fun MiniPlayer(
                         Modifier
                             .weight(1f)
                             .padding(
-                                horizontal = 10.dp
+                                horizontal =
+                                    10.dp
                             )
                     ) {
                         Text(
@@ -582,34 +575,60 @@ fun MiniPlayer(
                                 TextOverflow.Ellipsis
                         )
                     }
+                }
 
+                /*
+                 * Play button intentionally OUTSIDE translated content,
+                 * so outer card + control remain steady.
+                 */
+                Box(
+                    Modifier
+                        .align(
+                            Alignment.CenterEnd
+                        )
+                        .padding(
+                            end = 8.dp
+                        )
+                        .size(42.dp)
+                        .clip(
+                            CircleShape
+                        )
+                        .background(
+                            c.button
+                        )
+                        .border(
+                            .6.dp,
+                            c.border,
+                            CircleShape
+                        )
+                        .pointerInput(
+                            state.isPlaying
+                        ) {
+                            /*
+                             * Parent drag detector owns main card gesture.
+                             * Keeping control visually stable.
+                             */
+                        },
+                    contentAlignment =
+                        Alignment.Center
+                ) {
                     /*
-                     * Circular play/pause.
+                     * Clickable overlay separate from translated content.
                      */
                     Box(
                         Modifier
-                            .size(42.dp)
-                            .clip(
-                                CircleShape
-                            )
-                            .background(
-                                c.button
-                            )
-                            .border(
-                                .6.dp,
-                                c.border,
-                                CircleShape
-                            )
+                            .fillMaxSize()
+                            .clip(CircleShape)
                             .clickable {
                                 togglePlay()
                             },
-
                         contentAlignment =
                             Alignment.Center
                     ) {
                         if (state.isPlaying) {
                             MiniPauseIcon(
-                                color = c.text,
+                                color =
+                                    c.text,
                                 modifier =
                                     Modifier.size(
                                         18.dp
@@ -617,10 +636,13 @@ fun MiniPlayer(
                             )
                         } else {
                             Icon(
-                                Icons.Default
-                                    .PlayArrow,
-                                null,
-                                tint = c.text,
+                                imageVector =
+                                    Icons.Default
+                                        .PlayArrow,
+                                contentDescription =
+                                    null,
+                                tint =
+                                    c.text,
                                 modifier =
                                     Modifier.size(
                                         21.dp
