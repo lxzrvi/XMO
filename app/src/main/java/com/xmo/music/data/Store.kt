@@ -1,7 +1,9 @@
 package com.xmo.music.data
 
 import android.content.Context
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import kotlinx.coroutines.flow.first
@@ -10,8 +12,17 @@ private val Context.dataStore by preferencesDataStore(
     name = "xmo"
 )
 
+data class XmoProfile(
+    val name: String = "XMO User",
+    val avatarUri: String? = null,
+    val avatarIndex: Int = 0
+)
+
 object Store {
 
+    /*
+     * Existing keys — NEVER rename.
+     */
     private val orderKey =
         stringPreferencesKey(
             "home_order"
@@ -22,9 +33,35 @@ object Store {
             "categories"
         )
 
+    /*
+     * Search.
+     */
     private val searchHistoryKey =
         stringPreferencesKey(
             "search_history"
+        )
+
+    /*
+     * Setup/profile.
+     */
+    private val setupCompleteKey =
+        booleanPreferencesKey(
+            "setup_complete"
+        )
+
+    private val profileNameKey =
+        stringPreferencesKey(
+            "profile_name"
+        )
+
+    private val profileAvatarUriKey =
+        stringPreferencesKey(
+            "profile_avatar_uri"
+        )
+
+    private val profileAvatarIndexKey =
+        intPreferencesKey(
+            "profile_avatar_index"
         )
 
     val defaults =
@@ -35,6 +72,11 @@ object Store {
             "artists"
         )
 
+    /*
+     * =========================================================
+     * HOME ORDER
+     * =========================================================
+     */
     suspend fun order(
         context: Context
     ): List<String> {
@@ -54,6 +96,23 @@ object Store {
             }
     }
 
+    suspend fun saveOrder(
+        context: Context,
+        order: List<String>
+    ) {
+        context.dataStore.edit {
+            it[orderKey] =
+                order.joinToString(
+                    "|"
+                )
+        }
+    }
+
+    /*
+     * =========================================================
+     * CUSTOM CATEGORIES
+     * =========================================================
+     */
     suspend fun categories(
         context: Context
     ): List<UserCategory> {
@@ -99,18 +158,6 @@ object Store {
             }
     }
 
-    suspend fun saveOrder(
-        context: Context,
-        order: List<String>
-    ) {
-        context.dataStore.edit {
-            it[orderKey] =
-                order.joinToString(
-                    "|"
-                )
-        }
-    }
-
     suspend fun saveCategories(
         context: Context,
         cats: List<UserCategory>
@@ -150,7 +197,6 @@ object Store {
      * SEARCH HISTORY
      * =========================================================
      */
-
     suspend fun searchHistory(
         context: Context
     ): List<String> {
@@ -266,6 +312,129 @@ object Store {
                     .joinToString(
                         "\n"
                     )
+        }
+    }
+
+    /*
+     * =========================================================
+     * FIRST-RUN SETUP
+     * =========================================================
+     */
+    suspend fun setupComplete(
+        context: Context
+    ): Boolean {
+        return context.dataStore
+            .data
+            .first()[setupCompleteKey]
+            ?: false
+    }
+
+    suspend fun setSetupComplete(
+        context: Context,
+        complete: Boolean
+    ) {
+        context.dataStore.edit {
+            it[setupCompleteKey] =
+                complete
+        }
+    }
+
+    /*
+     * =========================================================
+     * PROFILE
+     * =========================================================
+     */
+    suspend fun profile(
+        context: Context
+    ): XmoProfile {
+        val prefs =
+            context.dataStore
+                .data
+                .first()
+
+        return XmoProfile(
+            name =
+                prefs[profileNameKey]
+                    ?.trim()
+                    ?.takeIf {
+                        it.isNotEmpty()
+                    }
+                    ?: "XMO User",
+
+            avatarUri =
+                prefs[profileAvatarUriKey]
+                    ?.takeIf {
+                        it.isNotBlank()
+                    },
+
+            avatarIndex =
+                prefs[profileAvatarIndexKey]
+                    ?: 0
+        )
+    }
+
+    suspend fun saveProfile(
+        context: Context,
+        profile: XmoProfile
+    ) {
+        context.dataStore.edit {
+            it[profileNameKey] =
+                profile.name
+                    .trim()
+                    .take(32)
+
+            it[profileAvatarIndexKey] =
+                profile.avatarIndex
+
+            val avatar =
+                profile.avatarUri
+
+            if (
+                avatar.isNullOrBlank()
+            ) {
+                it.remove(
+                    profileAvatarUriKey
+                )
+            } else {
+                it[profileAvatarUriKey] =
+                    avatar
+            }
+        }
+    }
+
+    /*
+     * Save profile + setup flag atomically.
+     */
+    suspend fun finishSetup(
+        context: Context,
+        profile: XmoProfile
+    ) {
+        context.dataStore.edit {
+            it[profileNameKey] =
+                profile.name
+                    .trim()
+                    .ifBlank {
+                        "XMO User"
+                    }
+                    .take(32)
+
+            it[profileAvatarIndexKey] =
+                profile.avatarIndex
+
+            if (
+                profile.avatarUri
+                    .isNullOrBlank()
+            ) {
+                it.remove(
+                    profileAvatarUriKey
+                )
+            } else {
+                it[profileAvatarUriKey] =
+                    profile.avatarUri
+            }
+
+            it[setupCompleteKey] =
+                true
         }
     }
 }
