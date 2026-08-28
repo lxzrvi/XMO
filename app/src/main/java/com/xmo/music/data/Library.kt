@@ -521,16 +521,7 @@ object Library {
                         it > 0
                     }
 
-            val channelCount =
-                retriever
-                    .text(
-                        MediaMetadataRetriever
-                            .METADATA_KEY_AUDIO_CHANNEL_COUNT
-                    )
-                    ?.toIntOrNull()
-                    ?.takeIf {
-                        it > 0
-                    }
+            val channelCount: Int? = null
 
             val embeddedDuration =
                 retriever
@@ -721,8 +712,18 @@ object Library {
                     )
             }
 
-        private fun String?.parseNumber(): Int? {
-            // existing code...
+            private fun String?.parseNumber(): Int? {
+            val value =
+                meaningful()
+                    ?: return null
+    
+            return value
+                .substringBefore("/")
+                .trim()
+                .toIntOrNull()
+                ?.takeIf {
+                    it > 0
+                }
         }
     
         private fun MediaMetadataRetriever.text(
@@ -732,8 +733,13 @@ object Library {
                 ?.trim()
                 ?.takeIf {
                     it.isNotEmpty() &&
-                        !it.equals("<unknown>", ignoreCase = true) &&
-                        !it.equals("unknown", ignoreCase = true)
+                        !it.equals(
+                            "<unknown>",
+                            ignoreCase = true
+                        ) &&
+                        !it.equals(
+                            "unknown",
+                            ignoreCase = true
+                        )
                 }
     }
-}
