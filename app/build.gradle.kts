@@ -71,15 +71,7 @@ dependencies {
     /*
      * XMO shared Liquid Glass
      */
-    implementation(
-        "dev.chrisbanes.haze:haze:2.0.0-alpha03"
-    )
-
-    implementation(
-        "dev.chrisbanes.haze:haze-blur:2.0.0-alpha03"
-    )
-
-    implementation(
-        "dev.chrisbanes.haze:haze-blur-materials:2.0.0-alpha03"
-    )
+    implementation("dev.chrisbanes.haze:haze:2.0.0-alpha05")
+    implementation("dev.chrisbanes.haze:haze-blur:2.0.0-alpha05")
+    implementation("dev.chrisbanes.haze:haze-blur-materials:2.0.0-alpha05")
 }
