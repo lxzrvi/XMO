@@ -1628,7 +1628,7 @@ private fun SettingsGroup(
     label: String,
     c: HomeColors,
     content:
-        @Composable Column.() -> Unit
+        @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
 ) {
     Column(
         Modifier
