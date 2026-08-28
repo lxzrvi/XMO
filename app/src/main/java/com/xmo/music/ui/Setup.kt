@@ -10,15 +10,15 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
@@ -28,13 +28,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -45,20 +40,20 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,28 +62,48 @@ import coil3.compose.AsyncImage
 import com.xmo.music.R
 import com.xmo.music.data.UserCategory
 import com.xmo.music.data.XmoProfile
-import kotlinx.coroutines.launch
 import java.util.UUID
-import kotlin.math.abs
 
-private data class SetupAvatar(
+internal data class SetupAvatar(
     val label: String,
     val icon: Int?
 )
+
+internal val XmoSetupAvatars =
+    listOf(
+        SetupAvatar(
+            "Profile",
+            null
+        ),
+        SetupAvatar(
+            "Headphones",
+            R.drawable.ic_xmo_songs
+        ),
+        SetupAvatar(
+            "Album",
+            R.drawable.ic_xmo_album
+        ),
+        SetupAvatar(
+            "Artist",
+            R.drawable.ic_xmo_artist
+        ),
+        SetupAvatar(
+            "Bolt",
+            R.drawable.ic_xmo_bolt
+        ),
+        SetupAvatar(
+            "Spark",
+            R.drawable.ic_xmo_spark
+        )
+    )
 
 @Composable
 fun Setup(
     initialProfile: XmoProfile,
     existingCategories: List<UserCategory>,
-    onCategoriesChanged: (
-        List<UserCategory>
-    ) -> Unit,
-    finish: (
-        XmoProfile
-    ) -> Unit,
-    setupLater: (
-        XmoProfile
-    ) -> Unit
+    onCategoriesChanged: (List<UserCategory>) -> Unit,
+    finish: (XmoProfile) -> Unit,
+    setupLater: (XmoProfile) -> Unit
 ) {
     val context =
         LocalContext.current
@@ -96,88 +111,89 @@ fun Setup(
     val activity =
         context as? Activity
 
-    val scope =
-        rememberCoroutineScope()
-
-    val colors =
-        homeColors(
-            com.xmo.music.XmoTheme.Dark
-        )
-
     val audioPermission =
         if (
             Build.VERSION.SDK_INT >= 33
         ) {
-            Manifest.permission
-                .READ_MEDIA_AUDIO
+            Manifest.permission.READ_MEDIA_AUDIO
         } else {
-            Manifest.permission
-                .READ_EXTERNAL_STORAGE
+            Manifest.permission.READ_EXTERNAL_STORAGE
         }
 
     val notificationPermission =
         if (
             Build.VERSION.SDK_INT >= 33
         ) {
-            Manifest.permission
-                .POST_NOTIFICATIONS
+            Manifest.permission.POST_NOTIFICATIONS
         } else {
             null
         }
 
-    var audioGranted by remember {
-        mutableStateOf(
-            context.hasPermission(
-                audioPermission
-            )
-        )
-    }
-
-    var notificationGranted by remember {
-        mutableStateOf(
-            notificationPermission ==
-                null ||
+    var audioGranted by
+        remember {
+            mutableStateOf(
                 context.hasPermission(
-                    notificationPermission
+                    audioPermission
                 )
-        )
-    }
+            )
+        }
 
-    var username by remember {
-        mutableStateOf(
-            initialProfile.name
-        )
-    }
+    var notificationGranted by
+        remember {
+            mutableStateOf(
+                notificationPermission == null ||
+                    context.hasPermission(
+                        notificationPermission
+                    )
+            )
+        }
 
-    var selectedAvatar by remember {
-        mutableIntStateOf(
-            initialProfile.avatarIndex
-        )
-    }
+    var username by
+        remember {
+            mutableStateOf(
+                initialProfile.name
+            )
+        }
 
-    var customAvatarUri by remember {
-        mutableStateOf<Uri?>(
-            initialProfile.avatarUri
-                ?.let(Uri::parse)
-        )
-    }
+    var selectedAvatar by
+        remember {
+            mutableIntStateOf(
+                initialProfile.avatarIndex
+                    .coerceIn(
+                        XmoSetupAvatars.indices
+                    )
+            )
+        }
 
-    var categoryName by remember {
-        mutableStateOf("")
-    }
+    var customAvatarUri by
+        remember {
+            mutableStateOf(
+                initialProfile.avatarUri
+                    ?.let(
+                        Uri::parse
+                    )
+            )
+        }
 
-    var setupCategories by remember {
-        mutableStateOf(
-            existingCategories
-        )
-    }
+    var categoryName by
+        remember {
+            mutableStateOf("")
+        }
+
+    var setupCategories by
+        remember {
+            mutableStateOf(
+                existingCategories
+            )
+        }
 
     val audioLauncher =
         rememberLauncherForActivityResult(
             ActivityResultContracts
                 .RequestPermission()
         ) {
-            audioGranted = it
+            audioGranted =
+                it
         }
 
     val notificationLauncher =
@@ -185,68 +201,33 @@ fun Setup(
             ActivityResultContracts
                 .RequestPermission()
         ) {
-            notificationGranted = it
+            notificationGranted =
+                it
         }
 
-    /*
-     * Android Photo Picker.
-     *
-     * No broad photo/storage permission.
-     */
     val photoPicker =
         rememberLauncherForActivityResult(
             ActivityResultContracts
                 .PickVisualMedia()
         ) { uri ->
 
-            if (uri != null) {
+            if (
+                uri != null
+            ) {
                 customAvatarUri =
                     uri
 
+                /*
+                 * First avatar slot becomes the custom image.
+                 */
                 selectedAvatar =
                     0
             }
         }
 
-    val avatars =
-        remember {
-            listOf(
-                SetupAvatar(
-                    "Profile",
-                    null
-                ),
-                SetupAvatar(
-                    "Headphones",
-                    R.drawable.ic_xmo_songs
-                ),
-                SetupAvatar(
-                    "Album",
-                    R.drawable.ic_xmo_album
-                ),
-                SetupAvatar(
-                    "Artist",
-                    R.drawable.ic_xmo_artist
-                ),
-                SetupAvatar(
-                    "Bolt",
-                    R.drawable.ic_xmo_bolt
-                ),
-                SetupAvatar(
-                    "Spark",
-                    R.drawable.ic_xmo_spark
-                )
-            )
-        }
-
-    val ready =
-        audioGranted &&
-            username.trim()
-                .isNotEmpty()
-
-    fun currentProfile():
-        XmoProfile {
-
-        return XmoProfile(
+    fun profile():
+        XmoProfile =
+        XmoProfile(
             name =
                 username
                     .trim()
@@ -257,8 +238,7 @@ fun Setup(
 
             avatarUri =
                 if (
-                    selectedAvatar ==
-                    0
+                    selectedAvatar == 0
                 ) {
                     customAvatarUri
                         ?.toString()
@@ -269,381 +249,381 @@ fun Setup(
             avatarIndex =
                 selectedAvatar
         )
-    }
+
+    val nameReady =
+        username
+            .trim()
+            .isNotEmpty()
+
+    val canContinue =
+        audioGranted &&
+            nameReady
 
     /*
-     * Dark onboarding matches supplied reference.
-     * Global theme can be selected later.
+     * Fixed-height page instead of a long onboarding list:
+     * avatar stays centred, permissions/actions remain near the
+     * bottom, and the layout stays edge-to-edge.
      */
-    LazyColumn(
+    Column(
         Modifier
             .fillMaxSize()
             .background(
-                Color(0xFF0D0F12)
-            )
-            .windowInsetsPadding(
-                WindowInsets.statusBars
-            )
-            .navigationBarsPadding(),
-
-        contentPadding =
-            PaddingValues(
-                start = 16.dp,
-                end = 16.dp,
-                bottom = 16.dp
-            )
-    ) {
-        item(
-            key = "brand"
-        ) {
-            Text(
-                "XMO",
-
-                color =
-                    Color.White,
-
-                fontFamily =
-                    XmoFont.logo,
-
-                fontSize =
-                    28.sp,
-
-                letterSpacing =
-                    4.sp,
-
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            top = 48.dp,
-                            bottom = 32.dp
-                        ),
-
-                textAlign =
-                    androidx.compose.ui.text.style
-                        .TextAlign.Center
-            )
-        }
-
-        /*
-         * =====================================================
-         * AVATAR
-         * =====================================================
-         */
-        item(
-            key = "avatar"
-        ) {
-            SetupAvatarChooser(
-                avatars =
-                    avatars,
-
-                selected =
-                    selectedAvatar,
-
-                customUri =
-                    customAvatarUri,
-
-                choose = {
-                    selectedAvatar = it
-                },
-
-                pickCustom = {
-                    photoPicker.launch(
-                        PickVisualMediaRequest(
-                            ActivityResultContracts
-                                .PickVisualMedia
-                                .ImageOnly
-                        )
+                Brush.verticalGradient(
+                    listOf(
+                        Color(0xFF0D0F12),
+                        Color(0xFF101115),
+                        Color(0xFF08090B)
                     )
-                }
-            )
-
-            Spacer(
-                Modifier.height(
-                    20.dp
                 )
             )
-        }
+            .statusBarsPadding()
+            .navigationBarsPadding()
+            .padding(
+                horizontal = 16.dp
+            )
+    ) {
+        Text(
+            text =
+                "XMO",
+
+            color =
+                Color.White,
+
+            fontFamily =
+                XmoFont.logo,
+
+            fontSize =
+                28.sp,
+
+            letterSpacing =
+                4.sp,
+
+            textAlign =
+                TextAlign.Center,
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        top = 32.dp
+                    )
+        )
+
+        Text(
+            text =
+                "Make XMO yours",
+
+            color =
+                Color.White.copy(
+                    alpha = .55f
+                ),
+
+            fontFamily =
+                XmoFont.thin,
+
+            fontSize =
+                11.sp,
+
+            textAlign =
+                TextAlign.Center,
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        top = 5.dp
+                    )
+        )
 
         /*
-         * =====================================================
-         * USERNAME
-         * =====================================================
+         * PFP is intentionally lower than the previous layout.
          */
-        item(
-            key = "name"
+        Spacer(
+            Modifier.height(
+                42.dp
+            )
+        )
+
+        SetupAvatarChooser(
+            avatars =
+                XmoSetupAvatars,
+
+            selected =
+                selectedAvatar,
+
+            customUri =
+                customAvatarUri,
+
+            choose = {
+                selectedAvatar =
+                    it
+            },
+
+            pickCustom = {
+                photoPicker.launch(
+                    PickVisualMediaRequest(
+                        ActivityResultContracts
+                            .PickVisualMedia
+                            .ImageOnly
+                    )
+                )
+            }
+        )
+
+        Spacer(
+            Modifier.height(
+                24.dp
+            )
+        )
+
+        SetupInput(
+            value =
+                username,
+
+            hint =
+                "Enter your name",
+
+            onValue = {
+                username =
+                    it.take(32)
+            }
+        )
+
+        Spacer(
+            Modifier.height(
+                12.dp
+            )
+        )
+
+        /*
+         * Optional category creation.
+         */
+        Row(
+            Modifier.fillMaxWidth(),
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
             SetupInput(
                 value =
-                    username,
+                    categoryName,
 
                 hint =
-                    "Enter your name",
+                    "Add a category",
 
                 onValue = {
-                    username =
-                        it.take(32)
-                }
+                    categoryName =
+                        it.take(24)
+                },
+
+                modifier =
+                    Modifier.weight(1f)
             )
 
             Spacer(
-                Modifier.height(
-                    16.dp
+                Modifier.size(
+                    8.dp
                 )
             )
-        }
 
-        /*
-         * =====================================================
-         * INITIAL CATEGORIES
-         * =====================================================
-         */
-        item(
-            key = "categories"
-        ) {
-            Row(
-                verticalAlignment =
-                    Alignment.CenterVertically
+            SetupSmallButton(
+                text =
+                    "Add",
+
+                enabled =
+                    categoryName
+                        .trim()
+                        .isNotEmpty()
             ) {
-                SetupInput(
-                    value =
-                        categoryName,
+                val clean =
+                    categoryName.trim()
 
-                    hint =
-                        "Add Category...",
-
-                    onValue = {
-                        categoryName =
-                            it.take(24)
-                    },
-
-                    modifier =
-                        Modifier.weight(1f)
-                )
-
-                Spacer(
-                    Modifier.size(
-                        8.dp
-                    )
-                )
-
-                Box(
-                    Modifier
-                        .height(48.dp)
-                        .clip(
-                            RoundedCornerShape(
-                                12.dp
-                            )
-                        )
-                        .background(
-                            Color.White.copy(
-                                alpha = .06f
-                            )
-                        )
-                        .clickable(
-                            enabled =
-                                categoryName
-                                    .trim()
-                                    .isNotEmpty()
-                        ) {
-                            val clean =
-                                categoryName
-                                    .trim()
-
-                            if (
-                                clean.isNotEmpty()
-                            ) {
-                                val category =
-                                    UserCategory(
-                                        id =
-                                            "cat_${UUID.randomUUID()}",
-
-                                        name =
-                                            clean,
-
-                                        icon =
-                                            setupCategories.size %
-                                                4
-                                    )
-
-                                setupCategories =
-                                    setupCategories +
-                                        category
-
-                                onCategoriesChanged(
-                                    setupCategories
-                                )
-
-                                categoryName =
-                                    ""
-                            }
-                        }
-                        .padding(
-                            horizontal =
-                                16.dp
-                        ),
-
-                    contentAlignment =
-                        Alignment.Center
+                if (
+                    clean.isNotEmpty()
                 ) {
-                    Text(
-                        "Add",
+                    val next =
+                        setupCategories +
+                            UserCategory(
+                                id =
+                                    "cat_${UUID.randomUUID()}",
 
-                        color =
-                            Color.White,
+                                name =
+                                    clean,
 
-                        fontFamily =
-                            XmoFont.medium,
+                                icon =
+                                    setupCategories.size %
+                                        4
+                            )
 
-                        fontSize =
-                            12.sp
+                    setupCategories =
+                        next
+
+                    categoryName =
+                        ""
+
+                    onCategoriesChanged(
+                        next
                     )
                 }
             }
+        }
 
-            if (
-                setupCategories.isNotEmpty()
-            ) {
-                Spacer(
-                    Modifier.height(
-                        10.dp
+        if (
+            setupCategories.isNotEmpty()
+        ) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        top = 9.dp
                     )
-                )
+                    .horizontalScroll(
+                        rememberScrollState()
+                    ),
 
-                /*
-                 * Native horizontal compact pills.
-                 * No fake/demo categories.
-                 */
-                LazyRow(
-                    horizontalArrangement =
-                        Arrangement.spacedBy(
-                            7.dp
-                        )
-                ) {
-                    itemsIndexed(
-                        items =
-                            setupCategories,
+                horizontalArrangement =
+                    Arrangement.spacedBy(
+                        7.dp
+                    )
+            ) {
+                setupCategories.forEach { category ->
 
-                        key = { _, cat ->
-                            cat.id
-                        }
-                    ) {
-                            _,
-                            category ->
-
-                        Row(
-                            Modifier
-                                .clip(
-                                    RoundedCornerShape(
-                                        20.dp
-                                    )
+                    Row(
+                        Modifier
+                            .clip(
+                                RoundedCornerShape(
+                                    18.dp
                                 )
-                                .background(
-                                    Color.White.copy(
-                                        alpha = .06f
-                                    )
-                                )
-                                .border(
-                                    .6.dp,
-                                    Color.White.copy(
-                                        alpha = .06f
-                                    ),
-                                    RoundedCornerShape(
-                                        20.dp
-                                    )
-                                )
-                                .padding(
-                                    start = 12.dp,
-                                    top = 7.dp,
-                                    end = 6.dp,
-                                    bottom = 7.dp
-                                ),
-
-                            verticalAlignment =
-                                Alignment.CenterVertically
-                        ) {
-                            Text(
-                                category.name,
-
-                                color =
-                                    Color.White,
-
-                                fontFamily =
-                                    XmoFont.medium,
-
-                                fontSize =
-                                    11.sp,
-
-                                maxLines =
-                                    1,
-
-                                overflow =
-                                    TextOverflow.Ellipsis
                             )
-
-                            Box(
-                                Modifier
-                                    .size(
-                                        24.dp
-                                    )
-                                    .clip(
-                                        CircleShape
-                                    )
-                                    .clickable {
-                                        setupCategories =
-                                            setupCategories
-                                                .filterNot {
-                                                    it.id ==
-                                                        category.id
-                                                }
-
-                                        onCategoriesChanged(
-                                            setupCategories
-                                        )
-                                    },
-
-                                contentAlignment =
-                                    Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector =
-                                        Icons.Default.Close,
-
-                                    contentDescription =
-                                        "Remove",
-
-                                    tint =
-                                        Color.White.copy(
-                                            alpha =
-                                                .55f
-                                        ),
-
-                                    modifier =
-                                        Modifier.size(
-                                            13.dp
-                                        )
+                            .background(
+                                Color.White.copy(
+                                    alpha = .055f
                                 )
-                            }
+                            )
+                            .border(
+                                .7.dp,
+                                Color.White.copy(
+                                    alpha = .08f
+                                ),
+                                RoundedCornerShape(
+                                    18.dp
+                                )
+                            )
+                            .padding(
+                                start = 12.dp,
+                                end = 4.dp,
+                                top = 5.dp,
+                                bottom = 5.dp
+                            ),
+
+                        verticalAlignment =
+                            Alignment.CenterVertically
+                    ) {
+                        Text(
+                            category.name,
+
+                            color =
+                                Color.White,
+
+                            fontFamily =
+                                XmoFont.medium,
+
+                            fontSize =
+                                10.sp,
+
+                            maxLines =
+                                1,
+
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+
+                        Box(
+                            Modifier
+                                .size(
+                                    26.dp
+                                )
+                                .clip(
+                                    CircleShape
+                                )
+                                .clickable {
+                                    val next =
+                                        setupCategories
+                                            .filterNot {
+                                                it.id ==
+                                                    category.id
+                                            }
+
+                                    setupCategories =
+                                        next
+
+                                    onCategoriesChanged(
+                                        next
+                                    )
+                                },
+
+                            contentAlignment =
+                                Alignment.Center
+                        ) {
+                            Icon(
+                                imageVector =
+                                    Icons.Default.Close,
+
+                                contentDescription =
+                                    "Remove",
+
+                                tint =
+                                    Color.White.copy(
+                                        alpha = .52f
+                                    ),
+
+                                modifier =
+                                    Modifier.size(
+                                        13.dp
+                                    )
+                            )
                         }
                     }
                 }
             }
-
-            Spacer(
-                Modifier.height(
-                    28.dp
-                )
-            )
         }
 
         /*
-         * =====================================================
-         * PERMISSIONS
-         * =====================================================
+         * Push permissions to the lower portion of the screen.
          */
-        item(
-            key = "permissions"
+        Spacer(
+            Modifier.weight(
+                1f
+            )
+        )
+
+        Column(
+            verticalArrangement =
+                Arrangement.spacedBy(
+                    9.dp
+                )
         ) {
+            SetupPermissionRow(
+                title =
+                    "Audio & Storage Access",
+
+                subtitle =
+                    "Required to find and play your local music",
+
+                granted =
+                    audioGranted,
+
+                required =
+                    true
+            ) {
+                if (
+                    !audioGranted
+                ) {
+                    audioLauncher.launch(
+                        audioPermission
+                    )
+                }
+            }
+
             SetupPermissionRow(
                 title =
                     "Notification Permission",
@@ -655,253 +635,341 @@ fun Setup(
                     ) {
                         "Not required on this Android version"
                     } else {
-                        "Allow playback alerts & updates"
+                        "Playback controls and media notifications"
                     },
 
                 granted =
                     notificationGranted,
 
-                click = {
-                    if (
-                        notificationPermission !=
-                        null &&
-                        !notificationGranted
-                    ) {
-                        notificationLauncher.launch(
-                            notificationPermission
-                        )
-                    }
-                }
-            )
-
-            Spacer(
-                Modifier.height(
-                    10.dp
-                )
-            )
-
-            SetupPermissionRow(
-                title =
-                    "Audio & Storage Access",
-
-                subtitle =
-                    "Scan local device music files",
-
-                granted =
-                    audioGranted,
-
-                click = {
-                    if (!audioGranted) {
-                        audioLauncher.launch(
-                            audioPermission
-                        )
-                    }
-                }
-            )
-
-            Spacer(
-                Modifier.height(
-                    18.dp
-                )
-            )
-        }
-
-        /*
-         * =====================================================
-         * ACTIONS
-         * =====================================================
-         */
-        item(
-            key = "actions"
-        ) {
-            Row(
-                Modifier.fillMaxWidth(),
-                horizontalArrangement =
-                    Arrangement.spacedBy(
-                        8.dp
-                    )
+                required =
+                    false
             ) {
-                SetupAction(
-                    text = "Exit",
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        ),
-                    background =
-                        XmoRed.copy(
-                            alpha = .12f
-                        ),
-                    color =
-                        XmoRed
+                if (
+                    notificationPermission != null &&
+                    !notificationGranted
                 ) {
-                    activity?.finish()
-                }
-
-                SetupAction(
-                    text =
-                        "Setup Later",
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        ),
-                    background =
-                        Color.White.copy(
-                            alpha = .06f
-                        ),
-                    color =
-                        Color.White
-                ) {
-                    setupLater(
-                        currentProfile()
-                    )
-                }
-
-                SetupAction(
-                    text =
-                        "Start Now",
-                    modifier =
-                        Modifier.weight(
-                            1f
-                        ),
-                    background =
-                        if (ready) {
-                            Color(0xFF34C759)
-                        } else {
-                            Color.White.copy(
-                                alpha = .12f
-                            )
-                        },
-                    color =
-                        if (ready) {
-                            Color.White
-                        } else {
-                            Color.White.copy(
-                                alpha = .40f
-                            )
-                        },
-                    enabled =
-                        ready
-                ) {
-                    finish(
-                        currentProfile()
+                    notificationLauncher.launch(
+                        notificationPermission
                     )
                 }
             }
+        }
 
-            Text(
-                "XMO is offline. Your profile, library preferences and playback data stay on this device and are not sent to external servers.",
+        Spacer(
+            Modifier.height(
+                14.dp
+            )
+        )
 
-                color =
-                    Color.White.copy(
-                        alpha = .50f
-                    ),
-
-                fontFamily =
-                    XmoFont.thin,
-
-                fontSize =
-                    9.sp,
-
-                lineHeight =
-                    13.sp,
-
-                textAlign =
-                    androidx.compose.ui.text.style
-                        .TextAlign.Center,
+        /*
+         * Setup Later cannot bypass music permission anymore.
+         */
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement =
+                Arrangement.spacedBy(
+                    8.dp
+                )
+        ) {
+            SetupAction(
+                text =
+                    "Exit",
 
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            top = 14.dp,
-                            bottom = 6.dp
+                    Modifier.weight(1f),
+
+                background =
+                    XmoRed.copy(
+                        alpha = .12f
+                    ),
+
+                color =
+                    XmoRed
+            ) {
+                activity?.finish()
+            }
+
+            SetupAction(
+                text =
+                    "Setup Later",
+
+                modifier =
+                    Modifier.weight(1f),
+
+                background =
+                    if (
+                        canContinue
+                    ) {
+                        Color.White.copy(
+                            alpha = .07f
                         )
-            )
+                    } else {
+                        Color.White.copy(
+                            alpha = .025f
+                        )
+                    },
+
+                color =
+                    if (
+                        canContinue
+                    ) {
+                        Color.White
+                    } else {
+                        Color.White.copy(
+                            alpha = .28f
+                        )
+                    },
+
+                enabled =
+                    canContinue
+            ) {
+                setupLater(
+                    profile()
+                )
+            }
+
+            SetupAction(
+                text =
+                    "Start Now",
+
+                modifier =
+                    Modifier.weight(1f),
+
+                background =
+                    if (
+                        canContinue
+                    ) {
+                        XmoRed
+                    } else {
+                        Color.White.copy(
+                            alpha = .05f
+                        )
+                    },
+
+                color =
+                    if (
+                        canContinue
+                    ) {
+                        Color.White
+                    } else {
+                        Color.White.copy(
+                            alpha = .30f
+                        )
+                    },
+
+                enabled =
+                    canContinue
+            ) {
+                finish(
+                    profile()
+                )
+            }
         }
+
+        Text(
+            text =
+                "XMO stays local. Your music, profile and library data remain on this device.",
+
+            color =
+                Color.White.copy(
+                    alpha = .40f
+                ),
+
+            fontFamily =
+                XmoFont.thin,
+
+            fontSize =
+                8.sp,
+
+            lineHeight =
+                11.sp,
+
+            textAlign =
+                TextAlign.Center,
+
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        top = 10.dp,
+                        bottom = 8.dp
+                    )
+        )
     }
 }
 
 @Composable
-private fun SetupAvatarChooser(
+internal fun SetupAvatarChooser(
     avatars: List<SetupAvatar>,
     selected: Int,
     customUri: Uri?,
     choose: (Int) -> Unit,
     pickCustom: () -> Unit
 ) {
-    val state =
-        rememberLazyListState(
-            initialFirstVisibleItemIndex =
-                selected.coerceAtLeast(
-                    0
-                )
-        )
-
     /*
-     * Keep selected card visible.
+     * Three-column construction keeps the selected PFP physically
+     * centred. The neighbouring choices scroll independently on
+     * either side instead of shifting the selected card off-centre.
      */
-    LaunchedEffect(selected) {
-        if (
-            selected in
-            avatars.indices
-        ) {
-            state.animateScrollToItem(
-                selected
-            )
-        }
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(
-                112.dp
-            ),
-
-        contentAlignment =
-            Alignment.Center
+    Column(
+        Modifier.fillMaxWidth(),
+        horizontalAlignment =
+            Alignment.CenterHorizontally
     ) {
-        /*
-         * Selected target.
-         */
         Box(
             Modifier
-                .size(
-                    92.dp
-                )
-                .border(
-                    2.dp,
-                    XmoRed,
-                    CircleShape
-                )
-        )
+                .fillMaxWidth()
+                .height(
+                    114.dp
+                ),
+            contentAlignment =
+                Alignment.Center
+        ) {
+            val activeScale by
+                animateFloatAsState(
+                    targetValue =
+                        1.08f,
 
-        LazyRow(
-            state =
-                state,
+                    animationSpec =
+                        spring(
+                            dampingRatio = .74f,
+                            stiffness = 430f
+                        ),
 
-            contentPadding =
-                PaddingValues(
-                    horizontal =
-                        135.dp
+                    label =
+                        "selectedAvatarScale"
+                )
+
+            Box(
+                Modifier
+                    .size(
+                        96.dp
+                    )
+                    .graphicsLayer {
+                        scaleX =
+                            activeScale
+
+                        scaleY =
+                            activeScale
+                    }
+                    .clip(
+                        CircleShape
+                    )
+                    .background(
+                        Brush.radialGradient(
+                            listOf(
+                                XmoRed.copy(
+                                    alpha = .27f
+                                ),
+                                Color.White.copy(
+                                    alpha = .045f
+                                )
+                            )
+                        )
+                    )
+                    .border(
+                        2.dp,
+                        XmoRed,
+                        CircleShape
+                    ),
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                AvatarContent(
+                    avatar =
+                        avatars[
+                            selected.coerceIn(
+                                avatars.indices
+                            )
+                        ],
+
+                    index =
+                        selected,
+
+                    customUri =
+                        customUri,
+
+                    active =
+                        true,
+
+                    modifier =
+                        Modifier
+                            .size(
+                                84.dp
+                            )
+                            .clip(
+                                CircleShape
+                            )
+                )
+            }
+
+            Box(
+                Modifier
+                    .align(
+                        Alignment.TopCenter
+                    )
+                    .padding(
+                        start = 76.dp,
+                        top = 5.dp
+                    )
+                    .size(
+                        30.dp
+                    )
+                    .clip(
+                        CircleShape
+                    )
+                    .background(
+                        XmoRed
+                    )
+                    .border(
+                        2.dp,
+                        Color(0xFF0D0F12),
+                        CircleShape
+                    )
+                    .clickable(
+                        onClick =
+                            pickCustom
+                    ),
+
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                Icon(
+                    imageVector =
+                        Icons.Default.Add,
+
+                    contentDescription =
+                        "Choose profile picture",
+
+                    tint =
+                        Color.White,
+
+                    modifier =
+                        Modifier.size(
+                            16.dp
+                        )
+                )
+            }
+        }
+
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(
+                    rememberScrollState()
+                )
+                .padding(
+                    top = 7.dp,
+                    bottom = 2.dp
                 ),
 
             horizontalArrangement =
                 Arrangement.spacedBy(
-                    24.dp
+                    10.dp
                 )
         ) {
-            itemsIndexed(
-                items =
-                    avatars,
-
-                key = {
-                        index,
-                        _ ->
-
-                    index
-                }
-            ) {
+            avatars.forEachIndexed {
                     index,
                     avatar ->
 
@@ -912,153 +980,187 @@ private fun SetupAvatarChooser(
                 Box(
                     Modifier
                         .size(
-                            80.dp
+                            52.dp
                         )
                         .clip(
                             CircleShape
                         )
                         .background(
-                            Color.White.copy(
-                                alpha =
-                                    if (active)
-                                        .08f
-                                    else
-                                        .03f
-                            )
+                            if (
+                                active
+                            ) {
+                                XmoRed.copy(
+                                    alpha = .14f
+                                )
+                            } else {
+                                Color.White.copy(
+                                    alpha = .035f
+                                )
+                            }
                         )
                         .border(
-                            .7.dp,
-                            Color.White.copy(
-                                alpha =
-                                    if (active)
-                                        .14f
-                                    else
-                                        .05f
-                            ),
+                            if (
+                                active
+                            ) {
+                                1.3.dp
+                            } else {
+                                .7.dp
+                            },
+
+                            if (
+                                active
+                            ) {
+                                XmoRed
+                            } else {
+                                Color.White.copy(
+                                    alpha = .08f
+                                )
+                            },
+
                             CircleShape
                         )
                         .clickable {
-                            choose(index)
+                            choose(
+                                index
+                            )
                         },
 
                     contentAlignment =
                         Alignment.Center
                 ) {
-                    if (
-                        index == 0 &&
-                        customUri != null
-                    ) {
-                        AsyncImage(
-                            model =
-                                customUri,
+                    AvatarContent(
+                        avatar =
+                            avatar,
 
-                            contentDescription =
-                                null,
+                        index =
+                            index,
 
-                            modifier =
-                                Modifier.fillMaxSize(),
+                        customUri =
+                            customUri,
 
-                            contentScale =
-                                ContentScale.Crop
-                        )
-                    } else if (
-                        avatar.icon != null
-                    ) {
-                        XmoIcon(
-                            icon =
-                                avatar.icon,
+                        active =
+                            active,
 
-                            tint =
-                                Color.White.copy(
-                                    alpha =
-                                        if (active)
-                                            1f
-                                        else
-                                            .28f
-                                ),
-
-                            modifier =
-                                Modifier.size(
-                                    25.dp
+                        modifier =
+                            Modifier
+                                .size(
+                                    44.dp
                                 )
-                        )
-                    } else {
-                        Icon(
-                            imageVector =
-                                Icons.Default.Person,
-
-                            contentDescription =
-                                null,
-
-                            tint =
-                                Color.White.copy(
-                                    alpha =
-                                        if (active)
-                                            1f
-                                        else
-                                            .28f
-                                ),
-
-                            modifier =
-                                Modifier.size(
-                                    25.dp
+                                .clip(
+                                    CircleShape
                                 )
-                        )
-                    }
+                    )
                 }
             }
-        }
-
-        /*
-         * Custom photo add button.
-         */
-        Box(
-            Modifier
-                .align(
-                    Alignment.TopCenter
-                )
-                .padding(
-                    start = 66.dp,
-                    top = 11.dp
-                )
-                .size(
-                    27.dp
-                )
-                .clip(
-                    CircleShape
-                )
-                .background(
-                    XmoRed
-                )
-                .clickable(
-                    onClick =
-                        pickCustom
-                ),
-
-            contentAlignment =
-                Alignment.Center
-        ) {
-            Icon(
-                imageVector =
-                    Icons.Default.Add,
-
-                contentDescription =
-                    "Choose profile picture",
-
-                tint =
-                    Color.White,
-
-                modifier =
-                    Modifier.size(
-                        15.dp
-                    )
-            )
         }
     }
 }
 
 @Composable
-private fun SetupInput(
+internal fun AvatarContent(
+    avatar: SetupAvatar,
+    index: Int,
+    customUri: Uri?,
+    active: Boolean,
+    modifier: Modifier
+) {
+    Box(
+        modifier,
+        contentAlignment =
+            Alignment.Center
+    ) {
+        when {
+            index == 0 &&
+                customUri != null -> {
+
+                AsyncImage(
+                    model =
+                        customUri,
+
+                    contentDescription =
+                        null,
+
+                    contentScale =
+                        ContentScale.Crop,
+
+                    modifier =
+                        Modifier.fillMaxSize()
+                )
+            }
+
+            avatar.icon != null -> {
+
+                XmoIcon(
+                    icon =
+                        avatar.icon,
+
+                    tint =
+                        Color.White.copy(
+                            alpha =
+                                if (
+                                    active
+                                ) {
+                                    1f
+                                } else {
+                                    .52f
+                                }
+                        ),
+
+                    modifier =
+                        Modifier.size(
+                            if (
+                                active
+                            ) {
+                                27.dp
+                            } else {
+                                20.dp
+                            }
+                        )
+                )
+            }
+
+            else -> {
+                /*
+                 * This exact first built-in avatar becomes the
+                 * default everywhere when no photo was selected.
+                 */
+                Icon(
+                    imageVector =
+                        Icons.Default.Person,
+
+                    contentDescription =
+                        null,
+
+                    tint =
+                        Color.White.copy(
+                            alpha =
+                                if (
+                                    active
+                                ) {
+                                    1f
+                                } else {
+                                    .52f
+                                }
+                        ),
+
+                    modifier =
+                        Modifier.size(
+                            if (
+                                active
+                            ) {
+                                29.dp
+                            } else {
+                                21.dp
+                            }
+                        )
+                )
+            }
+        }
+    }
+}
+
+@Composable
+internal fun SetupInput(
     value: String,
     hint: String,
     onValue: (String) -> Unit,
@@ -1072,26 +1174,25 @@ private fun SetupInput(
             )
             .clip(
                 RoundedCornerShape(
-                    12.dp
+                    15.dp
                 )
             )
             .background(
                 Color.White.copy(
-                    alpha = .025f
+                    alpha = .045f
                 )
             )
             .border(
-                1.dp,
+                .8.dp,
                 Color.White.copy(
-                    alpha = .04f
+                    alpha = .10f
                 ),
                 RoundedCornerShape(
-                    12.dp
+                    15.dp
                 )
             )
             .padding(
-                horizontal =
-                    16.dp
+                horizontal = 15.dp
             ),
 
         verticalAlignment =
@@ -1125,7 +1226,7 @@ private fun SetupInput(
                 ),
 
             decorationBox = {
-                    input ->
+                    field ->
 
                 Box(
                     contentAlignment =
@@ -1139,7 +1240,7 @@ private fun SetupInput(
 
                             color =
                                 Color.White.copy(
-                                    alpha = .40f
+                                    alpha = .38f
                                 ),
 
                             fontFamily =
@@ -1150,9 +1251,93 @@ private fun SetupInput(
                         )
                     }
 
-                    input()
+                    field()
                 }
             }
+        )
+    }
+}
+
+@Composable
+private fun SetupSmallButton(
+    text: String,
+    enabled: Boolean,
+    click: () -> Unit
+) {
+    Box(
+        Modifier
+            .height(
+                48.dp
+            )
+            .clip(
+                RoundedCornerShape(
+                    15.dp
+                )
+            )
+            .background(
+                if (
+                    enabled
+                ) {
+                    XmoRed.copy(
+                        alpha = .17f
+                    )
+                } else {
+                    Color.White.copy(
+                        alpha = .025f
+                    )
+                }
+            )
+            .border(
+                .8.dp,
+                if (
+                    enabled
+                ) {
+                    XmoRed.copy(
+                        alpha = .40f
+                    )
+                } else {
+                    Color.White.copy(
+                        alpha = .06f
+                    )
+                },
+                RoundedCornerShape(
+                    15.dp
+                )
+            )
+            .clickable(
+                enabled =
+                    enabled,
+
+                onClick =
+                    click
+            )
+            .padding(
+                horizontal =
+                    17.dp
+            ),
+
+        contentAlignment =
+            Alignment.Center
+    ) {
+        Text(
+            text,
+
+            color =
+                if (
+                    enabled
+                ) {
+                    XmoRed
+                } else {
+                    Color.White.copy(
+                        alpha = .28f
+                    )
+                },
+
+            fontFamily =
+                XmoFont.medium,
+
+            fontSize =
+                11.sp
         )
     }
 }
@@ -1162,24 +1347,29 @@ private fun SetupPermissionRow(
     title: String,
     subtitle: String,
     granted: Boolean,
+    required: Boolean,
     click: () -> Unit
 ) {
+    val green =
+        Color(0xFF34C759)
+
     val background by
         animateColorAsState(
             targetValue =
-                if (granted) {
-                    Color(0xFF34C759)
-                        .copy(
-                            alpha = .08f
-                        )
+                if (
+                    granted
+                ) {
+                    green.copy(
+                        alpha = .075f
+                    )
                 } else {
                     Color.White.copy(
-                        alpha = .025f
+                        alpha = .035f
                     )
                 },
 
             label =
-                "permission"
+                "permissionBackground"
         )
 
     Row(
@@ -1187,77 +1377,85 @@ private fun SetupPermissionRow(
             .fillMaxWidth()
             .clip(
                 RoundedCornerShape(
-                    24.dp
+                    20.dp
                 )
             )
             .background(
                 background
             )
             .border(
-                1.dp,
+                .8.dp,
 
-                if (granted) {
-                    Color(0xFF34C759)
-                        .copy(
-                            alpha = .50f
-                        )
+                if (
+                    granted
+                ) {
+                    green.copy(
+                        alpha = .38f
+                    )
+                } else if (
+                    required
+                ) {
+                    XmoRed.copy(
+                        alpha = .32f
+                    )
                 } else {
                     Color.White.copy(
-                        alpha = .04f
+                        alpha = .08f
                     )
                 },
 
                 RoundedCornerShape(
-                    24.dp
+                    20.dp
                 )
             )
             .clickable(
+                enabled =
+                    !granted,
+
                 onClick =
                     click
             )
             .padding(
-                horizontal = 18.dp,
-                vertical = 12.dp
+                horizontal = 16.dp,
+                vertical = 11.dp
             ),
 
         verticalAlignment =
             Alignment.CenterVertically
     ) {
-        /*
-         * Naked status indicator.
-         */
-        Canvas(
-            Modifier.size(
-                18.dp
-            )
-        ) {
-            drawCircle(
-                color =
-                    if (granted)
-                        Color(0xFF34C759)
-                    else
+        Box(
+            Modifier
+                .size(
+                    10.dp
+                )
+                .clip(
+                    CircleShape
+                )
+                .background(
+                    if (
+                        granted
+                    ) {
+                        green
+                    } else if (
+                        required
+                    ) {
+                        XmoRed
+                    } else {
                         Color.White.copy(
-                            alpha = .45f
-                        ),
-
-                radius =
-                    size.minDimension *
-                        .22f,
-
-                center =
-                    Offset(
-                        size.width / 2f,
-                        size.height / 2f
-                    )
-            )
-        }
+                            alpha = .42f
+                        )
+                    }
+                )
+        )
 
         Column(
             Modifier
-                .weight(1f)
+                .weight(
+                    1f
+                )
                 .padding(
                     start = 12.dp,
-                    end = 10.dp
+                    end = 8.dp
                 )
         ) {
             Text(
@@ -1270,7 +1468,7 @@ private fun SetupPermissionRow(
                     XmoFont.medium,
 
                 fontSize =
-                    13.sp
+                    12.sp
             )
 
             Text(
@@ -1278,36 +1476,48 @@ private fun SetupPermissionRow(
 
                 color =
                     Color.White.copy(
-                        alpha = .50f
+                        alpha = .48f
                     ),
 
                 fontFamily =
                     XmoFont.thin,
 
                 fontSize =
-                    10.sp
+                    9.sp,
+
+                maxLines =
+                    1,
+
+                overflow =
+                    TextOverflow.Ellipsis
             )
         }
 
         Text(
-            if (granted)
+            if (
+                granted
+            ) {
                 "Allowed"
-            else
-                "Allow",
+            } else {
+                "Allow"
+            },
 
             color =
-                if (granted)
-                    Color(0xFF34C759)
-                else
+                if (
+                    granted
+                ) {
+                    green
+                } else {
                     Color.White.copy(
-                        alpha = .55f
-                    ),
+                        alpha = .65f
+                    )
+                },
 
             fontFamily =
                 XmoFont.medium,
 
             fontSize =
-                11.sp
+                10.sp
         )
     }
 }
@@ -1324,11 +1534,11 @@ private fun SetupAction(
     Box(
         modifier
             .height(
-                46.dp
+                44.dp
             )
             .clip(
                 RoundedCornerShape(
-                    12.dp
+                    14.dp
                 )
             )
             .background(
@@ -1336,9 +1546,19 @@ private fun SetupAction(
             )
             .border(
                 .7.dp,
-                background,
+                if (
+                    enabled
+                ) {
+                    background.copy(
+                        alpha = 1f
+                    )
+                } else {
+                    Color.White.copy(
+                        alpha = .04f
+                    )
+                },
                 RoundedCornerShape(
-                    12.dp
+                    14.dp
                 )
             )
             .clickable(
@@ -1362,19 +1582,20 @@ private fun SetupAction(
                 XmoFont.medium,
 
             fontSize =
-                11.sp
+                10.sp,
+
+            textAlign =
+                TextAlign.Center
         )
     }
 }
 
 private fun Context.hasPermission(
     permission: String
-): Boolean {
-    return ContextCompat
+): Boolean =
+    ContextCompat
         .checkSelfPermission(
             this,
             permission
         ) ==
-        PackageManager
-            .PERMISSION_GRANTED
-}
+        PackageManager.PERMISSION_GRANTED
