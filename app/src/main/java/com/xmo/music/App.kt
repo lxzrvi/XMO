@@ -11,6 +11,7 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import com.xmo.music.data.Library
 import com.xmo.music.data.Song
@@ -42,11 +43,11 @@ fun App() {
         rememberSaveableStateHolder()
 
     /*
-     * ---------------------------------------------------------
-     * MEDIA3 PLAYER
-     * ---------------------------------------------------------
+     * =========================================================
+     * PLAYER
+     * =========================================================
      *
-     * UI owns MediaController wrapper.
+     * XmoPlayer owns MediaController.
      * PlaybackService owns ExoPlayer.
      */
     val player =
@@ -62,22 +63,18 @@ fun App() {
         }
     }
 
-    /*
-     * Keep this lifecycle aware because playback may continue
-     * while Activity is backgrounded.
-     */
     val playbackState by
-        player.state
-            .collectAsState()
+        player.state.collectAsState()
 
     /*
-     * ---------------------------------------------------------
-     * PERMISSION
-     * ---------------------------------------------------------
+     * =========================================================
+     * AUDIO PERMISSION
+     * =========================================================
      */
     val audioPermission =
         if (
-            Build.VERSION.SDK_INT >= 33
+            Build.VERSION.SDK_INT >=
+            33
         ) {
             Manifest.permission.READ_MEDIA_AUDIO
         } else {
@@ -87,28 +84,26 @@ fun App() {
     var allowed by
         remember {
             mutableStateOf(
-                ContextCompat
-                    .checkSelfPermission(
-                        context,
-                        audioPermission
-                    ) ==
+                ContextCompat.checkSelfPermission(
+                    context,
+                    audioPermission
+                ) ==
                     PackageManager.PERMISSION_GRANTED
             )
         }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
-            ActivityResultContracts
-                .RequestPermission()
+            ActivityResultContracts.RequestPermission()
         ) { granted ->
             allowed =
                 granted
         }
 
     /*
-     * ---------------------------------------------------------
+     * =========================================================
      * APP STATE
-     * ---------------------------------------------------------
+     * =========================================================
      */
     var tab by
         remember {
@@ -144,12 +139,12 @@ fun App() {
         }
 
     /*
-     * ---------------------------------------------------------
-     * NOW PLAYING NAVIGATION STATE
-     * ---------------------------------------------------------
+     * =========================================================
+     * NOW PLAYING STATE
+     * =========================================================
      *
-     * Playing screen is NOT a NavBar tab.
-     * It is a full-screen overlay above Home/Search/Settings.
+     * NowPlaying is NOT a NavBar tab.
+     * It sits above the entire app.
      */
     var showNowPlaying by
         remember {
@@ -169,9 +164,9 @@ fun App() {
         }
 
     /*
-     * ---------------------------------------------------------
-     * LOAD DATASTORE + LIBRARY
-     * ---------------------------------------------------------
+     * =========================================================
+     * INITIAL LOAD
+     * =========================================================
      */
     LaunchedEffect(Unit) {
         order =
@@ -193,7 +188,7 @@ fun App() {
     }
 
     /*
-     * Permission may be granted after first composition.
+     * Permission can be granted after the first composition.
      */
     LaunchedEffect(
         allowed
@@ -208,10 +203,9 @@ fun App() {
 
     LaunchedEffect(Unit) {
         if (!allowed) {
-            permissionLauncher
-                .launch(
-                    audioPermission
-                )
+            permissionLauncher.launch(
+                audioPermission
+            )
         }
     }
 
@@ -225,136 +219,147 @@ fun App() {
     ) {
         /*
          * -----------------------------------------------------
-         * MAIN APP
+         * MAIN TAB CONTENT
          * -----------------------------------------------------
          */
-        stateHolder.SaveableStateProvider(
-            key = "tab_$tab"
+        Box(
+            Modifier
+                .fillMaxSize()
+                .zIndex(0f)
         ) {
-            when (tab) {
-                0 -> {
-                    Home(
-                        songs =
-                            songs,
+            stateHolder.SaveableStateProvider(
+                key = "tab_$tab"
+            ) {
+                when (tab) {
+                    0 -> {
+                        Home(
+                            songs =
+                                songs,
 
-                        allowed =
-                            allowed,
+                            allowed =
+                                allowed,
 
-                        theme =
-                            theme,
+                            theme =
+                                theme,
 
-                        order =
-                            order,
+                            order =
+                                order,
 
-                        categories =
-                            categories,
+                            categories =
+                                categories,
 
-                        setTheme = {
-                            theme = it
-                        },
+                            setTheme = {
+                                theme =
+                                    it
+                            },
 
-                        refresh = {
-                            if (!allowed) {
-                                permissionLauncher
-                                    .launch(
+                            refresh = {
+                                if (!allowed) {
+                                    permissionLauncher.launch(
                                         audioPermission
                                     )
-                            } else {
-                                scope.launch {
-                                    songs =
-                                        Library.songs(
-                                            context
-                                        )
-                                }
-                            }
-                        },
-
-                        saveOrder = {
-                            order = it
-
-                            scope.launch {
-                                Store.saveOrder(
-                                    context,
-                                    it
-                                )
-                            }
-                        },
-
-                        saveCategories = {
-                            categories = it
-
-                            scope.launch {
-                                Store.saveCategories(
-                                    context,
-                                    it
-                                )
-                            }
-                        },
-
-                        /*
-                         * -------------------------------------
-                         * REAL SONG TAP
-                         * -------------------------------------
-                         *
-                         * Home gives:
-                         *
-                         * selected song
-                         * real source/category
-                         * source queue
-                         */
-                        onPlaySong = {
-                                song,
-                                source,
-                                isCategory,
-                                queue ->
-
-                            if (
-                                queue.isNotEmpty()
-                            ) {
-                                val index =
-                                    queue.indexOfFirst {
-                                        it.id ==
-                                            song.id
-                                    }
-
-                                if (index >= 0) {
-                                    /*
-                                     * Keep source metadata before
-                                     * opening player UI.
-                                     */
-                                    playingSource =
-                                        source
-
-                                    playingFromCategory =
-                                        isCategory
-
-                                    /*
-                                     * Actual Media3 playback.
-                                     */
-                                    player.play(
+                                } else {
+                                    scope.launch {
                                         songs =
-                                            queue,
-                                        index =
-                                            index
-                                    )
+                                            Library.songs(
+                                                context
+                                            )
+                                    }
+                                }
+                            },
 
-                                    /*
-                                     * Player enters from bottom.
-                                     */
-                                    showNowPlaying =
-                                        true
+                            saveOrder = {
+                                order =
+                                    it
+
+                                scope.launch {
+                                    Store.saveOrder(
+                                        context,
+                                        it
+                                    )
+                                }
+                            },
+
+                            saveCategories = {
+                                categories =
+                                    it
+
+                                scope.launch {
+                                    Store.saveCategories(
+                                        context,
+                                        it
+                                    )
+                                }
+                            },
+
+                            /*
+                             * ---------------------------------
+                             * SONG TAP
+                             * ---------------------------------
+                             *
+                             * Do NOT wait for playbackState.
+                             * Open NowPlaying immediately.
+                             */
+                            onPlaySong = {
+                                    song,
+                                    source,
+                                    isCategory,
+                                    queue ->
+
+                                if (
+                                    queue.isNotEmpty()
+                                ) {
+                                    val index =
+                                        queue.indexOfFirst {
+                                            it.id ==
+                                                song.id
+                                        }
+
+                                    if (
+                                        index >=
+                                        0
+                                    ) {
+                                        /*
+                                         * Store source first.
+                                         */
+                                        playingSource =
+                                            source
+
+                                        playingFromCategory =
+                                            isCategory
+
+                                        /*
+                                         * Open UI immediately.
+                                         *
+                                         * This is deliberately
+                                         * BEFORE player.play().
+                                         */
+                                        showNowPlaying =
+                                            true
+
+                                        /*
+                                         * Real Media3 playback.
+                                         */
+                                        player.play(
+                                            songs =
+                                                queue,
+
+                                            index =
+                                                index
+                                        )
+                                    }
                                 }
                             }
-                        }
-                    )
-                }
+                        )
+                    }
 
-                1 -> {
-                    Search()
-                }
+                    1 -> {
+                        Search()
+                    }
 
-                else -> {
-                    Settings()
+                    else -> {
+                        Settings()
+                    }
                 }
             }
         }
@@ -363,85 +368,84 @@ fun App() {
          * -----------------------------------------------------
          * APPROVED NAVBAR
          * -----------------------------------------------------
-         *
-         * No geometry changes.
-         *
-         * It remains below the NowPlaying layer because player
-         * is composed later in this Box.
          */
-        NavBar(
-            selected =
-                tab,
+        Box(
+            Modifier
+                .fillMaxSize()
+                .zIndex(1f)
+        ) {
+            NavBar(
+                selected =
+                    tab,
 
-            theme =
-                theme
-        ) { newTab ->
-            tab =
-                newTab
+                theme =
+                    theme
+            ) { value ->
+                tab =
+                    value
+            }
         }
 
         /*
-         * =====================================================
+         * -----------------------------------------------------
          * NOW PLAYING
-         * =====================================================
+         * -----------------------------------------------------
          *
-         * Last Box child = above Home + NavBar.
+         * Highest z-index.
+         * Therefore NavBar can never draw over it.
          */
         if (
             showNowPlaying
         ) {
-            NowPlaying(
-                state =
-                    playbackState,
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .zIndex(100f)
+            ) {
+                NowPlaying(
+                    state =
+                        playbackState,
 
-                theme =
-                    theme,
+                    theme =
+                        theme,
 
-                source =
-                    playingSource,
+                    source =
+                        playingSource,
 
-                sourceIsCategory =
-                    playingFromCategory,
+                    sourceIsCategory =
+                        playingFromCategory,
 
-                /*
-                 * Reads real MediaController position.
-                 * NowPlaying calls this periodically.
-                 */
-                refreshPosition = {
-                    player
-                        .refreshPosition()
-                },
+                    refreshPosition = {
+                        player.refreshPosition()
+                    },
 
-                togglePlay = {
-                    player
-                        .togglePlayPause()
-                },
+                    togglePlay = {
+                        player.togglePlayPause()
+                    },
 
-                previous = {
-                    player
-                        .previous()
-                },
+                    previous = {
+                        player.previous()
+                    },
 
-                next = {
-                    player
-                        .next()
-                },
+                    next = {
+                        player.next()
+                    },
 
-                seekTo = {
-                    player
-                        .seekTo(it)
-                },
+                    seekTo = {
+                        player.seekTo(
+                            it
+                        )
+                    },
 
-                /*
-                 * Dismiss UI only.
-                 *
-                 * Playback intentionally continues.
-                 */
-                dismiss = {
-                    showNowPlaying =
-                        false
-                }
-            )
+                    /*
+                     * Closing UI does NOT stop audio.
+                     */
+                    dismiss = {
+                        showNowPlaying =
+                            false
+                    }
+                )
+            }
         }
     }
 }
