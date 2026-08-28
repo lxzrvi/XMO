@@ -84,4 +84,28 @@ dependencies {
     implementation(
         "dev.chrisbanes.haze:haze-blur-materials:2.0.0-alpha05"
     )
+    
+    implementation(
+        "top.yukonga.miuix.kmp:miuix-ui:0.9.3"
+    )
+
+    implementation(
+        "top.yukonga.miuix.kmp:miuix-preference:0.9.3"
+    )
+
+    implementation(
+        "top.yukonga.miuix.kmp:miuix-icons:0.9.3"
+    )
+
+    implementation(
+        "top.yukonga.miuix.kmp:miuix-blur:0.9.3"
+    )
+
+    implementation(
+        "top.yukonga.miuix.kmp:miuix-squircle:0.9.3"
+    )
+
+    implementation(
+        "top.yukonga.miuix.kmp:miuix-nav:0.9.3"
+    )
 }
