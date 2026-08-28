@@ -694,14 +694,11 @@ fun NowPlaying(
                                 }
 
                             drawPath(
-                                path =
-                                    path,
-                                color =
-                                    c.border,
+                                path = path,
+                                color = c.border,
                                 style =
-                                    Stroke(
-                                        width =
-                                            stroke
+                                    androidx.compose.ui.graphics.drawscope.Stroke(
+                                        width = stroke
                                     )
                             )
                         }
