@@ -721,25 +721,19 @@ object Library {
                     )
             }
 
-    private fun String?.parseNumber():
-        Int? {
-        val value =
-            meaningful()
-                ?: return null
-
-        /*
-         * Handles common forms:
-         *
-         * 4
-         * 04
-         * 4/12
-         */
-        return value
-            .substringBefore("/")
-            .trim()
-            .toIntOrNull()
-            ?.takeIf {
-                it > 0
-            }
+        private fun String?.parseNumber(): Int? {
+            // existing code...
+        }
+    
+        private fun MediaMetadataRetriever.text(
+            key: Int
+        ): String? =
+            extractMetadata(key)
+                ?.trim()
+                ?.takeIf {
+                    it.isNotEmpty() &&
+                        !it.equals("<unknown>", ignoreCase = true) &&
+                        !it.equals("unknown", ignoreCase = true)
+                }
     }
 }
