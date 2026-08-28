@@ -12,7 +12,6 @@ android {
         applicationId = "com.xmo.music"
 
         minSdk = 31
-
         targetSdk = 36
 
         versionCode = 1
@@ -55,7 +54,7 @@ dependencies {
         "androidx.datastore:datastore-preferences:1.1.7"
     )
 
-    // Images
+    // Local images / artwork
     implementation(
         "io.coil-kt.coil3:coil-compose:3.3.0"
     )
@@ -64,7 +63,7 @@ dependencies {
         "androidx.palette:palette-ktx:1.0.0"
     )
 
-    // Media
+    // Media3
     implementation(
         "androidx.media3:media3-exoplayer:1.8.0"
     )
