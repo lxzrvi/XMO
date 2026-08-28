@@ -98,13 +98,21 @@ fun HomeHeader(
         "Turn up the volume!"
     )
 
-    var subtitle by remember { mutableIntStateOf(0) }
-    var menu by remember { mutableStateOf(false) }
+    var subtitle by remember {
+        mutableIntStateOf(0)
+    }
+
+    var menu by remember {
+        mutableStateOf(false)
+    }
 
     LaunchedEffect(Unit) {
         while (true) {
             delay(4500)
-            subtitle = (subtitle + 1) % subtitles.size
+
+            subtitle =
+                (subtitle + 1) %
+                    subtitles.size
         }
     }
 
@@ -114,10 +122,11 @@ fun HomeHeader(
             .padding(
                 start = 16.dp,
                 top = 7.dp,
-                end = 10.dp,
+                end = 12.dp,
                 bottom = 4.dp
             ),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
         Box(
             Modifier
@@ -131,13 +140,19 @@ fun HomeHeader(
                         )
                     )
                 )
-                .border(.6.dp, c.border, CircleShape),
-            contentAlignment = Alignment.Center
+                .border(
+                    .6.dp,
+                    c.border,
+                    CircleShape
+                ),
+            contentAlignment =
+                Alignment.Center
         ) {
             Text(
                 "X",
                 color = Color.White,
-                fontFamily = XmoFont.logo,
+                fontFamily =
+                    XmoFont.logo,
                 fontSize = 15.sp
             )
         }
@@ -150,8 +165,10 @@ fun HomeHeader(
             Text(
                 "XMO User",
                 color = c.text,
-                fontFamily = XmoFont.user,
-                fontWeight = FontWeight.Bold,
+                fontFamily =
+                    XmoFont.user,
+                fontWeight =
+                    FontWeight.Bold,
                 fontSize = 18.sp,
                 maxLines = 1
             )
@@ -159,71 +176,147 @@ fun HomeHeader(
             AnimatedContent(
                 targetState = subtitle,
                 transitionSpec = {
-                    fadeIn(tween(220)) togetherWith
-                        fadeOut(tween(180))
+                    fadeIn(
+                        tween(220)
+                    ) togetherWith
+                        fadeOut(
+                            tween(180)
+                        )
                 },
                 label = "subtitle"
             ) { index ->
                 Text(
                     subtitles[index],
                     color = c.sub,
-                    fontFamily = XmoFont.thin,
+                    fontFamily =
+                        XmoFont.thin,
                     fontSize = 11.sp,
                     maxLines = 1
                 )
             }
         }
 
-        IconButton(
-            onClick = refresh,
-            modifier = Modifier.size(42.dp)
-        ) {
-            XmoIcon(
-                R.drawable.ic_xmo_refresh,
-                c.icon,
-                Modifier.size(20.dp)
-            )
-        }
-
+        /*
+         * Refresh + hamburger are now one capsule.
+         */
         Box {
-            IconButton(
-                onClick = { menu = true },
-                modifier = Modifier.size(42.dp)
+            Row(
+                Modifier
+                    .clip(
+                        RoundedCornerShape(
+                            24.dp
+                        )
+                    )
+                    .background(c.button)
+                    .border(
+                        .6.dp,
+                        c.border,
+                        RoundedCornerShape(
+                            24.dp
+                        )
+                    )
+                    .padding(
+                        horizontal = 3.dp
+                    ),
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
-                XmoIcon(
-                    R.drawable.ic_xmo_menu,
-                    c.icon,
-                    Modifier.size(21.dp)
+                IconButton(
+                    onClick = refresh,
+                    modifier =
+                        Modifier.size(
+                            38.dp
+                        )
+                ) {
+                    XmoIcon(
+                        R.drawable
+                            .ic_xmo_refresh,
+                        c.icon,
+                        Modifier.size(
+                            18.dp
+                        )
+                    )
+                }
+
+                Box(
+                    Modifier
+                        .width(.6.dp)
+                        .height(18.dp)
+                        .background(
+                            c.border
+                        )
                 )
+
+                IconButton(
+                    onClick = {
+                        menu = true
+                    },
+                    modifier =
+                        Modifier.size(
+                            38.dp
+                        )
+                ) {
+                    XmoIcon(
+                        R.drawable
+                            .ic_xmo_menu,
+                        c.icon,
+                        Modifier.size(
+                            19.dp
+                        )
+                    )
+                }
             }
 
             DropdownMenu(
                 expanded = menu,
-                onDismissRequest = { menu = false },
-                containerColor = c.surface,
-                shape = RoundedCornerShape(12.dp)
-            ) {
-                XmoTheme.entries.forEach { item ->
-                    DropdownMenuItem(
-                        text = {
-                            Text(
-                                when (item) {
-                                    XmoTheme.Dark -> "Dark Theme"
-                                    XmoTheme.Light -> "Light Theme"
-                                    XmoTheme.Amoled -> "AMOLED"
-                                },
-                                color = if (theme == item)
-                                    XmoRed else c.text,
-                                fontFamily = XmoFont.medium,
-                                fontSize = 13.sp
-                            )
-                        },
-                        onClick = {
-                            setTheme(item)
-                            menu = false
-                        }
+                onDismissRequest = {
+                    menu = false
+                },
+                containerColor =
+                    c.surface,
+                shape =
+                    RoundedCornerShape(
+                        12.dp
                     )
-                }
+            ) {
+                XmoTheme.entries
+                    .forEach { item ->
+
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    when (item) {
+                                        XmoTheme.Dark ->
+                                            "Dark Theme"
+
+                                        XmoTheme.Light ->
+                                            "Light Theme"
+
+                                        XmoTheme.Amoled ->
+                                            "AMOLED"
+                                    },
+                                    color =
+                                        if (
+                                            theme ==
+                                            item
+                                        )
+                                            XmoRed
+                                        else
+                                            c.text,
+                                    fontFamily =
+                                        XmoFont.medium,
+                                    fontSize =
+                                        13.sp
+                                )
+                            },
+                            onClick = {
+                                setTheme(
+                                    item
+                                )
+                                menu = false
+                            }
+                        )
+                    }
             }
         }
     }
@@ -241,26 +334,47 @@ fun CategoryChip(
 ) {
     Row(
         modifier
-            .clip(RoundedCornerShape(18.dp))
-            .background(
-                if (active) XmoRed.copy(.18f)
-                else c.button
+            .clip(
+                RoundedCornerShape(
+                    18.dp
+                )
             )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            .background(
+                if (active)
+                    XmoRed.copy(.18f)
+                else
+                    c.button
+            )
+            .clickable(
+                onClick = onClick
+            )
+            .padding(
+                horizontal = 13.dp,
+                vertical = 7.dp
+            ),
+        verticalAlignment =
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            Arrangement.spacedBy(6.dp)
     ) {
         XmoIcon(
             icon,
-            if (active) XmoRed else tint,
+            if (active)
+                XmoRed
+            else
+                tint,
             Modifier.size(14.dp)
         )
 
         Text(
             text,
-            color = if (active) XmoRed else c.text,
-            fontFamily = XmoFont.medium,
+            color =
+                if (active)
+                    XmoRed
+                else
+                    c.text,
+            fontFamily =
+                XmoFont.medium,
             fontSize = 12.sp,
             maxLines = 1
         )
@@ -281,8 +395,12 @@ fun SectionTitle(
         modifier
             .fillMaxWidth()
             .animateContentSize()
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .padding(
+                horizontal = 10.dp,
+                vertical = 8.dp
+            ),
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
         XmoIcon(
             icon,
@@ -298,15 +416,19 @@ fun SectionTitle(
             Text(
                 title,
                 color = c.text,
-                fontFamily = XmoFont.bold,
+                fontFamily =
+                    XmoFont.bold,
                 fontSize = 17.sp
             )
 
-            if (subtitle.isNotBlank()) {
+            if (
+                subtitle.isNotBlank()
+            ) {
                 Text(
                     subtitle,
                     color = c.sub,
-                    fontFamily = XmoFont.thin,
+                    fontFamily =
+                        XmoFont.thin,
                     fontSize = 10.sp
                 )
             }
@@ -317,14 +439,23 @@ fun SectionTitle(
                 Modifier
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(XmoRed.copy(.18f))
-                    .clickable(onClick = onAction),
-                contentAlignment = Alignment.Center
+                    .background(
+                        XmoRed.copy(
+                            .18f
+                        )
+                    )
+                    .clickable {
+                        onAction()
+                    },
+                contentAlignment =
+                    Alignment.Center
             ) {
                 XmoIcon(
                     it,
                     XmoRed,
-                    Modifier.size(14.dp)
+                    Modifier.size(
+                        14.dp
+                    )
                 )
             }
         }
@@ -339,32 +470,53 @@ fun SongTile(
     theme: XmoTheme,
     modifier: Modifier = Modifier
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context =
+        androidx.compose.ui.platform
+            .LocalContext.current
 
-    var dominant by remember(song.artwork) {
-        mutableStateOf(Color(0xFF35353A))
-    }
-
-    LaunchedEffect(song.artwork) {
-        dominant = Artwork.color(
-            context,
-            song.artwork
+    var dominant by remember(
+        song.artwork
+    ) {
+        mutableStateOf(
+            Color(0xFF35353A)
         )
     }
 
-    val alpha = when (theme) {
-        XmoTheme.Light -> .35f
-        XmoTheme.Dark -> .40f
-        XmoTheme.Amoled -> .45f
+    LaunchedEffect(
+        song.artwork
+    ) {
+        dominant =
+            Artwork.color(
+                context,
+                song.artwork
+            )
     }
+
+    val alpha =
+        when (theme) {
+            XmoTheme.Light ->
+                .35f
+
+            XmoTheme.Dark ->
+                .40f
+
+            XmoTheme.Amoled ->
+                .45f
+        }
 
     Column(
         modifier
-            .clip(RoundedCornerShape(10.dp))
+            .clip(
+                RoundedCornerShape(
+                    10.dp
+                )
+            )
             .background(
                 Brush.linearGradient(
                     listOf(
-                        dominant.copy(alpha),
+                        dominant.copy(
+                            alpha
+                        ),
                         Artwork.end(
                             dominant,
                             theme
@@ -375,7 +527,9 @@ fun SongTile(
             .border(
                 .55.dp,
                 c.border,
-                RoundedCornerShape(10.dp)
+                RoundedCornerShape(
+                    10.dp
+                )
             )
             .padding(5.dp)
     ) {
@@ -383,15 +537,29 @@ fun SongTile(
             Modifier
                 .fillMaxWidth()
                 .aspectRatio(1f)
-                .clip(RoundedCornerShape(6.dp))
-                .background(dominant.copy(.15f))
+                .clip(
+                    RoundedCornerShape(
+                        6.dp
+                    )
+                )
+                .background(
+                    dominant.copy(
+                        .15f
+                    )
+                )
         ) {
             AsyncImage(
-                model = song.artwork,
-                contentDescription = null,
-                modifier = Modifier.fillMaxSize(),
+                model =
+                    song.artwork,
+                contentDescription =
+                    null,
+                modifier =
+                    Modifier
+                        .fillMaxSize(),
                 contentScale =
-                    androidx.compose.ui.layout.ContentScale.Crop
+                    androidx.compose.ui
+                        .layout
+                        .ContentScale.Crop
             )
         }
 
@@ -399,7 +567,8 @@ fun SongTile(
             Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
             Column(
                 Modifier.weight(1f)
@@ -407,24 +576,31 @@ fun SongTile(
                 Text(
                     song.title,
                     color = c.text,
-                    fontFamily = XmoFont.bold,
+                    fontFamily =
+                        XmoFont.bold,
                     fontSize = 10.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow =
+                        TextOverflow
+                            .Ellipsis
                 )
 
                 Text(
                     song.artist,
                     color = c.sub,
-                    fontFamily = XmoFont.thin,
+                    fontFamily =
+                        XmoFont.thin,
                     fontSize = 8.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow =
+                        TextOverflow
+                            .Ellipsis
                 )
             }
 
             XmoIcon(
-                R.drawable.ic_xmo_more,
+                R.drawable
+                    .ic_xmo_more,
                 c.sub,
                 Modifier.size(14.dp)
             )
