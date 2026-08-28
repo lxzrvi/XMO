@@ -13,10 +13,6 @@ android {
 
         minSdk = 31
 
-        /*
-         * Compile 37 only because dependencies need API 37.
-         * Runtime behavior stays target 36.
-         */
         targetSdk = 36
 
         versionCode = 1
@@ -28,11 +24,8 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility =
-            JavaVersion.VERSION_17
-
-        targetCompatibility =
-            JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 }
 
