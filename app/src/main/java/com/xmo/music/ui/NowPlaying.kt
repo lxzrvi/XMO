@@ -1458,31 +1458,23 @@ fun NowPlaying(
 
                     right = {
                         PlayerPillButton(
-                            active =
-                                false,
-
-                            c =
-                                c
-                        ) {
-                            lyricPicker.launch(
-                                arrayOf(
-                                    "text/plain",
-                                    "application/octet-stream",
-                                    "application/x-subrip"
+                            active = false,
+                            c = c,
+                            click = {
+                                lyricPicker.launch(
+                                    arrayOf(
+                                        "text/plain",
+                                        "application/octet-stream",
+                                        "application/x-subrip"
+                                    )
                                 )
-                            )
-                        } content@{
+                            }
+                        ) {
                             Text(
                                 "+",
-
-                                color =
-                                    accent,
-
-                                fontFamily =
-                                    XmoFont.medium,
-
-                                fontSize =
-                                    20.sp
+                                color = accent,
+                                fontFamily = XmoFont.medium,
+                                fontSize = 20.sp
                             )
                         }
 
@@ -2816,7 +2808,7 @@ private fun FullLyrics(
 private fun BorderSection(
     c: HomeColors,
     title: String,
-    right: @Composable Row.() -> Unit = {},
+    right: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit = {},
     content: @Composable Column.() -> Unit
 ) {
     val accent =
