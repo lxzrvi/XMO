@@ -89,6 +89,7 @@ import com.xmo.music.ui.blur.liveBlur
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.util.UUID
 import kotlin.math.abs
