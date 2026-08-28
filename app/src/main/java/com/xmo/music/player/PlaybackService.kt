@@ -8,7 +8,6 @@ import androidx.media3.session.MediaSessionService
 
 class PlaybackService : MediaSessionService() {
 
-    private var player: ExoPlayer? = null
     private var mediaSession: MediaSession? = null
 
     override fun onCreate() {
@@ -16,15 +15,13 @@ class PlaybackService : MediaSessionService() {
 
         val audioAttributes =
             AudioAttributes.Builder()
-                .setUsage(
-                    C.USAGE_MEDIA
-                )
+                .setUsage(C.USAGE_MEDIA)
                 .setContentType(
                     C.AUDIO_CONTENT_TYPE_MUSIC
                 )
                 .build()
 
-        val exoPlayer =
+        val player =
             ExoPlayer.Builder(this)
                 .build()
                 .apply {
@@ -33,22 +30,15 @@ class PlaybackService : MediaSessionService() {
                         true
                     )
 
-                    /*
-                     * Headphones/Bluetooth/audio-focus related
-                     * noisy-device handling.
-                     */
                     setHandleAudioBecomingNoisy(
                         true
                     )
                 }
 
-        player =
-            exoPlayer
-
         mediaSession =
             MediaSession.Builder(
                 this,
-                exoPlayer
+                player
             )
                 .build()
     }
@@ -61,17 +51,12 @@ class PlaybackService : MediaSessionService() {
     }
 
     override fun onDestroy() {
-        mediaSession
-            ?.release()
+        mediaSession?.run {
+            player.release()
+            release()
+        }
 
-        mediaSession =
-            null
-
-        player
-            ?.release()
-
-        player =
-            null
+        mediaSession = null
 
         super.onDestroy()
     }
