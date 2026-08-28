@@ -54,6 +54,8 @@ import com.xmo.music.ui.homeColors
 import com.xmo.music.ui.blur.liveBlurSource
 import com.xmo.music.ui.blur.rememberLiveBlurState
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.blur.layerBackdrop
+import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 
 enum class XmoTheme {
     Dark,
@@ -78,6 +80,10 @@ fun App() {
     val hazeState =
         rememberLiveBlurState()
 
+    val liquidBackdrop =
+        rememberLayerBackdrop()
+        
+    val liquidBackdrop = rememberLayerBackdrop()
     /*
      * =========================================================
      * MEDIA3
@@ -915,6 +921,9 @@ fun App() {
                     .liveBlurSource(
                         hazeState
                     )
+                    .layerBackdrop(
+                        liquidBackdrop
+                    )
             ) {
                 /*
                  * =================================================
@@ -1140,17 +1149,11 @@ fun App() {
                     !profileOpen
                 ) {
                     NavBar(
-                        selected =
-                            tab,
-
-                        theme =
-                            theme,
-
-                        hazeState =
-                            hazeState
+                        selected = tab,
+                        theme = theme,
+                        backdrop = liquidBackdrop
                     ) {
-                        tab =
-                            it
+                        tab = it
                     }
                 }
 
