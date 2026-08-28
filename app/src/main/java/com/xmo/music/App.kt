@@ -60,21 +60,15 @@ fun App() {
 
     /*
      * =========================================================
-     * ONE SHARED HAZE BACKDROP
+     * ONE SHARED HAZE STATE
      * =========================================================
-     *
-     * One state at application UI level.
-     *
-     * NavBar and MiniPlayer will reuse this same state.
-     *
-     * Never create a HazeState per button/tab/card.
      */
     val hazeState =
         rememberLiveBlurState()
 
     /*
      * =========================================================
-     * MEDIA3 PLAYER
+     * MEDIA3
      * =========================================================
      */
     val player =
@@ -100,12 +94,13 @@ fun App() {
 
     /*
      * =========================================================
-     * LOCAL AUDIO PERMISSION
+     * AUDIO PERMISSION
      * =========================================================
      */
     val audioPermission =
         if (
-            Build.VERSION.SDK_INT >= 33
+            Build.VERSION.SDK_INT >=
+            33
         ) {
             Manifest.permission
                 .READ_MEDIA_AUDIO
@@ -131,18 +126,14 @@ fun App() {
         rememberLauncherForActivityResult(
             ActivityResultContracts
                 .RequestPermission()
-        ) { granted ->
-
-            allowed =
-                granted
+        ) {
+            allowed = it
         }
 
     /*
      * =========================================================
-     * FIRST RUN / PROFILE
+     * SETUP / PROFILE
      * =========================================================
-     *
-     * null = DataStore is still loading.
      */
     var setupComplete by
         remember {
@@ -160,7 +151,7 @@ fun App() {
 
     /*
      * =========================================================
-     * MAIN APP STATE
+     * MAIN APP
      * =========================================================
      */
     var tab by
@@ -200,7 +191,7 @@ fun App() {
 
     /*
      * =========================================================
-     * PLAYER UI STATE
+     * PLAYER UI
      * =========================================================
      */
     var showNowPlaying by
@@ -210,12 +201,6 @@ fun App() {
             )
         }
 
-    /*
-     * Existing MiniPlayer can remain under NowPlaying while
-     * NowPlaying is entering.
-     *
-     * onOpened() removes it silently afterwards.
-     */
     var miniVisible by
         remember {
             mutableStateOf(
@@ -223,11 +208,6 @@ fun App() {
             )
         }
 
-    /*
-     * Increment only after NowPlaying completely leaves screen.
-     *
-     * MiniPlayer uses this to rise from behind the NavBar.
-     */
     var miniRiseKey by
         remember {
             mutableIntStateOf(
@@ -251,7 +231,7 @@ fun App() {
 
     /*
      * =========================================================
-     * INITIAL DATASTORE LOAD
+     * INITIAL DATA
      * =========================================================
      */
     LaunchedEffect(Unit) {
@@ -276,7 +256,8 @@ fun App() {
             )
 
         if (
-            setupComplete == true &&
+            setupComplete ==
+            true &&
             allowed
         ) {
             songs =
@@ -286,19 +267,14 @@ fun App() {
         }
     }
 
-    /*
-     * Permission can become allowed after:
-     *
-     * - Setup
-     * - main permission launcher
-     */
     LaunchedEffect(
         allowed,
         setupComplete
     ) {
         if (
             allowed &&
-            setupComplete == true
+            setupComplete ==
+            true
         ) {
             songs =
                 Library.songs(
@@ -307,32 +283,29 @@ fun App() {
         }
     }
 
-    /*
-     * Setup owns first-run audio permission.
-     *
-     * Existing users still get main app permission request
-     * when needed.
-     */
     LaunchedEffect(
         setupComplete
     ) {
         if (
-            setupComplete == true &&
+            setupComplete ==
+            true &&
             !allowed
         ) {
-            permissionLauncher.launch(
-                audioPermission
-            )
+            permissionLauncher
+                .launch(
+                    audioPermission
+                )
         }
     }
 
     /*
      * =========================================================
-     * INITIAL DATASTORE LOADING
+     * LOADING
      * =========================================================
      */
     if (
-        setupComplete == null
+        setupComplete ==
+        null
     ) {
         Box(
             Modifier.fillMaxSize()
@@ -343,14 +316,12 @@ fun App() {
 
     /*
      * =========================================================
-     * FIRST-RUN SETUP
+     * FIRST RUN SETUP
      * =========================================================
-     *
-     * Setup itself does not need app glass backdrop.
-     * It has its own clean first-run identity.
      */
     if (
-        setupComplete == false
+        setupComplete ==
+        false
     ) {
         Setup(
             initialProfile =
@@ -371,29 +342,30 @@ fun App() {
                         nextCategories
                     )
 
-                    /*
-                     * Keep initial custom category IDs in the
-                     * same Home section/category ordering system.
-                     */
                     val customIds =
-                        nextCategories.map {
-                            it.id
-                        }
+                        nextCategories
+                            .map {
+                                it.id
+                            }
 
                     val builtIns =
                         order.filter {
-                            it in Store.defaults
+                            it in
+                                Store.defaults
                         }
 
                     val existingCustom =
                         order.filter {
-                            it !in Store.defaults &&
-                                it in customIds
+                            it !in
+                                Store.defaults &&
+                                it in
+                                customIds
                         }
 
                     val missing =
                         customIds.filterNot {
-                            it in existingCustom
+                            it in
+                                existingCustom
                         }
 
                     val nextOrder =
@@ -415,10 +387,6 @@ fun App() {
                     result ->
 
                 scope.launch {
-                    /*
-                     * Setup owns its own launcher, so refresh
-                     * actual permission here.
-                     */
                     allowed =
                         ContextCompat
                             .checkSelfPermission(
@@ -455,11 +423,6 @@ fun App() {
                     profile =
                         result
 
-                    /*
-                     * Setup Later still marks onboarding as done,
-                     * otherwise user would be forced through it
-                     * on every launch.
-                     */
                     Store.finishSetup(
                         context,
                         result
@@ -476,18 +439,13 @@ fun App() {
 
     /*
      * =========================================================
-     * SHARED PLAYBACK ENTRY POINT
+     * SHARED PLAY COMMAND
      * =========================================================
-     *
-     * Used by:
-     * Home
-     * Search
-     * future Album/Artist screens
      */
-    fun playSong(
+    fun startSong(
         song: Song,
         source: String,
-        sourceIsCategory: Boolean,
+        isCategory: Boolean,
         queue: List<Song>
     ) {
         val index =
@@ -497,7 +455,8 @@ fun App() {
             }
 
         if (
-            index < 0
+            index <
+            0
         ) {
             return
         }
@@ -506,54 +465,33 @@ fun App() {
             source
 
         playingSourceIsCategory =
-            sourceIsCategory
+            isCategory
 
         /*
-         * If audio was already playing, keep current MiniPlayer
-         * exactly where it is during NowPlaying entrance.
-         *
-         * NowPlaying will cover it naturally.
+         * Existing MiniPlayer remains exactly where it is while
+         * NowPlaying enters.
          */
         miniVisible =
             playback.currentSongId !=
                 null
 
-        /*
-         * Open UI immediately.
-         */
         showNowPlaying =
             true
 
-        /*
-         * Real Media3 queue.
-         */
         player.play(
             queue,
             index
         )
     }
 
-    /*
-     * =========================================================
-     * MAIN APPLICATION
-     * =========================================================
-     *
-     * Profile is supplied throughout UI without threading
-     * profile arguments through giant Home.kt.
-     */
     CompositionLocalProvider(
         LocalXmoProfile provides
             profile
     ) {
         /*
          * =====================================================
-         * SHARED HAZE SOURCE
+         * SINGLE SHARED BACKDROP SOURCE
          * =====================================================
-         *
-         * Main app is the single backdrop capture source.
-         *
-         * Future NavBar/MiniPlayer hazeBlur() calls consume this
-         * same state.
          */
         Box(
             Modifier
@@ -581,9 +519,7 @@ fun App() {
                     ) {
                         when (tab) {
                             /*
-                             * ---------------------------------
                              * HOME
-                             * ---------------------------------
                              */
                             0 -> {
                                 Home(
@@ -608,7 +544,9 @@ fun App() {
                                     },
 
                                     refresh = {
-                                        if (!allowed) {
+                                        if (
+                                            !allowed
+                                        ) {
                                             permissionLauncher
                                                 .launch(
                                                     audioPermission
@@ -657,14 +595,14 @@ fun App() {
                                             isCategory,
                                             queue ->
 
-                                        playSong(
+                                        startSong(
                                             song =
                                                 song,
 
                                             source =
                                                 source,
 
-                                            sourceIsCategory =
+                                            isCategory =
                                                 isCategory,
 
                                             queue =
@@ -675,9 +613,7 @@ fun App() {
                             }
 
                             /*
-                             * ---------------------------------
                              * SEARCH
-                             * ---------------------------------
                              */
                             1 -> {
                                 Search(
@@ -701,14 +637,14 @@ fun App() {
                                             isCategory,
                                             queue ->
 
-                                        playSong(
+                                        startSong(
                                             song =
                                                 song,
 
                                             source =
                                                 source,
 
-                                            sourceIsCategory =
+                                            isCategory =
                                                 isCategory,
 
                                             queue =
@@ -719,9 +655,7 @@ fun App() {
                             }
 
                             /*
-                             * ---------------------------------
                              * SETTINGS
-                             * ---------------------------------
                              */
                             else -> {
                                 Settings(
@@ -734,7 +668,9 @@ fun App() {
                                     },
 
                                     rescan = {
-                                        if (!allowed) {
+                                        if (
+                                            !allowed
+                                        ) {
                                             permissionLauncher
                                                 .launch(
                                                     audioPermission
@@ -756,36 +692,26 @@ fun App() {
 
             /*
              * =================================================
-             * APPROVED NAVBAR
+             * HAZE NAVBAR
              * =================================================
-             *
-             * Geometry / gesture system unchanged.
-             *
-             * Next file pass will give NavBar the shared
-             * hazeState for rendering only.
              */
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .zIndex(
-                        10f
-                    )
-            ) {
-                NavBar(
-                    selected =
-                        tab,
+            NavBar(
+                selected =
+                    tab,
 
-                    theme =
-                        theme
-                ) {
-                    tab =
-                        it
-                }
+                theme =
+                    theme,
+
+                hazeState =
+                    hazeState
+            ) {
+                tab =
+                    it
             }
 
             /*
              * =================================================
-             * MINIPLAYER
+             * HAZE MINIPLAYER
              * =================================================
              */
             if (
@@ -807,14 +733,17 @@ fun App() {
                         theme =
                             theme,
 
+                        hazeState =
+                            hazeState,
+
                         riseKey =
                             miniRiseKey,
 
                         /*
-                         * Do NOT hide/animate MiniPlayer here.
+                         * Tap / completed swipe-up:
                          *
-                         * It remains still.
-                         * NowPlaying rises over it.
+                         * MiniPlayer itself does not move away.
+                         * Full player simply rises over it.
                          */
                         openPlayer = {
                             showNowPlaying =
@@ -871,10 +800,9 @@ fun App() {
                             player.queue(),
 
                         /*
-                         * Player entrance is complete.
+                         * Full-screen entrance complete.
                          *
-                         * MiniPlayer can now disappear from
-                         * background without visual animation.
+                         * Remove MiniPlayer silently from behind.
                          */
                         onOpened = {
                             miniVisible =
@@ -909,15 +837,16 @@ fun App() {
                         },
 
                         /*
-                         * Called only after NowPlaying is
-                         * completely below viewport.
+                         * NowPlaying calls this after FULL downward
+                         * exit only.
                          */
                         dismiss = {
                             showNowPlaying =
                                 false
 
                             /*
-                             * Trigger new MiniPlayer rise.
+                             * New MiniPlayer composition starts
+                             * below NavBar and rises to position.
                              */
                             miniRiseKey++
 
@@ -931,12 +860,8 @@ fun App() {
 
             /*
              * =================================================
-             * MINIPLAYER RECOVERY
+             * RECOVERY
              * =================================================
-             *
-             * Keeps MiniPlayer available after playback starts
-             * or Activity state updates when NowPlaying isn't
-             * visible.
              */
             LaunchedEffect(
                 playback.currentSongId,
