@@ -3,11 +3,12 @@ package com.xmo.music.ui.nowplaying
 import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -41,7 +41,6 @@ import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -58,6 +57,12 @@ import com.xmo.music.data.SongLyrics
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.XmoFont
 import kotlinx.coroutines.delay
+
+/*
+ * =============================================================
+ * COVER-SIZED LYRICS
+ * =============================================================
+ */
 
 @Composable
 internal fun ArtworkLyrics(
@@ -96,6 +101,10 @@ internal fun ArtworkLyrics(
                     )
         )
 
+        /*
+         * Local LRC + fullscreen controls remain inside the
+         * artwork footprint.
+         */
         XmoCapsule(
             background =
                 colors.text.copy(
@@ -141,8 +150,8 @@ internal fun ArtworkLyrics(
         }
 
         /*
-         * Explicit route back to artwork. Manual lyric scrolling
-         * cannot accidentally flip the surface.
+         * Explicitly returns to artwork. Scrolling/touching the
+         * lyrics themselves does not close this surface.
          */
         Text(
             text = "ARTWORK",
@@ -173,6 +182,12 @@ internal fun ArtworkLyrics(
     }
 }
 
+/*
+ * =============================================================
+ * FOLLOWING LYRICS
+ * =============================================================
+ */
+
 @Composable
 internal fun FollowLyrics(
     lyrics: SongLyrics?,
@@ -187,7 +202,7 @@ internal fun FollowLyrics(
         lyrics.lines.isEmpty()
     ) {
         Box(
-            modifier,
+            modifier = modifier,
             contentAlignment =
                 Alignment.Center
         ) {
@@ -220,23 +235,17 @@ internal fun FollowLyrics(
 
     val active =
         currentLyricIndex(
-            lyrics,
-            position
+            lyrics = lyrics,
+            position = position
         )
 
     val listState =
         rememberLazyListState()
 
     /*
-     * Spotify/Apple-style interaction principle:
-     *
-     * playback follows the active timestamp automatically;
-     * as soon as the user manually browses lyrics, automatic
-     * positioning backs off. Three seconds after interaction
-     * ends it follows playback again.
-     *
-     * Visuals are XMO's own rather than reproducing another
-     * application's exact UI.
+     * User scrolling temporarily owns positioning. After three
+     * seconds without manual scrolling, synced lyrics return to
+     * following actual playback position.
      */
     var browsing by remember {
         mutableStateOf(false)
@@ -281,8 +290,7 @@ internal fun FollowLyrics(
             centerLyric(
                 state = listState,
                 index = active,
-                fullscreen =
-                    fullscreen
+                fullscreen = fullscreen
             )
         }
     }
@@ -291,21 +299,20 @@ internal fun FollowLyrics(
         state = listState,
         modifier = modifier,
         contentPadding =
-            androidx.compose.foundation.layout
-                .PaddingValues(
-                    top =
-                        if (fullscreen) {
-                            245.dp
-                        } else {
-                            110.dp
-                        },
-                    bottom =
-                        if (fullscreen) {
-                            285.dp
-                        } else {
-                            110.dp
-                        }
-                ),
+            PaddingValues(
+                top =
+                    if (fullscreen) {
+                        245.dp
+                    } else {
+                        110.dp
+                    },
+                bottom =
+                    if (fullscreen) {
+                        285.dp
+                    } else {
+                        110.dp
+                    }
+            ),
         verticalArrangement =
             Arrangement.spacedBy(
                 if (fullscreen) {
@@ -318,7 +325,7 @@ internal fun FollowLyrics(
         itemsIndexed(
             items = lyrics.lines,
             key = { index, line ->
-                "${line.timeMs}:$index:${line.text}"
+                "$index:${line.timeMs}:${line.text}"
             }
         ) { index, line ->
 
@@ -431,6 +438,12 @@ private suspend fun centerLyric(
     )
 }
 
+/*
+ * =============================================================
+ * FULLSCREEN LYRICS
+ * =============================================================
+ */
+
 @Composable
 internal fun FullLyrics(
     lyrics: SongLyrics?,
@@ -452,11 +465,10 @@ internal fun FullLyrics(
     close: () -> Unit
 ) {
     val foreground =
-        if (dominant.luminance() > .58f) {
-            Color(0xFF111214)
-        } else {
-            Color.White
-        } {
+        if (
+            dominant.luminance() >
+            .58f
+        ) {
             Color(0xFF111214)
         } else {
             Color.White
@@ -464,9 +476,12 @@ internal fun FullLyrics(
 
     val lyricColors =
         HomeColors(
-            bg = Color.Transparent,
-            surface = Color.Transparent,
-            text = foreground,
+            bg =
+                Color.Transparent,
+            surface =
+                Color.Transparent,
+            text =
+                foreground,
             sub =
                 foreground.copy(
                     alpha = .60f
@@ -500,6 +515,12 @@ internal fun FullLyrics(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
+            /*
+             * =================================================
+             * HEADER
+             * =================================================
+             */
+
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -521,6 +542,11 @@ internal fun FullLyrics(
                                 RoundedCornerShape(
                                     9.dp
                                 )
+                            )
+                            .background(
+                                foreground.copy(
+                                    alpha = .08f
+                                )
                             ),
                     contentScale =
                         ContentScale.Crop
@@ -529,10 +555,15 @@ internal fun FullLyrics(
                 Column(
                     Modifier
                         .weight(1f)
-                        .padding(start = 10.dp)
+                        .padding(
+                            start = 10.dp
+                        )
                 ) {
                     Text(
-                        text = title,
+                        text =
+                            title.ifBlank {
+                                "Unknown song"
+                            },
                         color = foreground,
                         fontFamily =
                             XmoFont.bold,
@@ -543,7 +574,10 @@ internal fun FullLyrics(
                     )
 
                     Text(
-                        text = artist,
+                        text =
+                            artist.ifBlank {
+                                "Unknown artist"
+                            },
                         color =
                             foreground.copy(
                                 alpha = .60f
@@ -558,7 +592,8 @@ internal fun FullLyrics(
                 }
 
                 /*
-                 * Requested exact control order:
+                 * Requested order:
+                 *
                  * Play -> Previous -> Next -> Close
                  */
                 XmoCapsule(
@@ -568,7 +603,9 @@ internal fun FullLyrics(
                         )
                 ) {
                     CapsuleButton(
-                        onClick = togglePlay
+                        size = 39.dp,
+                        onClick =
+                            togglePlay
                     ) {
                         Icon(
                             imageVector =
@@ -590,8 +627,11 @@ internal fun FullLyrics(
                     }
 
                     CapsuleButton(
-                        enabled = canPrevious,
-                        onClick = previous
+                        size = 39.dp,
+                        enabled =
+                            canPrevious,
+                        onClick =
+                            previous
                     ) {
                         Icon(
                             imageVector =
@@ -615,8 +655,11 @@ internal fun FullLyrics(
                     }
 
                     CapsuleButton(
-                        enabled = canNext,
-                        onClick = next
+                        size = 39.dp,
+                        enabled =
+                            canNext,
+                        onClick =
+                            next
                     ) {
                         Icon(
                             imageVector =
@@ -638,6 +681,7 @@ internal fun FullLyrics(
                     }
 
                     CapsuleButton(
+                        size = 39.dp,
                         onClick = close
                     ) {
                         Icon(
@@ -654,13 +698,18 @@ internal fun FullLyrics(
             }
 
             /*
-             * Real MediaController seek state, draggable by finger.
+             * =================================================
+             * REAL DRAGGABLE PROGRESS
+             * =================================================
              */
+
             Column(
                 Modifier
                     .fillMaxWidth()
                     .padding(
-                        horizontal = 17.dp
+                        start = 17.dp,
+                        end = 17.dp,
+                        top = 2.dp
                     )
             ) {
                 RoundedSeekBar(
@@ -709,6 +758,10 @@ internal fun FullLyrics(
                 Modifier.height(4.dp)
             )
 
+            /*
+             * No fixed screen-height calculation. Weight gives
+             * lyrics exactly the remaining safe viewport.
+             */
             FollowLyrics(
                 lyrics = lyrics,
                 position = position,
