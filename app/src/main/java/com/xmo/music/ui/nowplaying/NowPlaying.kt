@@ -6,7 +6,6 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -43,6 +42,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
@@ -64,10 +64,10 @@ import com.xmo.music.data.SongLyrics
 import com.xmo.music.data.UserCategory
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.Artwork
-import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 import com.xmo.music.ui.homeColors
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -120,7 +120,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * CURRENT QUEUE WINDOW
+     * CURRENT SONG / QUEUE WINDOW
      * =========================================================
      */
 
@@ -139,31 +139,6 @@ fun NowPlaying(
             currentIndex
         )
 
-    val artistTrackCount =
-    remember(
-        songs,
-        currentSong?.artist
-    ) {
-        val artist =
-            currentSong
-                ?.artist
-                ?.trim()
-                .orEmpty()
-
-        if (artist.isBlank()) {
-            0
-        } else {
-            songs.count { song ->
-                song.artist
-                    .trim()
-                    .equals(
-                        artist,
-                        ignoreCase = true
-                    )
-            }
-        }
-    }
-
     val previousSong =
         queue.getOrNull(
             currentIndex - 1
@@ -177,10 +152,52 @@ fun NowPlaying(
     val songIsInCategory =
         currentSong?.let { song ->
             categories.any { category ->
-                song.id in
-                    category.songIds
+                song.id in category.songIds
             }
         } == true
+
+    val artistTrackCount =
+        remember(
+            songs,
+            currentSong?.artist
+        ) {
+            val artist =
+                currentSong
+                    ?.artist
+                    ?.trim()
+                    .orEmpty()
+
+            if (artist.isBlank()) {
+                0
+            } else {
+                songs.count { song ->
+                    song.artist
+                        .trim()
+                        .equals(
+                            artist,
+                            ignoreCase = true
+                        )
+                }
+            }
+        }
+
+    /*
+     * =========================================================
+     * CAROUSEL POSITION
+     * =========================================================
+     *
+     * Declared before artwork-color effects because color
+     * transaction ownership depends on the real cover position.
+     */
+
+    val coverX =
+        remember {
+            Animatable(0f)
+        }
+
+    var coverWidth by remember {
+        mutableFloatStateOf(1f)
+    }
 
     /*
      * =========================================================
@@ -206,6 +223,19 @@ fun NowPlaying(
         )
     }
 
+    /*
+     * Last visually committed carousel color.
+     *
+     * During a swipe this stays frozen as the origin, preventing
+     * Media3 confirmation from briefly reintroducing the old
+     * artwork color.
+     */
+    var committedColor by remember {
+        mutableStateOf(
+            Color(0xFF52545A)
+        )
+    }
+
     suspend fun extractBright(
         uri: Uri?
     ): Color {
@@ -216,19 +246,39 @@ fun NowPlaying(
                     uri
                 )
 
-        return liftArtworkColor(raw)
+        return liftArtworkColor(
+            raw
+        )
     }
 
     LaunchedEffect(
         currentSong?.artwork,
         state.artworkUri
     ) {
-        currentColor =
+        val extracted =
             extractBright(
                 currentSong?.artwork
-                    ?: state.artworkUri
-                        ?.let(Uri::parse)
+                    ?: state
+                        .artworkUri
+                        ?.let(
+                            Uri::parse
+                        )
             )
+
+        currentColor =
+            extracted
+
+        /*
+         * Only adopt it directly when the carousel is actually at
+         * rest. A moving carousel owns its own interpolation.
+         */
+        if (
+            abs(coverX.value) <
+            1f
+        ) {
+            committedColor =
+                extracted
+        }
     }
 
     LaunchedEffect(
@@ -255,44 +305,17 @@ fun NowPlaying(
                 ?: currentColor
     }
 
-    val animatedCurrentColor by
-        animateColorAsState(
-            targetValue =
-                currentColor,
-            animationSpec =
-                tween(390),
-            label =
-                "playerDominant"
-        )
-
-    /*
-     * =========================================================
-     * ARTWORK TRANSACTION
-     * =========================================================
-     */
-
-    val coverX =
-        remember {
-            Animatable(0f)
+    LaunchedEffect(
+        state.currentSongId,
+        currentColor
+    ) {
+        if (
+            abs(coverX.value) <
+            1f
+        ) {
+            committedColor =
+                currentColor
         }
-
-    var coverWidth by remember {
-        mutableFloatStateOf(1f)
-    }
-
-    /*
-     * This color is deliberately frozen while the cover is away
-     * from its resting point. Otherwise currentColor changing
-     * after Media3 confirmation can visually snap the background.
-     */
-    var transactionBaseColor by remember {
-        mutableStateOf(
-            currentColor
-        )
-    }
-
-    var lastRestingSongId by remember {
-        mutableStateOf<Long?>(null)
     }
 
     val coverFraction =
@@ -305,33 +328,6 @@ fun NowPlaying(
                 1f
             )
 
-    LaunchedEffect(
-        state.currentSongId,
-        coverX.value,
-        animatedCurrentColor
-    ) {
-        if (
-            abs(coverX.value) <
-            1f
-        ) {
-            transactionBaseColor =
-                animatedCurrentColor
-
-            lastRestingSongId =
-                state.currentSongId
-        }
-    }
-
-    val colorBase =
-        if (
-            abs(coverFraction) >
-            .001f
-        ) {
-            transactionBaseColor
-        } else {
-            animatedCurrentColor
-        }
-
     val colorDestination =
         when {
             coverFraction < 0f ->
@@ -341,16 +337,23 @@ fun NowPlaying(
                 previousColor
 
             else ->
-                colorBase
+                currentColor
         }
 
     val displayColor =
-        mixColor(
-            from = colorBase,
-            to = colorDestination,
-            fraction =
-                abs(coverFraction)
-        )
+        if (
+            abs(coverFraction) >
+            .001f
+        ) {
+            mixColor(
+                from = committedColor,
+                to = colorDestination,
+                fraction =
+                    abs(coverFraction)
+            )
+        } else {
+            currentColor
+        }
 
     val deep =
         Artwork.deep(
@@ -368,10 +371,6 @@ fun NowPlaying(
             Color.White
         }
 
-    /*
-     * Main playback controls remain white/light as requested.
-     * They no longer receive circular surfaces.
-     */
     val controlForeground =
         if (
             theme ==
@@ -382,6 +381,24 @@ fun NowPlaying(
             Color(0xFF171719)
         } else {
             Color.White
+        }
+
+    val playBackground =
+        when (theme) {
+            XmoTheme.Light ->
+                Color.Black.copy(
+                    alpha = .10f
+                )
+
+            XmoTheme.Dark ->
+                Color.White.copy(
+                    alpha = .13f
+                )
+
+            XmoTheme.Amoled ->
+                Color.White.copy(
+                    alpha = .15f
+                )
         }
 
     val panel =
@@ -422,7 +439,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * REAL PLAYBACK POSITION POLLING
+     * REAL POSITION POLLING
      * =========================================================
      */
 
@@ -447,7 +464,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * LOCAL LYRICS
+     * LYRICS
      * =========================================================
      */
 
@@ -501,7 +518,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * SCREEN UI STATE
+     * UI STATE
      * =========================================================
      */
 
@@ -529,7 +546,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * PLAYER OPEN / CLOSE
+     * OPEN / CLOSE
      * =========================================================
      */
 
@@ -588,14 +605,6 @@ fun NowPlaying(
         dismiss()
     }
 
-    /*
-     * Back chain:
-     *
-     * fullscreen lyrics
-     * -> cover-size lyrics
-     * -> artwork
-     * -> player close
-     */
     BackHandler {
         when {
             fullLyrics -> {
@@ -639,10 +648,8 @@ fun NowPlaying(
             .graphicsLayer {
                 translationY =
                     playerY.value +
-                        (
-                            entrance.value *
-                                screenHeight
-                            )
+                        entrance.value *
+                        screenHeight
             }
             .clip(
                 RoundedCornerShape(
@@ -681,9 +688,7 @@ fun NowPlaying(
         )
 
         /*
-         * There is deliberately NO verticalScroll here.
-         *
-         * Main Now Playing is now a fixed screen.
+         * Fixed player: intentionally no verticalScroll.
          */
         Column(
             Modifier
@@ -694,9 +699,6 @@ fun NowPlaying(
              * =================================================
              * HEADER
              * =================================================
-             *
-             * Player dismissal drag lives here only.
-             * Artwork cannot dismiss the player anymore.
              */
 
             Box(
@@ -808,6 +810,7 @@ fun NowPlaying(
                         )
                 ) {
                     CapsuleButton(
+                        size = 40.dp,
                         onClick = {
                             currentSong
                                 ?.let {
@@ -833,6 +836,7 @@ fun NowPlaying(
                     }
 
                     CapsuleButton(
+                        size = 40.dp,
                         onClick = {
                             overlay =
                                 PlayerOverlay.Options
@@ -855,10 +859,7 @@ fun NowPlaying(
             }
 
             /*
-             * Artwork was 68dp below header.
-             *
-             * Requested +25dp:
-             * 68 + 25 = 93dp.
+             * Artwork stays lower than the old design.
              */
             Spacer(
                 Modifier.height(93.dp)
@@ -866,7 +867,7 @@ fun NowPlaying(
 
             /*
              * =================================================
-             * ARTWORK / COVER-SIZE LYRICS
+             * ARTWORK / SMALL LYRICS
              * =================================================
              */
 
@@ -924,11 +925,7 @@ fun NowPlaying(
             )
 
             /*
-             * Old gap was 104dp. The artwork itself has already
-             * moved 25dp down, therefore we don't compensate by
-             * pulling the body upward.
-             *
-             * Reduced only enough to fit the fixed viewport.
+             * Requested artwork -> panel gap.
              */
             Spacer(
                 Modifier.height(95.dp)
@@ -936,7 +933,7 @@ fun NowPlaying(
 
             /*
              * =================================================
-             * FIXED PLAYER PANEL
+             * PLAYER PANEL
              * =================================================
              */
 
@@ -953,9 +950,9 @@ fun NowPlaying(
                     .background(panel)
                     .padding(
                         start = 12.dp,
-                        top = 22.dp,
+                        top = 19.dp,
                         end = 12.dp,
-                        bottom = 6.dp
+                        bottom = 5.dp
                     )
             ) {
                 /*
@@ -981,6 +978,9 @@ fun NowPlaying(
                                 end = 7.dp
                             )
                     ) {
+                        /*
+                         * Song name deliberately has no action.
+                         */
                         Text(
                             text =
                                 state.title
@@ -997,34 +997,40 @@ fun NowPlaying(
                                 TextOverflow.Ellipsis
                         )
 
-                        Text(
-                            PressButton(
-                                modifier =
-                                    Modifier.fillMaxWidth(),
-                                onClick = {
-                                    overlay =
-                                        PlayerOverlay.Artist
-                                }
-                            ) {
-                                Text(
-                                    text =
-                                        state.artist.ifBlank {
+                        /*
+                         * Artist has a real action: device-library
+                         * artist name + MediaStore track count.
+                         */
+                        PressButton(
+                            modifier =
+                                Modifier.fillMaxWidth(),
+                            onClick = {
+                                overlay =
+                                    PlayerOverlay.Artist
+                            }
+                        ) {
+                            Text(
+                                text =
+                                    state.artist
+                                        .ifBlank {
                                             "Unknown artist"
                                         },
-                                    color = colors.sub,
-                                    fontFamily =
-                                        XmoFont.normal,
-                                    fontSize = 12.sp,
-                                    maxLines = 1,
-                                    overflow =
-                                        TextOverflow.Ellipsis,
-                                    modifier =
-                                        Modifier.fillMaxWidth()
-                                )
-                            }
+                                color =
+                                    colors.sub,
+                                fontFamily =
+                                    XmoFont.normal,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                overflow =
+                                    TextOverflow.Ellipsis,
+                                modifier =
+                                    Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
 
                     /*
-                     * Requested one connected capsule:
+                     * Same 40dp control height as header capsule.
                      *
                      * Like / Category / Timer / Queue / Details
                      */
@@ -1059,7 +1065,7 @@ fun NowPlaying(
                         }
 
                         CapsuleButton(
-                            size = 35.dp,
+                            size = 40.dp,
                             onClick = {
                                 overlay =
                                     PlayerOverlay.Options
@@ -1080,7 +1086,7 @@ fun NowPlaying(
                         }
 
                         CapsuleButton(
-                            size = 35.dp,
+                            size = 40.dp,
                             onClick = {
                                 overlay =
                                     PlayerOverlay.Sleep
@@ -1102,13 +1108,13 @@ fun NowPlaying(
                                     },
                                 modifier =
                                     Modifier.size(
-                                        17.dp
+                                        18.dp
                                     )
                             )
                         }
 
                         CapsuleButton(
-                            size = 35.dp,
+                            size = 40.dp,
                             onClick = {
                                 overlay =
                                     PlayerOverlay.Queue
@@ -1123,13 +1129,13 @@ fun NowPlaying(
                                     colors.icon,
                                 modifier =
                                     Modifier.size(
-                                        17.dp
+                                        18.dp
                                     )
                             )
                         }
 
                         CapsuleButton(
-                            size = 35.dp,
+                            size = 40.dp,
                             onClick = {
                                 overlay =
                                     PlayerOverlay.Details
@@ -1141,26 +1147,23 @@ fun NowPlaying(
                                     colors.icon,
                                 fontFamily =
                                     XmoFont.bold,
-                                fontSize = 17.sp
+                                fontSize = 18.sp
                             )
                         }
                     }
                 }
 
                 /*
-                 * Title/artist are now much closer to progress.
+                 * Song information stays close to progress.
                  */
                 Spacer(
-                    Modifier.height(8.dp)
+                    Modifier.height(7.dp)
                 )
 
                 /*
                  * =================================================
-                 * DRAGGABLE PROGRESS
+                 * SEEK
                  * =================================================
-                 *
-                 * RoundedSeekBar itself contains the requested
-                 * additional 4dp top displacement.
                  */
 
                 RoundedSeekBar(
@@ -1208,7 +1211,7 @@ fun NowPlaying(
                 }
 
                 Spacer(
-                    Modifier.height(8.dp)
+                    Modifier.height(7.dp)
                 )
 
                 /*
@@ -1218,47 +1221,42 @@ fun NowPlaying(
                  */
 
                 PlayerControls(
-                    isPlaying = state.isPlaying,
-                    hasPrevious = state.hasPrevious,
-                    hasNext = state.hasNext,
-                    shuffleEnabled = state.shuffleEnabled,
-                    repeatMode = state.repeatMode,
-                    foreground = controlForeground,
+                    isPlaying =
+                        state.isPlaying,
+                    hasPrevious =
+                        state.hasPrevious,
+                    hasNext =
+                        state.hasNext,
+                    shuffleEnabled =
+                        state.shuffleEnabled,
+                    repeatMode =
+                        state.repeatMode,
+                    foreground =
+                        controlForeground,
                     accent = accent,
                     playBackground =
-                        when (theme) {
-                            XmoTheme.Light ->
-                                Color.Black.copy(
-                                    alpha = .10f
-                                )
-                
-                            XmoTheme.Dark ->
-                                Color.White.copy(
-                                    alpha = .13f
-                                )
-                
-                            XmoTheme.Amoled ->
-                                Color.White.copy(
-                                    alpha = .15f
-                                )
-                        },
-                    togglePlay = togglePlay,
-                    previous = previous,
+                        playBackground,
+                    togglePlay =
+                        togglePlay,
+                    previous =
+                        previous,
                     next = next,
-                    toggleShuffle = toggleShuffle,
-                    cycleRepeat = cycleRepeat
+                    toggleShuffle =
+                        toggleShuffle,
+                    cycleRepeat =
+                        cycleRepeat
                 )
 
-                /*
-                 * No Lyrics/Artist/Details scrolling sections.
-                 */
                 Spacer(
                     Modifier.weight(1f)
                 )
 
                 /*
-                 * Tiny footer requested.
+                 * =================================================
+                 * SMALL FOOTER
+                 * =================================================
                  */
+
                 Column(
                     Modifier.fillMaxWidth(),
                     horizontalAlignment =
@@ -1296,22 +1294,6 @@ fun NowPlaying(
             }
         }
 
-        if (
-            overlay ==
-            PlayerOverlay.Artist
-        ) {
-            ArtistInfoBox(
-                artist =
-                    state.artist,
-                trackCount =
-                    artistTrackCount,
-                colors =
-                    colors,
-                close = {
-                    overlay = null
-                }
-            )
-        }
         /*
          * =====================================================
          * QUEUE
@@ -1344,7 +1326,8 @@ fun NowPlaying(
             PlayerOverlay.Options
         ) {
             SongOptionsBox(
-                song = currentSong,
+                song =
+                    currentSong,
                 categories =
                     categories,
                 colors = colors,
@@ -1365,12 +1348,13 @@ fun NowPlaying(
                         )
                 },
                 share = {
-                    currentSong?.let {
-                        shareSong(
-                            context,
-                            it
-                        )
-                    }
+                    currentSong
+                        ?.let {
+                            shareSong(
+                                context,
+                                it
+                            )
+                        }
 
                     overlay = null
                 },
@@ -1400,20 +1384,13 @@ fun NowPlaying(
                             }
                         )
                 },
-                createCategory = {
-                        name ->
-
+                createCategory = { name ->
                     val created =
                         createCategory(name)
 
                     if (
                         created != null
                     ) {
-                        /*
-                         * Existing App contract decides whether
-                         * the newly created category automatically
-                         * contains this song.
-                         */
                         pop =
                             PopMessage(
                                 "Created ${created.name}"
@@ -1427,7 +1404,7 @@ fun NowPlaying(
 
         /*
          * =====================================================
-         * SLEEP TIMER
+         * SLEEP
          * =====================================================
          */
 
@@ -1495,6 +1472,28 @@ fun NowPlaying(
 
         /*
          * =====================================================
+         * ARTIST
+         * =====================================================
+         */
+
+        if (
+            overlay ==
+            PlayerOverlay.Artist
+        ) {
+            ArtistInfoBox(
+                artist =
+                    state.artist,
+                trackCount =
+                    artistTrackCount,
+                colors = colors,
+                close = {
+                    overlay = null
+                }
+            )
+        }
+
+        /*
+         * =====================================================
          * FULLSCREEN LYRICS
          * =====================================================
          */
@@ -1533,8 +1532,8 @@ fun NowPlaying(
                     fullLyrics = false
 
                     /*
-                     * Fullscreen collapses logically back to the
-                     * artwork-sized lyrics surface.
+                     * Explicit fullscreen close returns to the
+                     * artwork-sized lyrics side.
                      */
                     artworkLyrics = true
                 }
@@ -1567,11 +1566,8 @@ fun NowPlaying(
 
 /*
  * =============================================================
- * FILLED LIKE
+ * FILLED HEART
  * =============================================================
- *
- * This is a real filled shape when active rather than merely
- * changing the tint of an outline icon.
  */
 
 @Composable
@@ -1582,75 +1578,75 @@ private fun FilledHeart(
     Canvas(
         Modifier.size(19.dp)
     ) {
-        val path =
-            Path()
-
         val w =
             size.width
 
         val h =
             size.height
 
-        path.moveTo(
-            w * .50f,
-            h * .88f
-        )
+        val path =
+            Path().apply {
+                moveTo(
+                    w * .50f,
+                    h * .88f
+                )
 
-        path.cubicTo(
-            w * .43f,
-            h * .80f,
-            w * .10f,
-            h * .59f,
-            w * .10f,
-            h * .32f
-        )
+                cubicTo(
+                    w * .43f,
+                    h * .80f,
+                    w * .10f,
+                    h * .59f,
+                    w * .10f,
+                    h * .32f
+                )
 
-        path.cubicTo(
-            w * .10f,
-            h * .14f,
-            w * .23f,
-            h * .07f,
-            w * .35f,
-            h * .07f
-        )
+                cubicTo(
+                    w * .10f,
+                    h * .14f,
+                    w * .23f,
+                    h * .07f,
+                    w * .35f,
+                    h * .07f
+                )
 
-        path.cubicTo(
-            w * .43f,
-            h * .07f,
-            w * .48f,
-            h * .12f,
-            w * .50f,
-            h * .18f
-        )
+                cubicTo(
+                    w * .43f,
+                    h * .07f,
+                    w * .48f,
+                    h * .12f,
+                    w * .50f,
+                    h * .18f
+                )
 
-        path.cubicTo(
-            w * .53f,
-            h * .12f,
-            w * .58f,
-            h * .07f,
-            w * .66f,
-            h * .07f
-        )
+                cubicTo(
+                    w * .53f,
+                    h * .12f,
+                    w * .58f,
+                    h * .07f,
+                    w * .66f,
+                    h * .07f
+                )
 
-        path.cubicTo(
-            w * .80f,
-            h * .07f,
-            w * .90f,
-            h * .17f,
-            w * .90f,
-            h * .32f
-        )
+                cubicTo(
+                    w * .80f,
+                    h * .07f,
+                    w * .90f,
+                    h * .17f,
+                    w * .90f,
+                    h * .32f
+                )
 
-        path.cubicTo(
-            w * .90f,
-            h * .59f,
-            w * .57f,
-            h * .80f,
-            w * .50f,
-            h * .88f
-        )
+                cubicTo(
+                    w * .90f,
+                    h * .59f,
+                    w * .57f,
+                    h * .80f,
+                    w * .50f,
+                    h * .88f
+                )
 
-        path.close()
+                close()
+            }
 
         if (filled) {
             drawPath(
@@ -1662,11 +1658,10 @@ private fun FilledHeart(
                 path = path,
                 color = color,
                 style =
-                    androidx.compose.ui.graphics
-                        .drawscope.Stroke(
-                            width =
-                                1.8.dp.toPx()
-                        )
+                    Stroke(
+                        width =
+                            1.8.dp.toPx()
+                    )
             )
         }
     }
@@ -1674,7 +1669,7 @@ private fun FilledHeart(
 
 /*
  * =============================================================
- * FILLED CATEGORY STAR
+ * FILLED STAR
  * =============================================================
  */
 
@@ -1761,11 +1756,10 @@ private fun FilledStar(
                 path = path,
                 color = color,
                 style =
-                    androidx.compose.ui.graphics
-                        .drawscope.Stroke(
-                            width =
-                                1.7.dp.toPx()
-                        )
+                    Stroke(
+                        width =
+                            1.7.dp.toPx()
+                    )
             )
         }
     }
@@ -1773,7 +1767,7 @@ private fun FilledStar(
 
 /*
  * =============================================================
- * HEADER-ONLY DISMISS GESTURE
+ * HEADER-ONLY DOWN DISMISS
  * =============================================================
  */
 
@@ -1783,7 +1777,7 @@ private fun Modifier.headerDownGesture(
     dismiss: () -> Unit
 ): Modifier =
     pointerInput(height) {
-        kotlinx.coroutines.coroutineScope {
+        coroutineScope {
             detectDragGestures(
                 onDrag = {
                         change,
@@ -1826,7 +1820,8 @@ private fun Modifier.headerDownGesture(
                             dismiss()
                         } else {
                             y.animateTo(
-                                targetValue = 0f,
+                                targetValue =
+                                    0f,
                                 animationSpec =
                                     spring(
                                         dampingRatio =
@@ -1842,7 +1837,8 @@ private fun Modifier.headerDownGesture(
                 onDragCancel = {
                     launch {
                         y.animateTo(
-                            targetValue = 0f,
+                            targetValue =
+                                0f,
                             animationSpec =
                                 tween(180)
                         )
@@ -1854,7 +1850,7 @@ private fun Modifier.headerDownGesture(
 
 /*
  * =============================================================
- * SHARE
+ * SHARE REAL LOCAL SONG
  * =============================================================
  */
 
