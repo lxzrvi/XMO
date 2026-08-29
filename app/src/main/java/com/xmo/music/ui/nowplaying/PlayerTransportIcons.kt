@@ -17,7 +17,7 @@ internal fun XmoPlayIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -73,8 +73,10 @@ internal fun XmoPlayIcon(
             }
 
         drawPath(
-            path = path,
-            color = color
+            path =
+                path,
+            color =
+                color
         )
     }
 }
@@ -85,7 +87,7 @@ internal fun XmoPauseIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val barWidth =
             size.width *
@@ -95,30 +97,24 @@ internal fun XmoPauseIcon(
             size.height *
                 .56f
 
-        val top =
-            size.height *
-                .22f
-
         val radius =
             barWidth *
-                .46f
+                .47f
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
             topLeft =
                 Offset(
-                    x =
-                        size.width *
-                            .28f,
-                    y =
-                        top
+                    size.width *
+                        .28f,
+                    size.height *
+                        .22f
                 ),
             size =
                 Size(
-                    width =
-                        barWidth,
-                    height =
-                        barHeight
+                    barWidth,
+                    barHeight
                 ),
             cornerRadius =
                 CornerRadius(
@@ -128,21 +124,19 @@ internal fun XmoPauseIcon(
         )
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
             topLeft =
                 Offset(
-                    x =
-                        size.width *
-                            .53f,
-                    y =
-                        top
+                    size.width *
+                        .53f,
+                    size.height *
+                        .22f
                 ),
             size =
                 Size(
-                    width =
-                        barWidth,
-                    height =
-                        barHeight
+                    barWidth,
+                    barHeight
                 ),
             cornerRadius =
                 CornerRadius(
@@ -159,7 +153,7 @@ internal fun XmoPreviousIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -167,30 +161,26 @@ internal fun XmoPreviousIcon(
         val h =
             size.height
 
-        val barWidth =
-            w *
-                .115f
+        val bar =
+            w * .115f
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
             topLeft =
                 Offset(
-                    x =
-                        w * .20f,
-                    y =
-                        h * .25f
+                    w * .20f,
+                    h * .25f
                 ),
             size =
                 Size(
-                    width =
-                        barWidth,
-                    height =
-                        h * .50f
+                    bar,
+                    h * .50f
                 ),
             cornerRadius =
                 CornerRadius(
-                    barWidth / 2f,
-                    barWidth / 2f
+                    bar / 2f,
+                    bar / 2f
                 )
         )
 
@@ -242,8 +232,10 @@ internal fun XmoPreviousIcon(
             }
 
         drawPath(
-            path = path,
-            color = color
+            path =
+                path,
+            color =
+                color
         )
     }
 }
@@ -254,7 +246,7 @@ internal fun XmoNextIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -262,30 +254,26 @@ internal fun XmoNextIcon(
         val h =
             size.height
 
-        val barWidth =
-            w *
-                .115f
+        val bar =
+            w * .115f
 
         drawRoundRect(
-            color = color,
+            color =
+                color,
             topLeft =
                 Offset(
-                    x =
-                        w * .685f,
-                    y =
-                        h * .25f
+                    w * .685f,
+                    h * .25f
                 ),
             size =
                 Size(
-                    width =
-                        barWidth,
-                    height =
-                        h * .50f
+                    bar,
+                    h * .50f
                 ),
             cornerRadius =
                 CornerRadius(
-                    barWidth / 2f,
-                    barWidth / 2f
+                    bar / 2f,
+                    bar / 2f
                 )
         )
 
@@ -337,8 +325,10 @@ internal fun XmoNextIcon(
             }
 
         drawPath(
-            path = path,
-            color = color
+            path =
+                path,
+            color =
+                color
         )
     }
 }
@@ -349,7 +339,7 @@ internal fun XmoShuffleIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -358,18 +348,16 @@ internal fun XmoShuffleIcon(
             size.height
 
         val stroke =
-            w *
-                .095f
+            w * .085f
 
         val style =
             Stroke(
-                width = stroke,
-                cap = StrokeCap.Round
+                width =
+                    stroke,
+                cap =
+                    StrokeCap.Round
             )
 
-        /*
-         * Upper crossing route.
-         */
         val upper =
             Path().apply {
                 moveTo(
@@ -378,33 +366,33 @@ internal fun XmoShuffleIcon(
                 )
 
                 cubicTo(
-                    w * .29f,
+                    w * .31f,
                     h * .30f,
-                    w * .34f,
-                    h * .32f,
-                    w * .42f,
-                    h * .43f
+                    w * .35f,
+                    h * .34f,
+                    w * .44f,
+                    h * .47f
                 )
 
                 cubicTo(
-                    w * .53f,
-                    h * .59f,
-                    w * .60f,
+                    w * .55f,
+                    h * .63f,
+                    w * .61f,
                     h * .70f,
-                    w * .76f,
+                    w * .78f,
                     h * .70f
                 )
             }
 
         drawPath(
-            path = upper,
-            color = color,
-            style = style
+            path =
+                upper,
+            color =
+                color,
+            style =
+                style
         )
 
-        /*
-         * Lower crossing route.
-         */
         val lower =
             Path().apply {
                 moveTo(
@@ -426,126 +414,46 @@ internal fun XmoShuffleIcon(
                     h * .33f,
                     w * .62f,
                     h * .30f,
-                    w * .76f,
+                    w * .78f,
                     h * .30f
                 )
             }
 
         drawPath(
-            path = lower,
-            color = color,
-            style = style
+            path =
+                lower,
+            color =
+                color,
+            style =
+                style
         )
 
-        /*
-         * Soft filled arrow heads.
-         */
-        val topArrow =
-            Path().apply {
-                moveTo(
-                    w * .72f,
-                    h * .19f
-                )
-
-                cubicTo(
-                    w * .72f,
-                    h * .16f,
-                    w * .76f,
-                    h * .15f,
-                    w * .79f,
-                    h * .18f
-                )
-
-                lineTo(
-                    w * .90f,
-                    h * .27f
-                )
-
-                cubicTo(
-                    w * .93f,
-                    h * .30f,
-                    w * .93f,
-                    h * .33f,
-                    w * .90f,
-                    h * .36f
-                )
-
-                lineTo(
-                    w * .79f,
-                    h * .45f
-                )
-
-                cubicTo(
-                    w * .76f,
-                    h * .48f,
-                    w * .72f,
-                    h * .46f,
-                    w * .72f,
-                    h * .42f
-                )
-
-                close()
-            }
-
-        drawPath(
-            path =
-                topArrow,
+        drawSoftArrowHead(
             color =
-                color
+                color,
+            right =
+                true,
+            center =
+                Offset(
+                    w * .80f,
+                    h * .30f
+                ),
+            scale =
+                w
         )
 
-        val bottomArrow =
-            Path().apply {
-                moveTo(
-                    w * .72f,
-                    h * .59f
-                )
-
-                cubicTo(
-                    w * .72f,
-                    h * .55f,
-                    w * .76f,
-                    h * .53f,
-                    w * .79f,
-                    h * .56f
-                )
-
-                lineTo(
-                    w * .90f,
-                    h * .66f
-                )
-
-                cubicTo(
-                    w * .93f,
-                    h * .69f,
-                    w * .93f,
-                    h * .72f,
-                    w * .90f,
-                    h * .75f
-                )
-
-                lineTo(
-                    w * .79f,
-                    h * .84f
-                )
-
-                cubicTo(
-                    w * .76f,
-                    h * .87f,
-                    w * .72f,
-                    h * .85f,
-                    w * .72f,
-                    h * .81f
-                )
-
-                close()
-            }
-
-        drawPath(
-            path =
-                bottomArrow,
+        drawSoftArrowHead(
             color =
-                color
+                color,
+            right =
+                true,
+            center =
+                Offset(
+                    w * .80f,
+                    h * .70f
+                ),
+            scale =
+                w
         )
     }
 }
@@ -557,7 +465,7 @@ internal fun XmoRepeatIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -566,18 +474,16 @@ internal fun XmoRepeatIcon(
             size.height
 
         val stroke =
-            w *
-                .085f
+            w * .082f
 
         val style =
             Stroke(
-                width = stroke,
-                cap = StrokeCap.Round
+                width =
+                    stroke,
+                cap =
+                    StrokeCap.Round
             )
 
-        /*
-         * Top route.
-         */
         val top =
             Path().apply {
                 moveTo(
@@ -588,27 +494,27 @@ internal fun XmoRepeatIcon(
                 cubicTo(
                     w * .18f,
                     h * .29f,
-                    w * .26f,
+                    w * .27f,
                     h * .25f,
-                    w * .38f,
+                    w * .39f,
                     h * .25f
                 )
 
                 lineTo(
-                    w * .76f,
+                    w * .78f,
                     h * .25f
                 )
             }
 
         drawPath(
-            path = top,
-            color = color,
-            style = style
+            path =
+                top,
+            color =
+                color,
+            style =
+                style
         )
 
-        /*
-         * Bottom route.
-         */
         val bottom =
             Path().apply {
                 moveTo(
@@ -619,151 +525,70 @@ internal fun XmoRepeatIcon(
                 cubicTo(
                     w * .82f,
                     h * .71f,
-                    w * .74f,
+                    w * .73f,
                     h * .75f,
-                    w * .62f,
+                    w * .61f,
                     h * .75f
                 )
 
                 lineTo(
-                    w * .24f,
+                    w * .22f,
                     h * .75f
                 )
             }
 
         drawPath(
-            path = bottom,
-            color = color,
-            style = style
+            path =
+                bottom,
+            color =
+                color,
+            style =
+                style
         )
 
-        /*
-         * Matching rounded arrow heads.
-         */
-        val rightArrow =
-            Path().apply {
-                moveTo(
-                    w * .72f,
-                    h * .13f
-                )
-
-                cubicTo(
-                    w * .72f,
-                    h * .09f,
-                    w * .77f,
-                    h * .08f,
-                    w * .80f,
-                    h * .11f
-                )
-
-                lineTo(
-                    w * .91f,
-                    h * .21f
-                )
-
-                cubicTo(
-                    w * .94f,
-                    h * .24f,
-                    w * .94f,
-                    h * .27f,
-                    w * .91f,
-                    h * .30f
-                )
-
-                lineTo(
-                    w * .80f,
-                    h * .40f
-                )
-
-                cubicTo(
-                    w * .77f,
-                    h * .43f,
-                    w * .72f,
-                    h * .41f,
-                    w * .72f,
-                    h * .37f
-                )
-
-                close()
-            }
-
-        drawPath(
-            path = rightArrow,
-            color = color
+        drawSoftArrowHead(
+            color =
+                color,
+            right =
+                true,
+            center =
+                Offset(
+                    w * .79f,
+                    h * .25f
+                ),
+            scale =
+                w
         )
 
-        val leftArrow =
-            Path().apply {
-                moveTo(
-                    w * .28f,
-                    h * .63f
-                )
-
-                cubicTo(
-                    w * .28f,
-                    h * .59f,
-                    w * .23f,
-                    h * .57f,
-                    w * .20f,
-                    h * .60f
-                )
-
-                lineTo(
-                    w * .09f,
-                    h * .70f
-                )
-
-                cubicTo(
-                    w * .06f,
-                    h * .73f,
-                    w * .06f,
-                    h * .76f,
-                    w * .09f,
-                    h * .79f
-                )
-
-                lineTo(
-                    w * .20f,
-                    h * .89f
-                )
-
-                cubicTo(
-                    w * .23f,
-                    h * .92f,
-                    w * .28f,
-                    h * .91f,
-                    w * .28f,
-                    h * .87f
-                )
-
-                close()
-            }
-
-        drawPath(
-            path = leftArrow,
-            color = color
+        drawSoftArrowHead(
+            color =
+                color,
+            right =
+                false,
+            center =
+                Offset(
+                    w * .21f,
+                    h * .75f
+                ),
+            scale =
+                w
         )
 
-        if (repeatOne) {
-            /*
-             * Filled soft "1". It remains inside the same repeat
-             * family instead of switching to a different icon.
-             */
+        if (
+            repeatOne
+        ) {
             drawRoundRect(
-                color = color,
+                color =
+                    color,
                 topLeft =
                     Offset(
-                        x =
-                            w * .49f,
-                        y =
-                            h * .40f
+                        w * .49f,
+                        h * .40f
                     ),
                 size =
                     Size(
-                        width =
-                            w * .075f,
-                        height =
-                            h * .22f
+                        w * .075f,
+                        h * .22f
                     ),
                 cornerRadius =
                     CornerRadius(
@@ -773,20 +598,17 @@ internal fun XmoRepeatIcon(
             )
 
             drawLine(
-                color = color,
+                color =
+                    color,
                 start =
                     Offset(
-                        x =
-                            w * .45f,
-                        y =
-                            h * .45f
+                        w * .45f,
+                        h * .45f
                     ),
                 end =
                     Offset(
-                        x =
-                            w * .52f,
-                        y =
-                            h * .40f
+                        w * .52f,
+                        h * .40f
                     ),
                 strokeWidth =
                     w * .06f,
@@ -795,4 +617,109 @@ internal fun XmoRepeatIcon(
             )
         }
     }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope
+    .drawSoftArrowHead(
+        color: Color,
+        right: Boolean,
+        center: Offset,
+        scale: Float
+    ) {
+    val direction =
+        if (
+            right
+        ) {
+            1f
+        } else {
+            -1f
+        }
+
+    val path =
+        Path().apply {
+            moveTo(
+                center.x -
+                    direction *
+                    scale *
+                    .075f,
+                center.y -
+                    scale *
+                    .115f
+            )
+
+            cubicTo(
+                center.x -
+                    direction *
+                    scale *
+                    .095f,
+                center.y -
+                    scale *
+                    .14f,
+                center.x -
+                    direction *
+                    scale *
+                    .125f,
+                center.y -
+                    scale *
+                    .10f,
+                center.x -
+                    direction *
+                    scale *
+                    .09f,
+                center.y -
+                    scale *
+                    .07f
+            )
+
+            lineTo(
+                center.x +
+                    direction *
+                    scale *
+                    .045f,
+                center.y
+            )
+
+            lineTo(
+                center.x -
+                    direction *
+                    scale *
+                    .09f,
+                center.y +
+                    scale *
+                    .07f
+            )
+
+            cubicTo(
+                center.x -
+                    direction *
+                    scale *
+                    .125f,
+                center.y +
+                    scale *
+                    .10f,
+                center.x -
+                    direction *
+                    scale *
+                    .095f,
+                center.y +
+                    scale *
+                    .14f,
+                center.x -
+                    direction *
+                    scale *
+                    .075f,
+                center.y +
+                    scale *
+                    .115f
+            )
+
+            close()
+        }
+
+    drawPath(
+        path =
+            path,
+        color =
+            color
+    )
 }
