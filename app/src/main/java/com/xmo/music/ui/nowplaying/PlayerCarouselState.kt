@@ -15,9 +15,14 @@ internal class PlayerCarouselState {
     val x =
         Animatable(0f)
 
+    /*
+     * Actual artwork width in pixels.
+     *
+     * Keep setter public for compatibility with existing
+     * PlayerArtwork usage.
+     */
     var width by
         mutableStateOf(1f)
-        private set
 
     /*
      *  0 = idle
@@ -28,22 +33,19 @@ internal class PlayerCarouselState {
         mutableIntStateOf(0)
 
     /*
-     * Real Media3 song that was current when manual navigation
-     * started. A different real currentSongId confirms playback.
+     * Song that was current when manual navigation started.
      */
     var manualSongId by
         mutableStateOf<Long?>(null)
 
     /*
-     * Media3 / external transition animation.
+     * True while Media3/external transition is visually moving.
      */
     var autoAnimating by
         mutableStateOf(false)
 
     /*
-     * Direction of the automatic visual transaction.
-     *
-     *  0 = none / unknown
+     *  0 = none
      *  1 = next
      * -1 = previous
      */
@@ -51,10 +53,11 @@ internal class PlayerCarouselState {
         mutableIntStateOf(0)
 
     /*
-     * Song IDs belonging to the visual transaction.
+     * Explicit visual transaction IDs.
      *
-     * These are intentionally independent from whatever queue
-     * window Compose receives while Media3 is changing items.
+     * They are intentionally independent from the live queue
+     * window because Media3 may publish the new song before the
+     * visual carousel has completed.
      */
     var visualFromSongId by
         mutableStateOf<Long?>(null)
@@ -63,14 +66,8 @@ internal class PlayerCarouselState {
         mutableStateOf<Long?>(null)
 
     /*
-     * Increments for every real visual transaction.
-     *
-     * Consumers can distinguish:
-     *
-     * old transaction ended
-     * -> new transaction immediately began
-     *
-     * without relying on delays/timers.
+     * Lets consumers distinguish consecutive transactions
+     * without timers.
      */
     var transactionGeneration by
         mutableLongStateOf(0L)
@@ -98,14 +95,6 @@ internal class PlayerCarouselState {
         get() =
             !transactionActive &&
                 abs(x.value) < 1f
-
-    fun updateWidth(
-        value: Float
-    ) {
-        if (value > 0f) {
-            width = value
-        }
-    }
 
     fun beginManual(
         direction: Int,
@@ -135,9 +124,6 @@ internal class PlayerCarouselState {
         visualToSongId =
             null
 
-        /*
-         * A manual transaction owns the carousel now.
-         */
         autoAnimating =
             false
 
@@ -211,11 +197,6 @@ internal class PlayerCarouselState {
         visualToSongId =
             toSongId
 
-        /*
-         * Automatic/external change takes ownership only when a
-         * manual transaction is not being confirmed by this same
-         * Media3 change.
-         */
         manualDirection =
             0
 
