@@ -3829,59 +3829,61 @@ private fun Modifier.downGesture(
     dismiss: () -> Unit
 ): Modifier =
     pointerInput(height) {
-        detectDragGestures(
-            onDrag = {
-                    change,
-                    amount ->
+        coroutineScope {
+            detectDragGestures(
+                onDrag = { change, amount ->
+                    if (
+                        amount.y > 0f ||
+                        y.value > 0f
+                    ) {
+                        change.consume()
 
-                if (
-                    amount.y > 0f ||
-                    y.value > 0f
-                ) {
-                    change.consume()
-
-                    y.snapTo(
-                        (
-                            y.value +
-                                amount.y
+                        launch {
+                            y.snapTo(
+                                (y.value + amount.y)
+                                    .coerceIn(
+                                        0f,
+                                        height
+                                    )
                             )
-                            .coerceIn(
+                        }
+                    }
+                },
+
+                onDragEnd = {
+                    launch {
+                        if (
+                            y.value >
+                            height * .13f
+                        ) {
+                            y.animateTo(
+                                height,
+                                tween(300)
+                            )
+
+                            dismiss()
+                        } else {
+                            y.animateTo(
                                 0f,
-                                height
+                                spring(
+                                    dampingRatio = .84f,
+                                    stiffness = 390f
+                                )
                             )
-                    )
-                }
-            },
+                        }
+                    }
+                },
 
-            onDragEnd = {
-                if (
-                    y.value >
-                    height * .13f
-                ) {
-                    y.animateTo(
-                        height,
-                        tween(300)
-                    )
-
-                    dismiss()
-                } else {
-                    y.animateTo(
-                        0f,
-                        spring(
-                            dampingRatio = .84f,
-                            stiffness = 390f
+                onDragCancel = {
+                    launch {
+                        y.animateTo(
+                            0f,
+                            tween(180)
                         )
-                    )
+                    }
                 }
-            },
-
-            onDragCancel = {
-                y.animateTo(
-                    0f,
-                    tween(180)
-                )
-            }
-        )
+            )
+        }
     }
 
 /*
