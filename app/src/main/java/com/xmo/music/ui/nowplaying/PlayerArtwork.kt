@@ -1,0 +1,430 @@
+package com.xmo.music.ui.nowplaying
+
+import android.net.Uri
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import com.xmo.music.data.SongLyrics
+import com.xmo.music.ui.HomeColors
+import com.xmo.music.ui.LocalXmoAccent
+import com.xmo.music.ui.XmoFont
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+
+@Composable
+internal fun PlayerArtwork(
+    currentId: Long?,
+    current: Uri?,
+    previous: Uri?,
+    next: Uri?,
+    canPrevious: Boolean,
+    canNext: Boolean,
+    x: Animatable<Float, *>,
+    setWidth: (Float) -> Unit,
+    showLyrics: Boolean,
+    lyrics: SongLyrics?,
+    position: Long,
+    colors: HomeColors,
+    accent: Color,
+    previousSong: () -> Unit,
+    nextSong: () -> Unit,
+    toggleLyrics: () -> Unit,
+    pickLyrics: () -> Unit,
+    fullscreenLyrics: () -> Unit
+) {
+    val scope =
+        rememberCoroutineScope()
+
+    var rawX by remember {
+        mutableFloatStateOf(0f)
+    }
+
+    /*
+     * Artwork URIs are frozen while Media3 is changing items.
+     * This prevents the queue recomposition from replacing the
+     * visual transaction before the controller confirms it.
+     */
+    var snapshotCurrent by remember {
+        mutableStateOf(current)
+    }
+
+    var snapshotPrevious by remember {
+        mutableStateOf(previous)
+    }
+
+    var snapshotNext by remember {
+        mutableStateOf(next)
+    }
+
+    var transactionSongId by remember {
+        mutableStateOf<Long?>(null)
+    }
+
+    /*
+     * -1 = previous transaction
+     *  0 = idle
+     *  1 = next transaction
+     */
+    var pending by remember {
+        mutableIntStateOf(0)
+    }
+
+    LaunchedEffect(
+        currentId,
+        pending,
+        current,
+        previous,
+        next
+    ) {
+        if (
+            pending != 0 &&
+            transactionSongId != null &&
+            currentId != transactionSongId
+        ) {
+            /*
+             * Real Media3 state changed. Reset displacement first,
+             * then adopt the new queue artwork.
+             */
+            x.snapTo(0f)
+
+            pending = 0
+            transactionSongId = null
+
+            snapshotCurrent = current
+            snapshotPrevious = previous
+            snapshotNext = next
+        } else if (pending == 0) {
+            snapshotCurrent = current
+            snapshotPrevious = previous
+            snapshotNext = next
+        }
+    }
+
+    BoxWithConstraints(
+        Modifier
+            .fillMaxWidth()
+            .height(382.dp)
+    ) {
+        val width =
+            constraints.maxWidth
+                .toFloat()
+                .coerceAtLeast(1f)
+
+        LaunchedEffect(width) {
+            setWidth(width)
+        }
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                .pointerInput(
+                    currentId,
+                    canPrevious,
+                    canNext,
+                    showLyrics
+                ) {
+                    /*
+                     * Lyrics own vertical/manual scrolling while the
+                     * artwork is reversed. Carousel is intentionally
+                     * disabled in that state.
+                     */
+                    if (showLyrics) {
+                        return@pointerInput
+                    }
+
+                    detectDragGestures(
+                        onDragStart = {
+                            rawX = 0f
+                        },
+
+                        onDrag = { change, amount ->
+                            if (pending != 0) {
+                                return@detectDragGestures
+                            }
+
+                            rawX += amount.x
+
+                            /*
+                             * Horizontal-only artwork transaction.
+                             * No vertical player dismissal exists here.
+                             */
+                            if (abs(rawX) > 7f) {
+                                change.consume()
+
+                                scope.launch {
+                                    var target =
+                                        x.value +
+                                            amount.x
+
+                                    if (
+                                        target < 0f &&
+                                        !canNext
+                                    ) {
+                                        target =
+                                            x.value +
+                                                amount.x *
+                                                    .17f
+                                    }
+
+                                    if (
+                                        target > 0f &&
+                                        !canPrevious
+                                    ) {
+                                        target =
+                                            x.value +
+                                                amount.x *
+                                                    .17f
+                                    }
+
+                                    x.snapTo(
+                                        target.coerceIn(
+                                            -width,
+                                            width
+                                        )
+                                    )
+                                }
+                            }
+                        },
+
+                        onDragEnd = {
+                            scope.launch {
+                                when {
+                                    x.value <
+                                        -width * .15f &&
+                                        canNext -> {
+
+                                        transactionSongId =
+                                            currentId
+
+                                        pending = 1
+
+                                        x.animateTo(
+                                            -width,
+                                            tween(220)
+                                        )
+
+                                        nextSong()
+                                    }
+
+                                    x.value >
+                                        width * .15f &&
+                                        canPrevious -> {
+
+                                        transactionSongId =
+                                            currentId
+
+                                        pending = -1
+
+                                        x.animateTo(
+                                            width,
+                                            tween(220)
+                                        )
+
+                                        previousSong()
+                                    }
+
+                                    else -> {
+                                        x.animateTo(
+                                            0f,
+                                            spring(
+                                                dampingRatio =
+                                                    .84f,
+                                                stiffness =
+                                                    430f
+                                            )
+                                        )
+                                    }
+                                }
+
+                                rawX = 0f
+                            }
+                        },
+
+                        onDragCancel = {
+                            scope.launch {
+                                if (pending == 0) {
+                                    x.animateTo(
+                                        0f,
+                                        tween(180)
+                                    )
+                                }
+
+                                rawX = 0f
+                            }
+                        }
+                    )
+                }
+        ) {
+            if (showLyrics) {
+                ArtworkLyrics(
+                    lyrics = lyrics,
+                    position = position,
+                    colors = colors,
+                    accent = accent,
+                    pickLyrics = pickLyrics,
+                    fullscreenLyrics =
+                        fullscreenLyrics,
+                    showArtwork =
+                        toggleLyrics,
+                    modifier =
+                        Modifier
+                            .padding(
+                                horizontal = 17.dp
+                            )
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .align(
+                                Alignment.Center
+                            )
+                )
+            } else {
+                snapshotPrevious?.let { uri ->
+                    Cover(
+                        uri = uri,
+                        modifier =
+                            Modifier
+                                .padding(
+                                    horizontal =
+                                        17.dp
+                                )
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .align(
+                                    Alignment.Center
+                                )
+                                .graphicsLayer {
+                                    translationX =
+                                        x.value -
+                                            width
+                                }
+                    )
+                }
+
+                Cover(
+                    uri = snapshotCurrent,
+                    modifier =
+                        Modifier
+                            .padding(
+                                horizontal = 17.dp
+                            )
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .align(
+                                Alignment.Center
+                            )
+                            .graphicsLayer {
+                                translationX =
+                                    x.value
+                            }
+                            .clickable(
+                                interactionSource =
+                                    remember {
+                                        MutableInteractionSource()
+                                    },
+                                indication = null,
+                                onClick =
+                                    toggleLyrics
+                            )
+                )
+
+                snapshotNext?.let { uri ->
+                    Cover(
+                        uri = uri,
+                        modifier =
+                            Modifier
+                                .padding(
+                                    horizontal =
+                                        17.dp
+                                )
+                                .fillMaxWidth()
+                                .aspectRatio(1f)
+                                .align(
+                                    Alignment.Center
+                                )
+                                .graphicsLayer {
+                                    translationX =
+                                        x.value +
+                                            width
+                                }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun Cover(
+    uri: Uri?,
+    modifier: Modifier
+) {
+    Box(
+        modifier
+            .clip(
+                RoundedCornerShape(24.dp)
+            )
+            .background(
+                Color.Black.copy(
+                    alpha = .07f
+                )
+            )
+    ) {
+        AsyncImage(
+            model = uri,
+            contentDescription = null,
+            modifier =
+                Modifier.fillMaxSize(),
+            contentScale =
+                ContentScale.Crop
+        )
+
+        if (uri == null) {
+            Box(
+                Modifier.fillMaxSize(),
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                Text(
+                    text = "XMO",
+                    color =
+                        LocalXmoAccent.current,
+                    fontFamily =
+                        XmoFont.logo,
+                    fontSize = 31.sp
+                )
+            }
+        }
+    }
+}
