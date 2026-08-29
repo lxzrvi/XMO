@@ -39,6 +39,9 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -87,20 +90,18 @@ internal fun QueueSheet(
         }
 
     val sheetHeight =
-        LocalConfiguration
-            .current
+        LocalConfiguration.current
             .screenHeightDp
             .dp *
             .72f
 
     /*
-     * Back closes the long-hold menu first. Otherwise it closes
-     * QueueSheet. This handler is inside the queue overlay, so it
-     * takes priority while the sheet is present.
+     * Menu gets Back priority over the sheet.
      */
     BackHandler {
         if (
-            menuIndex != null
+            menuIndex !=
+            null
         ) {
             menuIndex =
                 null
@@ -113,13 +114,17 @@ internal fun QueueSheet(
         modifier =
             Modifier.fillMaxSize()
     ) {
+        /*
+         * No ripple/hold dim.
+         */
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
                     .background(
                         Color.Black.copy(
-                            alpha = .10f
+                            alpha =
+                                .11f
                         )
                     )
                     .simpleTap(
@@ -161,6 +166,9 @@ internal fun QueueSheet(
                         colors.surface
                     )
         ) {
+            /*
+             * Handle owns swipe-down dismissal.
+             */
             Box(
                 modifier =
                     Modifier
@@ -177,7 +185,8 @@ internal fun QueueSheet(
                                         amount ->
 
                                     if (
-                                        amount.y > 0f ||
+                                        amount.y >
+                                        0f ||
                                         sheetY.value >
                                         0f
                                     ) {
@@ -203,7 +212,7 @@ internal fun QueueSheet(
                                         if (
                                             sheetY.value >
                                             sheetHeightPx *
-                                                .13f
+                                            .13f
                                         ) {
                                             sheetY.animateTo(
                                                 targetValue =
@@ -268,37 +277,68 @@ internal fun QueueSheet(
                             )
                             .background(
                                 colors.sub.copy(
-                                    alpha = .28f
+                                    alpha =
+                                        .28f
                                 )
                             )
                 )
             }
 
-            Text(
-                text =
-                    "Queue",
-                color =
-                    colors.text,
-                fontFamily =
-                    XmoFont.bold,
-                fontSize =
-                    19.sp,
+            Row(
                 modifier =
-                    Modifier.padding(
-                        start = 18.dp,
-                        top = 1.dp,
-                        bottom = 10.dp
-                    )
-            )
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start =
+                                18.dp,
+                            end =
+                                17.dp,
+                            top =
+                                1.dp,
+                            bottom =
+                                10.dp
+                        ),
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+                Text(
+                    text =
+                        "Queue",
+                    color =
+                        colors.text,
+                    fontFamily =
+                        XmoFont.bold,
+                    fontSize =
+                        19.sp,
+                    modifier =
+                        Modifier.weight(
+                            1f
+                        )
+                )
+
+                Text(
+                    text =
+                        "${queue.size} tracks",
+                    color =
+                        colors.sub,
+                    fontFamily =
+                        XmoFont.medium,
+                    fontSize =
+                        10.sp
+                )
+            }
 
             LazyColumn(
                 modifier =
                     Modifier.fillMaxSize(),
                 contentPadding =
                     PaddingValues(
-                        start = 12.dp,
-                        end = 12.dp,
-                        bottom = 30.dp
+                        start =
+                            12.dp,
+                        end =
+                            12.dp,
+                        bottom =
+                            30.dp
                     ),
                 verticalArrangement =
                     Arrangement.spacedBy(
@@ -331,8 +371,8 @@ internal fun QueueSheet(
                             colors,
                         onClick = {
                             /*
-                             * Real queue-index playback. Queue
-                             * deliberately remains open.
+                             * Real existing playback API.
+                             * Queue remains open.
                              */
                             playIndex(
                                 index
@@ -400,11 +440,11 @@ private fun QueueRow(
             Modifier
                 .fillMaxWidth()
                 .height(
-                    58.dp
+                    60.dp
                 )
                 .clip(
                     RoundedCornerShape(
-                        14.dp
+                        15.dp
                     )
                 )
                 .background(
@@ -412,7 +452,8 @@ private fun QueueRow(
                         active
                     ) {
                         accent.copy(
-                            alpha = .10f
+                            alpha =
+                                .105f
                         )
                     } else {
                         colors.button
@@ -442,11 +483,11 @@ private fun QueueRow(
             modifier =
                 Modifier
                     .size(
-                        48.dp
+                        50.dp
                     )
                     .clip(
                         RoundedCornerShape(
-                            10.dp
+                            11.dp
                         )
                     )
                     .background(
@@ -463,8 +504,10 @@ private fun QueueRow(
                         1f
                     )
                     .padding(
-                        horizontal =
-                            10.dp
+                        start =
+                            10.dp,
+                        end =
+                            8.dp
                     )
         ) {
             Text(
@@ -482,7 +525,8 @@ private fun QueueRow(
                     XmoFont.bold,
                 fontSize =
                     12.sp,
-                maxLines = 1,
+                maxLines =
+                    1,
                 overflow =
                     TextOverflow.Ellipsis
             )
@@ -496,17 +540,13 @@ private fun QueueRow(
                     XmoFont.normal,
                 fontSize =
                     10.sp,
-                maxLines = 1,
+                maxLines =
+                    1,
                 overflow =
                     TextOverflow.Ellipsis
             )
         }
 
-        /*
-         * Dedicated current-song mark instead of an unrelated
-         * generic icon. Filled rounded bars fit the XMO transport
-         * family.
-         */
         if (
             active
         ) {
@@ -516,109 +556,14 @@ private fun QueueRow(
                 modifier =
                     Modifier
                         .padding(
-                            end = 10.dp
+                            end =
+                                10.dp
                         )
                         .size(
-                            19.dp
+                            20.dp
                         )
             )
         }
-    }
-}
-
-@Composable
-private fun QueuePlayingMark(
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(
-        modifier =
-            modifier
-    ) {
-        val barWidth =
-            size.width *
-                .16f
-
-        val radius =
-            barWidth / 2f
-
-        drawRoundRect(
-            color = color,
-            topLeft =
-                Offset(
-                    x =
-                        size.width *
-                            .18f,
-                    y =
-                        size.height *
-                            .39f
-                ),
-            size =
-                Size(
-                    width =
-                        barWidth,
-                    height =
-                        size.height *
-                            .38f
-                ),
-            cornerRadius =
-                CornerRadius(
-                    radius,
-                    radius
-                )
-        )
-
-        drawRoundRect(
-            color = color,
-            topLeft =
-                Offset(
-                    x =
-                        size.width *
-                            .42f,
-                    y =
-                        size.height *
-                            .22f
-                ),
-            size =
-                Size(
-                    width =
-                        barWidth,
-                    height =
-                        size.height *
-                            .55f
-                ),
-            cornerRadius =
-                CornerRadius(
-                    radius,
-                    radius
-                )
-        )
-
-        drawRoundRect(
-            color = color,
-            topLeft =
-                Offset(
-                    x =
-                        size.width *
-                            .66f,
-                    y =
-                        size.height *
-                            .31f
-                ),
-            size =
-                Size(
-                    width =
-                        barWidth,
-                    height =
-                        size.height *
-                            .46f
-                ),
-            cornerRadius =
-                CornerRadius(
-                    radius,
-                    radius
-                )
-        )
     }
 }
 
@@ -636,7 +581,8 @@ private fun QueueActionMenu(
                 .fillMaxSize()
                 .background(
                     Color.Black.copy(
-                        alpha = .13f
+                        alpha =
+                            .15f
                     )
                 )
                 .simpleTap(
@@ -650,12 +596,12 @@ private fun QueueActionMenu(
                 Modifier
                     .padding(
                         horizontal =
-                            42.dp
+                            40.dp
                     )
                     .fillMaxWidth()
                     .clip(
                         RoundedCornerShape(
-                            24.dp
+                            25.dp
                         )
                     )
                     .background(
@@ -679,7 +625,7 @@ private fun QueueActionMenu(
                     modifier =
                         Modifier
                             .size(
-                                46.dp
+                                48.dp
                             )
                             .clip(
                                 RoundedCornerShape(
@@ -700,7 +646,8 @@ private fun QueueActionMenu(
                                 1f
                             )
                             .padding(
-                                start = 11.dp
+                                start =
+                                    11.dp
                             )
                 ) {
                     Text(
@@ -712,7 +659,8 @@ private fun QueueActionMenu(
                             XmoFont.bold,
                         fontSize =
                             14.sp,
-                        maxLines = 1,
+                        maxLines =
+                            1,
                         overflow =
                             TextOverflow.Ellipsis
                     )
@@ -726,7 +674,8 @@ private fun QueueActionMenu(
                             XmoFont.normal,
                         fontSize =
                             10.sp,
-                        maxLines = 1,
+                        maxLines =
+                            1,
                         overflow =
                             TextOverflow.Ellipsis
                     )
@@ -736,23 +685,26 @@ private fun QueueActionMenu(
             Spacer(
                 modifier =
                     Modifier.height(
-                        12.dp
+                        13.dp
                     )
             )
 
+            /*
+             * Existing supported queue action.
+             */
             PressButton(
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .height(
-                            46.dp
+                            47.dp
                         ),
                 enabled =
                     !active,
                 onClick =
                     play
             ) {
-                Box(
+                Row(
                     modifier =
                         Modifier
                             .fillMaxSize()
@@ -763,10 +715,39 @@ private fun QueueActionMenu(
                             )
                             .background(
                                 colors.button
+                            )
+                            .padding(
+                                horizontal =
+                                    14.dp
                             ),
-                    contentAlignment =
-                        Alignment.Center
+                    verticalAlignment =
+                        Alignment.CenterVertically
                 ) {
+                    QueuePlayIcon(
+                        color =
+                            colors.text.copy(
+                                alpha =
+                                    if (
+                                        active
+                                    ) {
+                                        .38f
+                                    } else {
+                                        1f
+                                    }
+                            ),
+                        modifier =
+                            Modifier.size(
+                                19.dp
+                            )
+                    )
+
+                    Spacer(
+                        modifier =
+                            Modifier.width(
+                                11.dp
+                            )
+                    )
+
                     Text(
                         text =
                             if (
@@ -782,7 +763,7 @@ private fun QueueActionMenu(
                                     if (
                                         active
                                     ) {
-                                        .48f
+                                        .46f
                                     } else {
                                         1f
                                     }
@@ -796,11 +777,190 @@ private fun QueueActionMenu(
             }
 
             /*
-             * Play Next / Remove / Reorder are intentionally not
-             * exposed. QueueSheet currently receives only the real
-             * playIndex API, so displaying those actions would be
-             * a fake backend control.
+             * Remove from Queue / Play Next / Reorder are not
+             * displayed as fake controls.
+             *
+             * Current XMO queue UI receives only playIndex.
+             * A real queue mutation callback is required before
+             * those actions can safely exist.
              */
         }
+    }
+}
+
+@Composable
+private fun QueuePlayingMark(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(
+        modifier =
+            modifier
+    ) {
+        val barWidth =
+            size.width *
+                .15f
+
+        val radius =
+            barWidth /
+                2f
+
+        drawRoundRect(
+            color =
+                color,
+            topLeft =
+                Offset(
+                    size.width *
+                        .17f,
+                    size.height *
+                        .40f
+                ),
+            size =
+                Size(
+                    barWidth,
+                    size.height *
+                        .36f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    radius,
+                    radius
+                )
+        )
+
+        drawRoundRect(
+            color =
+                color,
+            topLeft =
+                Offset(
+                    size.width *
+                        .425f,
+                    size.height *
+                        .21f
+                ),
+            size =
+                Size(
+                    barWidth,
+                    size.height *
+                        .55f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    radius,
+                    radius
+                )
+        )
+
+        drawRoundRect(
+            color =
+                color,
+            topLeft =
+                Offset(
+                    size.width *
+                        .68f,
+                    size.height *
+                        .31f
+                ),
+            size =
+                Size(
+                    barWidth,
+                    size.height *
+                        .45f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    radius,
+                    radius
+                )
+        )
+    }
+}
+
+@Composable
+private fun QueuePlayIcon(
+    color: Color,
+    modifier: Modifier
+) {
+    Canvas(
+        modifier =
+            modifier
+    ) {
+        val path =
+            Path().apply {
+                moveTo(
+                    size.width *
+                        .30f,
+                    size.height *
+                        .23f
+                )
+
+                cubicTo(
+                    size.width *
+                        .30f,
+                    size.height *
+                        .18f,
+                    size.width *
+                        .36f,
+                    size.height *
+                        .16f,
+                    size.width *
+                        .42f,
+                    size.height *
+                        .20f
+                )
+
+                lineTo(
+                    size.width *
+                        .76f,
+                    size.height *
+                        .43f
+                )
+
+                cubicTo(
+                    size.width *
+                        .83f,
+                    size.height *
+                        .48f,
+                    size.width *
+                        .83f,
+                    size.height *
+                        .52f,
+                    size.width *
+                        .76f,
+                    size.height *
+                        .57f
+                )
+
+                lineTo(
+                    size.width *
+                        .42f,
+                    size.height *
+                        .80f
+                )
+
+                cubicTo(
+                    size.width *
+                        .36f,
+                    size.height *
+                        .84f,
+                    size.width *
+                        .30f,
+                    size.height *
+                        .82f,
+                    size.width *
+                        .30f,
+                    size.height *
+                        .77f
+                )
+
+                close()
+            }
+
+        drawPath(
+            path =
+                path,
+            color =
+                color
+        )
     }
 }
