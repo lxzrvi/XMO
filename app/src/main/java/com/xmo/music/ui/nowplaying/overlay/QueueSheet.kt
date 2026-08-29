@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,8 +21,11 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -31,9 +33,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
 import com.xmo.music.ui.HomeColors
@@ -56,11 +59,13 @@ internal fun QueueSheet(
             Animatable(0f)
         }
 
-    val configuration =
-        LocalConfiguration.current
+    var measuredHeight by remember {
+        mutableFloatStateOf(1f)
+    }
 
-    val sheetHeightDp =
-        configuration.screenHeightDp *
+    val sheetHeight =
+        LocalConfiguration.current
+            .screenHeightDp.dp *
             .72f
 
     Box(
@@ -68,12 +73,12 @@ internal fun QueueSheet(
             .fillMaxSize()
             .background(
                 Color.Black.copy(
-                    alpha = .18f
+                    alpha = .12f
                 )
             )
             /*
-             * No clickable/ripple backdrop.
-             * This is intentionally a passive touch blocker.
+             * Passive full-screen hit target:
+             * no ripple, no press dim, no fake long-press state.
              */
             .pointerInput(Unit) {
                 awaitPointerEventScope {
@@ -88,9 +93,15 @@ internal fun QueueSheet(
         Column(
             Modifier
                 .fillMaxWidth()
-                .height(
-                    sheetHeightDp.dp
-                )
+                .height(sheetHeight)
+                .onSizeChanged {
+                    measuredHeight =
+                        it.height
+                            .toFloat()
+                            .coerceAtLeast(
+                                1f
+                            )
+                }
                 .graphicsLayer {
                     translationY =
                         sheetY.value
@@ -105,16 +116,13 @@ internal fun QueueSheet(
                     colors.surface
                 )
         ) {
-            /*
-             * Dedicated swipe handle.
-             *
-             * Queue list itself remains free for normal scrolling.
-             */
             Box(
                 Modifier
                     .fillMaxWidth()
-                    .height(36.dp)
-                    .pointerInput(Unit) {
+                    .height(38.dp)
+                    .pointerInput(
+                        measuredHeight
+                    ) {
                         detectDragGestures(
                             onDrag = {
                                     change,
@@ -133,8 +141,9 @@ internal fun QueueSheet(
                                                 sheetY.value +
                                                     amount.y
                                                 )
-                                                .coerceAtLeast(
-                                                    0f
+                                                .coerceIn(
+                                                    0f,
+                                                    measuredHeight
                                                 )
                                         )
                                     }
@@ -145,13 +154,14 @@ internal fun QueueSheet(
                                 scope.launch {
                                     if (
                                         sheetY.value >
-                                        90f
+                                        measuredHeight *
+                                            .13f
                                     ) {
                                         sheetY.animateTo(
                                             targetValue =
-                                                1_000f,
+                                                measuredHeight,
                                             animationSpec =
-                                                tween(250)
+                                                tween(280)
                                         )
 
                                         dismiss()
@@ -162,9 +172,9 @@ internal fun QueueSheet(
                                             animationSpec =
                                                 spring(
                                                     dampingRatio =
-                                                        .82f,
+                                                        .84f,
                                                     stiffness =
-                                                        430f
+                                                        420f
                                                 )
                                         )
                                     }
@@ -181,7 +191,7 @@ internal fun QueueSheet(
                                                 dampingRatio =
                                                     .84f,
                                                 stiffness =
-                                                    450f
+                                                    430f
                                             )
                                     )
                                 }
@@ -193,7 +203,7 @@ internal fun QueueSheet(
             ) {
                 Box(
                     Modifier
-                        .width(52.dp)
+                        .width(54.dp)
                         .height(5.dp)
                         .clip(
                             RoundedCornerShape(
@@ -202,7 +212,7 @@ internal fun QueueSheet(
                         )
                         .background(
                             colors.sub.copy(
-                                alpha = .30f
+                                alpha = .28f
                             )
                         )
                 )
@@ -210,15 +220,18 @@ internal fun QueueSheet(
 
             Text(
                 text = "Queue",
-                color = colors.text,
+                color =
+                    colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 19.sp,
+                fontSize =
+                    androidx.compose.ui.unit
+                        .TextUnit.Unspecified,
                 modifier =
                     Modifier.padding(
                         start = 18.dp,
-                        top = 2.dp,
-                        bottom = 11.dp
+                        top = 1.dp,
+                        bottom = 10.dp
                     )
             )
 
@@ -238,8 +251,8 @@ internal fun QueueSheet(
             ) {
                 items(
                     items = queue,
-                    key = { song ->
-                        song.id
+                    key = {
+                        it.id
                     }
                 ) { song ->
                     QueueRow(
@@ -247,7 +260,8 @@ internal fun QueueSheet(
                         active =
                             song.id ==
                                 currentSongId,
-                        colors = colors
+                        colors =
+                            colors
                     )
                 }
             }
@@ -287,8 +301,10 @@ private fun QueueRow(
             Alignment.CenterVertically
     ) {
         AsyncImage(
-            model = song.artwork,
-            contentDescription = null,
+            model =
+                song.artwork,
+            contentDescription =
+                null,
             modifier =
                 Modifier
                     .size(48.dp)
@@ -312,7 +328,8 @@ private fun QueueRow(
                 )
         ) {
             Text(
-                text = song.title,
+                text =
+                    song.title,
                 color =
                     if (active) {
                         accent
@@ -321,17 +338,27 @@ private fun QueueRow(
                     },
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 12.sp,
-                maxLines = 1
+                fontSize =
+                    androidx.compose.ui.unit
+                        .TextUnit.Unspecified,
+                maxLines = 1,
+                overflow =
+                    TextOverflow.Ellipsis
             )
 
             Text(
-                text = song.artist,
-                color = colors.sub,
+                text =
+                    song.artist,
+                color =
+                    colors.sub,
                 fontFamily =
                     XmoFont.normal,
-                fontSize = 10.sp,
-                maxLines = 1
+                fontSize =
+                    androidx.compose.ui.unit
+                        .TextUnit.Unspecified,
+                maxLines = 1,
+                overflow =
+                    TextOverflow.Ellipsis
             )
         }
     }
