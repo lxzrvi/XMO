@@ -634,7 +634,7 @@ fun NowPlaying(
                 )
 
                 Spacer(
-                    Modifier.weight(1f)
+                    Modifier.weight(5.dp)
                 )
 
                 PlayerBody(
