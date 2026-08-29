@@ -40,7 +40,8 @@ internal fun PlayerControls(
             Arrangement.Center
     ) {
         BarePlayerButton(
-            size = 45.dp,
+            size =
+                45.dp,
             onClick =
                 toggleShuffle
         ) {
@@ -68,7 +69,8 @@ internal fun PlayerControls(
         )
 
         BarePlayerButton(
-            size = 47.dp,
+            size =
+                47.dp,
             enabled =
                 hasPrevious,
             onClick =
@@ -101,7 +103,8 @@ internal fun PlayerControls(
         )
 
         BarePlayerButton(
-            size = 68.dp,
+            size =
+                68.dp,
             onClick =
                 togglePlay
         ) {
@@ -152,7 +155,8 @@ internal fun PlayerControls(
         )
 
         BarePlayerButton(
-            size = 47.dp,
+            size =
+                47.dp,
             enabled =
                 hasNext,
             onClick =
@@ -185,7 +189,8 @@ internal fun PlayerControls(
         )
 
         BarePlayerButton(
-            size = 45.dp,
+            size =
+                45.dp,
             onClick =
                 cycleRepeat
         ) {
