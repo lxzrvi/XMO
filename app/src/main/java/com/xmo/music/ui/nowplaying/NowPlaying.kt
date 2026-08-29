@@ -879,6 +879,7 @@ fun NowPlaying(
                     state.position,
                 colors = colors,
                 accent = accent,
+                theme = theme,
                 previousSong =
                     previousItem,
                 nextSong = next,
@@ -904,7 +905,7 @@ fun NowPlaying(
              * Reduced only enough to fit the fixed viewport.
              */
             Spacer(
-                Modifier.height(34.dp)
+                Modifier.height(95.dp)
             )
 
             /*
@@ -950,6 +951,7 @@ fun NowPlaying(
                         Modifier
                             .weight(1f)
                             .padding(
+                                top = 7.dp,
                                 end = 7.dp
                             )
                     ) {
@@ -996,7 +998,7 @@ fun NowPlaying(
                             colors.button
                     ) {
                         CapsuleButton(
-                            size = 35.dp,
+                            size = 40.dp,
                             onClick = {
                                 toggleLike()
 
@@ -1181,28 +1183,35 @@ fun NowPlaying(
                  */
 
                 PlayerControls(
-                    isPlaying =
-                        state.isPlaying,
-                    hasPrevious =
-                        state.hasPrevious,
-                    hasNext =
-                        state.hasNext,
-                    shuffleEnabled =
-                        state.shuffleEnabled,
-                    repeatMode =
-                        state.repeatMode,
-                    foreground =
-                        controlForeground,
+                    isPlaying = state.isPlaying,
+                    hasPrevious = state.hasPrevious,
+                    hasNext = state.hasNext,
+                    shuffleEnabled = state.shuffleEnabled,
+                    repeatMode = state.repeatMode,
+                    foreground = controlForeground,
                     accent = accent,
-                    togglePlay =
-                        togglePlay,
-                    previous =
-                        previous,
+                    playBackground =
+                        when (theme) {
+                            XmoTheme.Light ->
+                                Color.Black.copy(
+                                    alpha = .10f
+                                )
+                
+                            XmoTheme.Dark ->
+                                Color.White.copy(
+                                    alpha = .13f
+                                )
+                
+                            XmoTheme.Amoled ->
+                                Color.White.copy(
+                                    alpha = .15f
+                                )
+                        },
+                    togglePlay = togglePlay,
+                    previous = previous,
                     next = next,
-                    toggleShuffle =
-                        toggleShuffle,
-                    cycleRepeat =
-                        cycleRepeat
+                    toggleShuffle = toggleShuffle,
+                    cycleRepeat = cycleRepeat
                 )
 
                 /*
