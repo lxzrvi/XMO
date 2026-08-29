@@ -42,6 +42,7 @@ import com.xmo.music.data.Song
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 @Composable
