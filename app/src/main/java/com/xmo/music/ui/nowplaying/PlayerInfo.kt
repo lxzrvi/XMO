@@ -21,6 +21,7 @@ import com.composables.icons.lucide.Clock3
 import com.composables.icons.lucide.ListMusic
 import com.composables.icons.lucide.Lucide
 import com.xmo.music.ui.HomeColors
+import androidx.compose.foundation.layout.fillMaxSize
 import com.xmo.music.ui.XmoFont
 
 @Composable
@@ -198,6 +199,87 @@ internal fun PlayerInfo(
                             openArtist
                         )
             )
+        }
+    }
+}
+@Composable
+private fun SleepRingButton(
+    remainingMs: Long,
+    totalMs: Long?,
+    colors: HomeColors,
+    accent: Color,
+    onClick: () -> Unit
+) {
+    val active =
+        remainingMs > 0L
+
+    val progress =
+        if (
+            active &&
+            totalMs != null &&
+            totalMs > 0L
+        ) {
+            (
+                remainingMs.toFloat() /
+                    totalMs.toFloat()
+                )
+                .coerceIn(
+                    0f,
+                    1f
+                )
+        } else {
+            null
+        }
+
+    Box(
+        Modifier.size(40.dp),
+        contentAlignment =
+            Alignment.Center
+    ) {
+        CapsuleButton(
+            size = 40.dp,
+            onClick = onClick
+        ) {
+            Icon(
+                imageVector =
+                    Lucide.Clock3,
+                contentDescription =
+                    "Sleep timer",
+                tint =
+                    if (active) {
+                        accent
+                    } else {
+                        colors.icon
+                    },
+                modifier =
+                    Modifier.size(18.dp)
+            )
+        }
+
+        if (
+            progress != null
+        ) {
+            androidx.compose.foundation.Canvas(
+                Modifier.fillMaxSize()
+            ) {
+                drawArc(
+                    color = accent,
+                    startAngle = -90f,
+                    sweepAngle =
+                        360f *
+                            progress,
+                    useCenter = false,
+                    style =
+                        androidx.compose.ui.graphics.drawscope
+                            .Stroke(
+                                width =
+                                    1.8.dp.toPx(),
+                                cap =
+                                    androidx.compose.ui.graphics
+                                        .StrokeCap.Round
+                            )
+                )
+            }
         }
     }
 }
