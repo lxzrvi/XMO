@@ -69,7 +69,7 @@ internal fun PlayerControls(
         }
 
         androidx.compose.foundation.layout.Spacer(
-            Modifier.size(5.dp)
+            Modifier.size(12.dp)
         )
 
         BarePlayerButton(
@@ -141,7 +141,7 @@ internal fun PlayerControls(
         }
 
         androidx.compose.foundation.layout.Spacer(
-            Modifier.size(5.dp)
+            Modifier.size(12.dp)
         )
 
         BarePlayerButton(
