@@ -183,10 +183,7 @@ private fun Modifier.headerDownGesture(
     pointerInput(height) {
         coroutineScope {
             detectDragGestures(
-                onDrag = {
-                        change,
-                        amount ->
-
+                onDrag = { change, amount ->
                     if (
                         amount.y > 0f ||
                         y.value > 0f
@@ -243,9 +240,10 @@ private fun Modifier.headerDownGesture(
                         y.animateTo(
                             targetValue =
                                 0f,
-                        animationSpec =
-                            tween(180)
-                    )
+                            animationSpec =
+                                tween(180)
+                        )
+                    }
                 }
             )
         }
