@@ -40,13 +40,13 @@ internal fun PlayerControls(
 ) {
     Row(
         Modifier.fillMaxWidth(),
-        verticalAlignment =
-            Alignment.CenterVertically,
         horizontalArrangement =
-            Arrangement.SpaceBetween
+            Arrangement.Center,
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
         BarePlayerButton(
-            size = 48.dp,
+            size = 45.dp,
             onClick =
                 toggleShuffle
         ) {
@@ -64,113 +64,116 @@ internal fun PlayerControls(
                         foreground
                     },
                 modifier =
-                    Modifier.size(24.dp)
+                    Modifier.size(23.dp)
             )
         }
 
-        Row(
-            verticalAlignment =
-                Alignment.CenterVertically,
-            horizontalArrangement =
-                Arrangement.spacedBy(
-                    7.dp
-                )
+        androidx.compose.foundation.layout.Spacer(
+            Modifier.size(5.dp)
+        )
+
+        BarePlayerButton(
+            size = 47.dp,
+            enabled =
+                hasPrevious,
+            onClick = previous
         ) {
-            BarePlayerButton(
-                size = 47.dp,
-                enabled =
-                    hasPrevious,
-                onClick =
-                    previous
+            Icon(
+                imageVector =
+                    Lucide.SkipBack,
+                contentDescription =
+                    "Previous",
+                tint =
+                    foreground.copy(
+                        alpha =
+                            if (
+                                hasPrevious
+                            ) {
+                                1f
+                            } else {
+                                .30f
+                            }
+                    ),
+                modifier =
+                    Modifier.size(29.dp)
+            )
+        }
+
+        androidx.compose.foundation.layout.Spacer(
+            Modifier.size(5.dp)
+        )
+
+        BarePlayerButton(
+            size = 68.dp,
+            onClick =
+                togglePlay
+        ) {
+            androidx.compose.foundation.layout.Box(
+                Modifier
+                    .size(58.dp)
+                    .background(
+                        color =
+                            playBackground,
+                        shape =
+                            CircleShape
+                    ),
+                contentAlignment =
+                    Alignment.Center
             ) {
                 Icon(
                     imageVector =
-                        Lucide.SkipBack,
+                        if (isPlaying) {
+                            Lucide.Pause
+                        } else {
+                            Lucide.Play
+                        },
                     contentDescription =
-                        "Previous",
-                    tint =
-                        foreground.copy(
-                            alpha =
-                                if (
-                                    hasPrevious
-                                ) {
-                                    1f
-                                } else {
-                                    .30f
-                                }
-                        ),
+                        if (isPlaying) {
+                            "Pause"
+                        } else {
+                            "Play"
+                        },
+                    tint = foreground,
                     modifier =
-                        Modifier.size(29.dp)
-                )
-            }
-
-            BarePlayerButton(
-                size = 68.dp,
-                onClick =
-                    togglePlay
-            ) {
-                androidx.compose.foundation.layout.Box(
-                    Modifier
-                        .size(58.dp)
-                        .background(
-                            color =
-                                playBackground,
-                            shape =
-                                CircleShape
-                        ),
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-                    Icon(
-                        imageVector =
-                            if (isPlaying) {
-                                Lucide.Pause
-                            } else {
-                                Lucide.Play
-                            },
-                        contentDescription =
-                            if (isPlaying) {
-                                "Pause"
-                            } else {
-                                "Play"
-                            },
-                        tint =
-                            foreground,
-                        modifier =
-                            Modifier.size(
-                                35.dp
-                            )
-                    )
-                }
-            }
-
-            BarePlayerButton(
-                size = 47.dp,
-                enabled = hasNext,
-                onClick = next
-            ) {
-                Icon(
-                    imageVector =
-                        Lucide.SkipForward,
-                    contentDescription =
-                        "Next",
-                    tint =
-                        foreground.copy(
-                            alpha =
-                                if (hasNext) {
-                                    1f
-                                } else {
-                                    .30f
-                                }
-                        ),
-                    modifier =
-                        Modifier.size(29.dp)
+                        Modifier.size(35.dp)
                 )
             }
         }
 
+        androidx.compose.foundation.layout.Spacer(
+            Modifier.size(5.dp)
+        )
+
         BarePlayerButton(
-            size = 48.dp,
+            size = 47.dp,
+            enabled = hasNext,
+            onClick = next
+        ) {
+            Icon(
+                imageVector =
+                    Lucide.SkipForward,
+                contentDescription =
+                    "Next",
+                tint =
+                    foreground.copy(
+                        alpha =
+                            if (hasNext) {
+                                1f
+                            } else {
+                                .30f
+                            }
+                    ),
+                modifier =
+                    Modifier.size(29.dp)
+            )
+        }
+
+        androidx.compose.foundation.layout.Spacer(
+            Modifier.size(5.dp)
+        )
+
+        BarePlayerButton(
+            size = 45.dp,
             onClick =
                 cycleRepeat
         ) {
@@ -185,7 +188,16 @@ internal fun PlayerControls(
                         Lucide.Repeat2
                     },
                 contentDescription =
-                    "Repeat",
+                    when (repeatMode) {
+                        Player.REPEAT_MODE_ONE ->
+                            "Repeat one"
+
+                        Player.REPEAT_MODE_ALL ->
+                            "Repeat all"
+
+                        else ->
+                            "Repeat off"
+                    },
                 tint =
                     if (
                         repeatMode ==
@@ -196,7 +208,7 @@ internal fun PlayerControls(
                         accent
                     },
                 modifier =
-                    Modifier.size(24.dp)
+                    Modifier.size(23.dp)
             )
         }
     }
