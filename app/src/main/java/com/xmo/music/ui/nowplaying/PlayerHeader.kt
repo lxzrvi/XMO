@@ -1,5 +1,6 @@
 package com.xmo.music.ui.nowplaying
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,6 +48,21 @@ internal fun PlayerHeader(
     val scope =
         rememberCoroutineScope()
 
+    val animatedForeground by
+        animateColorAsState(
+            targetValue =
+                foreground,
+            animationSpec =
+                tween(360),
+            label =
+                "headerForeground"
+        )
+
+    val surface =
+        animatedForeground.copy(
+            alpha = .10f
+        )
+
     Box(
         Modifier
             .fillMaxWidth()
@@ -64,9 +81,7 @@ internal fun PlayerHeader(
         PremiumCircle(
             size = 40.dp,
             background =
-                foreground.copy(
-                    alpha = .10f
-                ),
+                surface,
             modifier =
                 Modifier.align(
                     Alignment.CenterStart
@@ -82,7 +97,8 @@ internal fun PlayerHeader(
                     Lucide.ChevronDown,
                 contentDescription =
                     "Close",
-                tint = foreground,
+                tint =
+                    animatedForeground,
                 modifier =
                     Modifier.size(22.dp)
             )
@@ -107,8 +123,8 @@ internal fun PlayerHeader(
                         "PLAYING FROM"
                     },
                 color =
-                    foreground.copy(
-                        alpha = .68f
+                    animatedForeground.copy(
+                        alpha = .66f
                     ),
                 fontFamily =
                     XmoFont.medium,
@@ -120,7 +136,8 @@ internal fun PlayerHeader(
 
             Text(
                 text = source,
-                color = foreground,
+                color =
+                    animatedForeground,
                 fontFamily =
                     XmoFont.bold,
                 fontSize = 16.sp,
@@ -134,9 +151,7 @@ internal fun PlayerHeader(
 
         XmoCapsule(
             background =
-                foreground.copy(
-                    alpha = .10f
-                ),
+                surface,
             modifier =
                 Modifier.align(
                     Alignment.CenterEnd
@@ -151,7 +166,8 @@ internal fun PlayerHeader(
                         Lucide.Share2,
                     contentDescription =
                         "Share",
-                    tint = foreground,
+                    tint =
+                        animatedForeground,
                     modifier =
                         Modifier.size(18.dp)
                 )
@@ -166,7 +182,8 @@ internal fun PlayerHeader(
                         Lucide.EllipsisVertical,
                     contentDescription =
                         "Options",
-                    tint = foreground,
+                    tint =
+                        animatedForeground,
                     modifier =
                         Modifier.size(19.dp)
                 )
@@ -183,7 +200,10 @@ private fun Modifier.headerDownGesture(
     pointerInput(height) {
         coroutineScope {
             detectDragGestures(
-                onDrag = { change, amount ->
+                onDrag = {
+                        change,
+                        amount ->
+
                     if (
                         amount.y > 0f ||
                         y.value > 0f
