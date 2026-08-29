@@ -717,14 +717,7 @@ fun NowPlaying(
 
                         overlay = null
                     },
-                    removeLyrics = {
-                        saveLyricsUri(null)
-
-                        pop =
-                            PopMessage(
-                                "Attached lyrics removed"
-                            )
-                    },
+                    
                     setCategory = {
                             category,
                             add ->
