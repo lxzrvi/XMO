@@ -2,9 +2,6 @@ package com.xmo.music.ui.nowplaying
 
 import android.content.Context
 import android.net.Uri
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animate
-import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
@@ -24,10 +21,16 @@ import kotlin.math.max
 internal class PlayerColorState(
     initial: Color
 ) {
-    var current by
+    /*
+     * Color of the cover currently resting in the visual centre.
+     */
+    var settled by
         mutableStateOf(initial)
         internal set
 
+    /*
+     * Frozen visual neighbors.
+     */
     var previous by
         mutableStateOf(initial)
         internal set
@@ -36,52 +39,59 @@ internal class PlayerColorState(
         mutableStateOf(initial)
         internal set
 
-    var committed by
-        mutableStateOf(initial)
-        internal set
-
-    var rendered by
+    /*
+     * Palette result corresponding to visualCurrent.
+     */
+    var visualCurrent by
         mutableStateOf(initial)
         internal set
 }
 
+/*
+ * This version deliberately has no independent resting-color
+ * animation.
+ *
+ * Cover displacement owns the transition:
+ *
+ * x = 0             -> settled
+ * x = -pageWidth    -> next
+ * x = +pageWidth    -> previous
+ *
+ * There is therefore no second color animation fighting against
+ * the artwork animation.
+ */
 @Composable
 internal fun rememberPlayerColors(
     context: Context,
-    currentArtwork: Uri?,
-    fallbackArtwork: Uri?,
-    previousArtwork: Uri?,
-    nextArtwork: Uri?,
-    currentSongId: Long?,
-    coverX: Animatable<Float, *>,
-    transactionActive: Boolean
+    carousel: PlayerCarouselState
 ): PlayerColorState {
-    val initial =
-        Color(0xFF6D7078)
+    val fallback =
+        Color(0xFF747984)
 
     val state =
         remember {
             PlayerColorState(
-                initial = initial
+                initial = fallback
             )
         }
 
-    val paletteCache =
+    val cache =
         remember {
             mutableStateMapOf<String, Color>()
         }
 
     suspend fun extract(
-        uri: Uri?
+        uri: Uri?,
+        default: Color
     ): Color {
         if (uri == null) {
-            return state.committed
+            return default
         }
 
         val key =
             uri.toString()
 
-        paletteCache[key]?.let {
+        cache[key]?.let {
             return it
         }
 
@@ -92,157 +102,113 @@ internal fun rememberPlayerColors(
                     uri
                 )
 
-        val lifted =
+        val result =
             liftArtworkColor(
                 raw
             )
 
-        paletteCache[key] =
-            lifted
+        cache[key] =
+            result
 
-        return lifted
+        return result
     }
 
     /*
-     * Real Media3-current Palette result.
-     *
-     * This may update before the visual carousel completes, so it
-     * must not directly replace committed/rendered.
+     * All three effects consume the SAME frozen visual artwork
+     * window used by PlayerArtwork.
      */
     LaunchedEffect(
-        currentSongId,
-        currentArtwork,
-        fallbackArtwork
+        carousel.visualSongId,
+        carousel.visualCurrent
     ) {
-        val requestedId =
-            currentSongId
-
-        val artwork =
-            currentArtwork
-                ?: fallbackArtwork
-
         val result =
-            if (artwork != null) {
-                extract(
-                    artwork
-                )
-            } else {
-                state.committed
-            }
+            extract(
+                uri =
+                    carousel.visualCurrent,
+                default =
+                    state.settled
+            )
 
+        state.visualCurrent =
+            result
+
+        /*
+         * At true visual rest the current visual artwork is the
+         * settled baseline.
+         */
         if (
-            requestedId ==
-            currentSongId
+            carousel.isResting
         ) {
-            state.current =
+            state.settled =
                 result
         }
     }
 
-    /*
-     * Adjacent Palette window remains frozen for the same period
-     * as PlayerArtwork's visual queue snapshot.
-     */
     LaunchedEffect(
-        previousArtwork,
-        transactionActive
+        carousel.visualPrevious
     ) {
-        if (
-            transactionActive
-        ) {
-            return@LaunchedEffect
-        }
-
         state.previous =
-            previousArtwork
-                ?.let {
-                    extract(it)
-                }
-                ?: state.committed
+            extract(
+                uri =
+                    carousel.visualPrevious,
+                default =
+                    state.settled
+            )
     }
 
     LaunchedEffect(
-        nextArtwork,
-        transactionActive
+        carousel.visualNext
     ) {
-        if (
-            transactionActive
-        ) {
-            return@LaunchedEffect
-        }
-
         state.next =
-            nextArtwork
-                ?.let {
-                    extract(it)
-                }
-                ?: state.committed
+            extract(
+                uri =
+                    carousel.visualNext,
+                default =
+                    state.settled
+            )
     }
 
     /*
-     * Commit only after the actual visual transaction returns to
-     * rest. No arbitrary song-transition timer is used.
+     * Commit the color BEFORE PlayerArtwork resets x to zero.
+     *
+     * Manual:
+     * cover reaches +/- pageWidth and waits for Media3.
+     *
+     * Automatic:
+     * cover reaches +/- pageWidth before window adoption.
+     *
+     * So reset-to-zero can never reveal the previous song color.
      */
     LaunchedEffect(
-        currentSongId,
-        transactionActive,
-        state.current
+        carousel.x.value,
+        carousel.width
     ) {
-        if (
-            transactionActive ||
-            abs(coverX.value) >= 1f ||
-            state.current == state.committed
-        ) {
-            return@LaunchedEffect
-        }
-
-        val expectedSongId =
-            currentSongId
-
-        val from =
-            state.rendered
-
-        val to =
-            state.current
-
-        animate(
-            initialValue = 0f,
-            targetValue = 1f,
-            animationSpec =
-                tween<Float>(
-                    durationMillis = 460
+        val width =
+            carousel.width
+                .coerceAtLeast(
+                    1f
                 )
-        ) { value, _ ->
 
-            /*
-             * Kept compatible with the animation callback type in
-             * the existing project.
-             */
-            val raw =
-                value ?: 0f
-
-            state.rendered =
-                mixColor(
-                    from = from,
-                    to = to,
-                    fraction =
-                        smoothPlayerFraction(
-                            raw
-                        )
+        val fraction =
+            (
+                carousel.x.value /
+                    width
                 )
-        }
+                .coerceIn(
+                    -1f,
+                    1f
+                )
 
         if (
-            !transactionActive &&
-            expectedSongId ==
-            currentSongId &&
-            state.current == to
+            fraction <= -.995f
         ) {
-            state.committed =
-                to
-
-            state.rendered =
-                to
+            state.settled =
+                state.next
+        } else if (
+            fraction >= .995f
+        ) {
+            state.settled =
+                state.previous
         }
     }
 
@@ -274,7 +240,7 @@ internal fun playerDisplayColor(
         abs(fraction) <
         .001f
     ) {
-        return colors.rendered
+        return colors.settled
     }
 
     val destination =
@@ -288,7 +254,7 @@ internal fun playerDisplayColor(
 
     return mixColor(
         from =
-            colors.committed,
+            colors.settled,
         to =
             destination,
         fraction =
@@ -314,9 +280,9 @@ internal fun playerThemeColors(
     val overlayText =
         if (
             displayColor.luminance() >
-            .67f
+            .66f
         ) {
-            Color(0xFF151519)
+            Color(0xFF15161A)
         } else {
             Color.White
         }
@@ -334,59 +300,55 @@ internal fun playerThemeColors(
     val softButton =
         when (theme) {
             XmoTheme.Light ->
-                Color.Black.copy(
-                    alpha = .065f
+                Color.White.copy(
+                    alpha = .34f
                 )
 
             XmoTheme.Dark ->
                 Color.White.copy(
-                    alpha = .105f
+                    alpha = .095f
                 )
 
             XmoTheme.Amoled ->
                 Color.White.copy(
-                    alpha = .12f
+                    alpha = .10f
                 )
         }
 
-    /*
-     * Artwork remains visible below the lower controls panel.
-     */
     val panel =
         when (theme) {
             XmoTheme.Light ->
                 Color.White.copy(
-                    alpha = .52f
+                    alpha = .54f
                 )
 
             XmoTheme.Dark ->
-                Color(0xFF202126)
+                Color(0xFF17191E)
                     .copy(
                         alpha = .52f
                     )
 
             XmoTheme.Amoled ->
-                Color(0xFF08090B)
-                    .copy(
-                        alpha = .62f
-                    )
+                Color.Black.copy(
+                    alpha = .60f
+                )
         }
 
     val border =
         when (theme) {
             XmoTheme.Light ->
                 Color.White.copy(
-                    alpha = .42f
+                    alpha = .55f
                 )
 
             XmoTheme.Dark ->
                 Color.White.copy(
-                    alpha = .13f
+                    alpha = .15f
                 )
 
             XmoTheme.Amoled ->
                 Color.White.copy(
-                    alpha = .15f
+                    alpha = .16f
                 )
         }
 
@@ -409,7 +371,7 @@ internal fun playerThemeColors(
 internal fun liftArtworkColor(
     color: Color
 ): Color {
-    val strongest =
+    val peak =
         max(
             color.red,
             max(
@@ -419,35 +381,34 @@ internal fun liftArtworkColor(
         )
 
     if (
-        strongest <= .001f
+        peak <= .002f
     ) {
         return Color(
-            0xFF777A84
+            0xFF747984
         )
     }
 
-    val targetPeak =
+    val wantedPeak =
         when {
-            strongest < .18f ->
-                .48f
+            peak < .16f ->
+                .50f
 
-            strongest < .30f ->
+            peak < .26f ->
+                .47f
+
+            peak < .38f ->
                 .44f
 
-            strongest < .40f ->
-                .42f
-
             else ->
-                strongest
+                peak
         }
 
     val multiplier =
         if (
-            strongest <
-            targetPeak
+            wantedPeak > peak
         ) {
-            targetPeak /
-                strongest
+            wantedPeak /
+                peak
         } else {
             1f
         }
@@ -482,26 +443,30 @@ internal fun liftArtworkColor(
                 1f
             )
 
-    val whiteLift =
+    /*
+     * Tiny lift prevents muddy dominant colors without turning
+     * artwork hues pastel.
+     */
+    val lift =
         if (
-            strongest < .42f
+            peak < .38f
         ) {
-            .07f
+            .055f
         } else {
-            .025f
+            .018f
         }
 
     red +=
         (1f - red) *
-            whiteLift
+            lift
 
     green +=
         (1f - green) *
-            whiteLift
+            lift
 
     blue +=
         (1f - blue) *
-            whiteLift
+            lift
 
     return Color(
         red =
