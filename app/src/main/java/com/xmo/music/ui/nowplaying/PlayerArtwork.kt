@@ -31,7 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -75,9 +75,7 @@ internal fun PlayerArtwork(
 
     var rawX by
         remember {
-            mutableFloatStateOf(
-                0f
-            )
+            mutableFloatStateOf(0f)
         }
 
     /*
@@ -294,9 +292,8 @@ internal fun PlayerArtwork(
             LocalDensity.current
 
         /*
-         * coverSizeModifier uses 17dp on both horizontal sides.
-         * Carousel travel therefore uses the real square-cover
-         * width rather than the wider host width.
+         * Artwork has 17dp horizontal inset on each side.
+         * This value is ONLY used by the artwork carousel.
          */
         val horizontalInsetPx =
             with(density) {
@@ -308,7 +305,7 @@ internal fun PlayerArtwork(
                 constraints.maxWidth
                     .toFloat() -
                     horizontalInsetPx
-                )
+            )
                 .coerceAtLeast(
                     1f
                 )
@@ -348,8 +345,8 @@ internal fun PlayerArtwork(
                             },
 
                             onDrag = {
-                                    change,
-                                    amount ->
+                                change,
+                                amount ->
 
                                 if (
                                     carousel
@@ -506,10 +503,11 @@ internal fun PlayerArtwork(
             contentAlignment =
                 Alignment.Center
         ) {
+
             /*
-             * Both layers retain identical host bounds.
-             * AnimatedContent is deliberately not used so it
-             * cannot resize/crop the artwork-sized lyrics card.
+             * ARTWORK
+             *
+             * This remains square and cropped intentionally.
              */
             AnimatedVisibility(
                 visible =
@@ -567,6 +565,16 @@ internal fun PlayerArtwork(
                 )
             }
 
+            /*
+             * LYRICS
+             *
+             * IMPORTANT:
+             * Do NOT use coverSizeModifier() here.
+             *
+             * Lyrics get the entire 382dp host height so
+             * FollowLyrics can place the active lyric at
+             * the physical center.
+             */
             AnimatedVisibility(
                 visible =
                     showLyrics,
@@ -587,7 +595,7 @@ internal fun PlayerArtwork(
                                 tween(
                                     durationMillis =
                                         380
-                                )
+                            )
                         ),
                 exit =
                     fadeOut(
@@ -605,7 +613,7 @@ internal fun PlayerArtwork(
                                     durationMillis =
                                         280
                                 )
-                        )
+                            )
             ) {
                 Box(
                     modifier =
@@ -614,19 +622,29 @@ internal fun PlayerArtwork(
                         Alignment.Center
                 ) {
                     ArtworkLyrics(
-                        lyrics = lyrics,
-                        position = position,
-                        colors = colors,
-                        accent = accent,
-                        theme = theme,
+                        lyrics =
+                            lyrics,
+                        position =
+                            position,
+                        colors =
+                            colors,
+                        accent =
+                            accent,
+                        theme =
+                            theme,
                         pickLyrics =
                             pickLyrics,
                         fullscreenLyrics =
                             fullscreenLyrics,
                         showArtwork =
                             toggleLyrics,
+
+                        /*
+                         * Full host area instead of
+                         * square artwork dimensions.
+                         */
                         modifier =
-                            coverSizeModifier()
+                            Modifier.fillMaxSize()
                     )
                 }
             }
@@ -649,7 +667,8 @@ private fun ArtworkCarousel(
     ) {
         previous?.let {
             Cover(
-                uri = it,
+                uri =
+                    it,
                 modifier =
                     coverSizeModifier()
                         .align(
@@ -688,7 +707,8 @@ private fun ArtworkCarousel(
 
         next?.let {
             Cover(
-                uri = it,
+                uri =
+                    it,
                 modifier =
                     coverSizeModifier()
                         .align(
@@ -703,6 +723,11 @@ private fun ArtworkCarousel(
     }
 }
 
+/*
+ * ONLY FOR ALBUM ART.
+ *
+ * Square + Crop is intentional.
+ */
 private fun coverSizeModifier(): Modifier =
     Modifier
         .padding(
@@ -733,11 +758,17 @@ private fun Cover(
                 )
     ) {
         AsyncImage(
-            model = uri,
+            model =
+                uri,
             contentDescription =
                 null,
             modifier =
                 Modifier.fillMaxSize(),
+
+            /*
+             * Album artwork is intentionally cropped
+             * to fill the square cover.
+             */
             contentScale =
                 ContentScale.Crop
         )
@@ -750,7 +781,8 @@ private fun Cover(
                     Alignment.Center
             ) {
                 Text(
-                    text = "XMO",
+                    text =
+                        "XMO",
                     color =
                         LocalXmoAccent.current,
                     fontFamily =
