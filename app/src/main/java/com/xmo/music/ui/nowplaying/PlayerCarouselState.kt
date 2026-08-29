@@ -1,74 +1,74 @@
 package com.xmo.music.ui.nowplaying
 
+import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlin.math.abs
 
 @Stable
-internal class PlayerCarouselState {
-
+internal class PlayerCarouselState(
+    initialId: Long?,
+    initialIndex: Int,
+    initialCurrent: Uri?,
+    initialPrevious: Uri?,
+    initialNext: Uri?
+) {
     val x =
-        Animatable(
-            0f
-        )
+        Animatable(0f)
 
     /*
-     * Real square artwork width in pixels.
+     * Carousel page width.
+     *
+     * Important:
+     * This is the HOST width again, not artwork width.
+     *
+     * The artwork itself keeps its 17dp inset. Previous and next
+     * covers therefore retain the original visual separation.
      */
     var width by
-        mutableStateOf(
-            1f
-        )
+        mutableStateOf(1f)
 
-    /*
-     *  0 = no manual transaction
-     *  1 = next
-     * -1 = previous
-     */
     var manualDirection by
-        mutableIntStateOf(
-            0
-        )
+        mutableIntStateOf(0)
 
     var manualSongId by
-        mutableStateOf<Long?>(
-            null
-        )
+        mutableStateOf<Long?>(null)
 
     var autoAnimating by
-        mutableStateOf(
-            false
-        )
+        mutableStateOf(false)
+
+    var autoDirection by
+        mutableIntStateOf(0)
 
     /*
-     *  0 = none
-     *  1 = next
-     * -1 = previous
+     * ONE frozen visual queue window.
+     *
+     * Artwork and Palette both consume these values. Live queue
+     * recomposition cannot replace the destination halfway
+     * through an animation.
      */
-    var autoDirection by
-        mutableIntStateOf(
-            0
-        )
+    var visualSongId by
+        mutableStateOf(initialId)
+        private set
 
-    var visualFromSongId by
-        mutableStateOf<Long?>(
-            null
-        )
+    var visualIndex by
+        mutableIntStateOf(initialIndex)
+        private set
 
-    var visualToSongId by
-        mutableStateOf<Long?>(
-            null
-        )
+    var visualCurrent by
+        mutableStateOf(initialCurrent)
+        private set
 
-    var transactionGeneration by
-        mutableLongStateOf(
-            0L
-        )
+    var visualPrevious by
+        mutableStateOf(initialPrevious)
+        private set
+
+    var visualNext by
+        mutableStateOf(initialNext)
         private set
 
     val transactionActive: Boolean
@@ -76,28 +76,39 @@ internal class PlayerCarouselState {
             manualDirection != 0 ||
                 autoAnimating
 
-    val direction: Int
-        get() =
-            when {
-                manualDirection != 0 ->
-                    manualDirection
-
-                autoAnimating ->
-                    autoDirection
-
-                else ->
-                    0
-            }
-
     val isResting: Boolean
         get() =
             !transactionActive &&
                 abs(x.value) < 1f
 
-    fun beginManual(
-        direction: Int,
-        currentSongId: Long?
+    fun updateIdleWindow(
+        id: Long?,
+        index: Int,
+        current: Uri?,
+        previous: Uri?,
+        next: Uri?
     ) {
+        if (transactionActive) {
+            return
+        }
+
+        if (id != visualSongId) {
+            return
+        }
+
+        visualIndex = index
+        visualCurrent = current
+        visualPrevious = previous
+        visualNext = next
+    }
+
+    fun beginManual(
+        direction: Int
+    ) {
+        if (transactionActive) {
+            return
+        }
+
         val normalized =
             direction.coerceIn(
                 -1,
@@ -108,131 +119,83 @@ internal class PlayerCarouselState {
             return
         }
 
-        transactionGeneration++
-
         manualDirection =
             normalized
 
         manualSongId =
-            currentSongId
-
-        visualFromSongId =
-            currentSongId
-
-        visualToSongId =
-            null
-
-        autoAnimating =
-            false
-
-        autoDirection =
-            0
+            visualSongId
     }
 
-    fun confirmManualTarget(
-        songId: Long?
+    fun finishManual(
+        id: Long?,
+        index: Int,
+        current: Uri?,
+        previous: Uri?,
+        next: Uri?
     ) {
-        if (
-            manualDirection != 0 &&
-            songId != null &&
-            songId != manualSongId
-        ) {
-            visualToSongId =
-                songId
-        }
-    }
+        adoptWindow(
+            id = id,
+            index = index,
+            current = current,
+            previous = previous,
+            next = next
+        )
 
-    fun finishManual() {
-        manualDirection =
-            0
-
-        manualSongId =
-            null
-
-        visualFromSongId =
-            visualToSongId
-
-        visualToSongId =
-            null
+        manualDirection = 0
+        manualSongId = null
     }
 
     fun cancelManual() {
-        manualDirection =
-            0
-
-        manualSongId =
-            null
-
-        visualFromSongId =
-            null
-
-        visualToSongId =
-            null
+        manualDirection = 0
+        manualSongId = null
     }
 
     fun beginAutomatic(
-        fromSongId: Long?,
-        toSongId: Long?,
         direction: Int
     ) {
-        val normalized =
+        if (transactionActive) {
+            return
+        }
+
+        autoDirection =
             direction.coerceIn(
                 -1,
                 1
             )
 
-        transactionGeneration++
-
-        autoAnimating =
-            true
-
-        autoDirection =
-            normalized
-
-        visualFromSongId =
-            fromSongId
-
-        visualToSongId =
-            toSongId
-
-        manualDirection =
-            0
-
-        manualSongId =
-            null
+        autoAnimating = true
     }
 
-    fun finishAutomatic() {
-        autoAnimating =
-            false
+    fun finishAutomatic(
+        id: Long?,
+        index: Int,
+        current: Uri?,
+        previous: Uri?,
+        next: Uri?
+    ) {
+        adoptWindow(
+            id = id,
+            index = index,
+            current = current,
+            previous = previous,
+            next = next
+        )
 
-        autoDirection =
-            0
-
-        visualFromSongId =
-            visualToSongId
-
-        visualToSongId =
-            null
+        autoDirection = 0
+        autoAnimating = false
     }
 
-    fun clearVisualTransaction() {
-        manualDirection =
-            0
-
-        manualSongId =
-            null
-
-        autoAnimating =
-            false
-
-        autoDirection =
-            0
-
-        visualFromSongId =
-            null
-
-        visualToSongId =
-            null
+    private fun adoptWindow(
+        id: Long?,
+        index: Int,
+        current: Uri?,
+        previous: Uri?,
+        next: Uri?
+    ) {
+        visualSongId = id
+        visualIndex = index
+        visualCurrent = current
+        visualPrevious = previous
+        visualNext = next
     }
 }
