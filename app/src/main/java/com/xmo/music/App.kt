@@ -41,7 +41,7 @@ import com.xmo.music.ui.Home
 import com.xmo.music.ui.LocalXmoProfile
 import com.xmo.music.ui.MiniPlayer
 import com.xmo.music.ui.NavBar
-import com.xmo.music.ui.NowPlaying
+import com.xmo.music.ui.nowplaying.NowPlaying
 import com.xmo.music.ui.ProfileEditor
 import com.xmo.music.ui.ProvideXmoAccent
 import com.xmo.music.ui.Search
