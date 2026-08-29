@@ -38,6 +38,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.input.pointer.pointerInput
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
 import com.xmo.music.data.SongLyrics
@@ -409,6 +410,13 @@ fun NowPlaying(
         Modifier
             .fillMaxSize()
             .onSizeChanged {
+                .pointerInput(Unit) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent()
+                        }
+                    }
+                }
                 screenHeight =
                     it.height
                         .toFloat()
