@@ -59,6 +59,7 @@ internal fun PlayerArtwork(
     position: Long,
     colors: HomeColors,
     accent: Color,
+    theme: XmoTheme,
     previousSong: () -> Unit,
     nextSong: () -> Unit,
     toggleLyrics: () -> Unit,
@@ -294,6 +295,7 @@ internal fun PlayerArtwork(
                     position = position,
                     colors = colors,
                     accent = accent,
+                    theme = theme,
                     pickLyrics = pickLyrics,
                     fullscreenLyrics =
                         fullscreenLyrics,
