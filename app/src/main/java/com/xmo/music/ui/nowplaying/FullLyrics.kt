@@ -3,6 +3,7 @@ package com.xmo.music.ui.nowplaying
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +22,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,15 +60,22 @@ internal fun FullLyrics(
     val foregroundTarget =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFF151519)
+                if (
+                    dominant.luminance() >
+                    .74f
+                ) {
+                    Color(0xFF15161A)
+                } else {
+                    Color(0xFF111216)
+                }
 
             XmoTheme.Dark,
             XmoTheme.Amoled ->
                 if (
                     dominant.luminance() >
-                    .70f
+                    .76f
                 ) {
-                    Color(0xFF17181B)
+                    Color(0xFF15161A)
                 } else {
                     Color.White
                 }
@@ -77,7 +87,8 @@ internal fun FullLyrics(
                 foregroundTarget,
             animationSpec =
                 tween(
-                    durationMillis = 500
+                    durationMillis =
+                        460
                 ),
             label =
                 "fullLyricsForeground"
@@ -85,24 +96,27 @@ internal fun FullLyrics(
 
     val lyricColors =
         HomeColors(
-            bg = Color.Transparent,
-            surface = Color.Transparent,
-            text = foreground,
+            bg =
+                Color.Transparent,
+            surface =
+                Color.Transparent,
+            text =
+                foreground,
             sub =
                 foreground.copy(
-                    alpha = .58f
+                    alpha = .56f
                 ),
             button =
                 foreground.copy(
-                    alpha = .09f
+                    alpha = .10f
                 ),
             icon =
                 foreground.copy(
-                    alpha = .82f
+                    alpha = .86f
                 ),
             border =
                 foreground.copy(
-                    alpha = .14f
+                    alpha = .15f
                 )
         )
 
@@ -111,17 +125,20 @@ internal fun FullLyrics(
             Modifier.fillMaxSize()
     ) {
         PlayerBackground(
-            dominant = dominant,
-            deep = deep,
-            theme = theme
+            dominant =
+                dominant,
+            deep =
+                deep,
+            theme =
+                theme
         )
 
         /*
-         * Safe-area box owns the entire lyrics viewport.
+         * FollowLyrics gets the whole safe-area viewport.
          *
-         * The top metadata/seek UI is an overlay, so it does not
-         * push FollowLyrics downward. Current lyric therefore
-         * targets the real safe-screen centre.
+         * Header and seek controls are overlays instead of taking
+         * vertical layout space. The lyric viewport center is
+         * therefore the physical center of the safe screen.
          */
         Box(
             modifier =
@@ -131,11 +148,16 @@ internal fun FullLyrics(
                     .navigationBarsPadding()
         ) {
             FollowLyrics(
-                lyrics = lyrics,
-                position = position,
-                colors = lyricColors,
-                accent = accent,
-                fullscreen = true,
+                lyrics =
+                    lyrics,
+                position =
+                    position,
+                colors =
+                    lyricColors,
+                accent =
+                    accent,
+                fullscreen =
+                    true,
                 modifier =
                     Modifier.fillMaxSize()
             )
@@ -163,7 +185,8 @@ internal fun FullLyrics(
                         Alignment.CenterVertically
                 ) {
                     AsyncImage(
-                        model = artwork,
+                        model =
+                            artwork,
                         contentDescription =
                             null,
                         modifier =
@@ -236,7 +259,7 @@ internal fun FullLyrics(
                             foreground,
                         background =
                             foreground.copy(
-                                alpha = .09f
+                                alpha = .10f
                             ),
                         togglePlay =
                             togglePlay,
@@ -254,7 +277,8 @@ internal fun FullLyrics(
                         Modifier
                             .fillMaxWidth()
                             .padding(
-                                horizontal = 17.dp
+                                horizontal =
+                                    17.dp
                             )
                 ) {
                     RoundedSeekBar(
@@ -266,7 +290,7 @@ internal fun FullLyrics(
                             accent,
                         inactive =
                             foreground.copy(
-                                alpha = .18f
+                                alpha = .20f
                             ),
                         seekTo =
                             seekTo
@@ -335,7 +359,9 @@ private fun FullLyricsControls(
             onClick =
                 togglePlay
         ) {
-            if (isPlaying) {
+            if (
+                isPlaying
+            ) {
                 XmoPauseIcon(
                     color =
                         foreground,
@@ -367,10 +393,12 @@ private fun FullLyricsControls(
                 color =
                     foreground.copy(
                         alpha =
-                            if (canPrevious) {
+                            if (
+                                canPrevious
+                            ) {
                                 1f
                             } else {
-                                .28f
+                                .26f
                             }
                     ),
                 modifier =
@@ -391,10 +419,12 @@ private fun FullLyricsControls(
                 color =
                     foreground.copy(
                         alpha =
-                            if (canNext) {
+                            if (
+                                canNext
+                            ) {
                                 1f
                             } else {
-                                .28f
+                                .26f
                             }
                     ),
                 modifier =
@@ -409,55 +439,75 @@ private fun FullLyricsControls(
             onClick =
                 close
         ) {
-            androidx.compose.foundation.Canvas(
+            SoftCloseIcon(
+                color =
+                    foreground,
                 modifier =
                     Modifier.size(
                         18.dp
                     )
-            ) {
-                val stroke =
-                    2.dp.toPx()
-
-                drawLine(
-                    color =
-                        foreground,
-                    start =
-                        androidx.compose.ui.geometry.Offset(
-                            size.width * .25f,
-                            size.height * .25f
-                        ),
-                    end =
-                        androidx.compose.ui.geometry.Offset(
-                            size.width * .75f,
-                            size.height * .75f
-                        ),
-                    strokeWidth =
-                        stroke,
-                    cap =
-                        androidx.compose.ui.graphics
-                            .StrokeCap.Round
-                )
-
-                drawLine(
-                    color =
-                        foreground,
-                    start =
-                        androidx.compose.ui.geometry.Offset(
-                            size.width * .75f,
-                            size.height * .25f
-                        ),
-                    end =
-                        androidx.compose.ui.geometry.Offset(
-                            size.width * .25f,
-                            size.height * .75f
-                        ),
-                    strokeWidth =
-                        stroke,
-                    cap =
-                        androidx.compose.ui.graphics
-                            .StrokeCap.Round
-                )
-            }
+            )
         }
+    }
+}
+
+@Composable
+private fun SoftCloseIcon(
+    color: Color,
+    modifier: Modifier
+) {
+    Canvas(
+        modifier =
+            modifier
+    ) {
+        val stroke =
+            size.minDimension *
+                .115f
+
+        drawLine(
+            color =
+                color,
+            start =
+                Offset(
+                    size.width *
+                        .25f,
+                    size.height *
+                        .25f
+                ),
+            end =
+                Offset(
+                    size.width *
+                        .75f,
+                    size.height *
+                        .75f
+                ),
+            strokeWidth =
+                stroke,
+            cap =
+                StrokeCap.Round
+        )
+
+        drawLine(
+            color =
+                color,
+            start =
+                Offset(
+                    size.width *
+                        .75f,
+                    size.height *
+                        .25f
+                ),
+            end =
+                Offset(
+                    size.width *
+                        .25f,
+                    size.height *
+                        .75f
+                ),
+            strokeWidth =
+                stroke,
+            cap =
+                StrokeCap.Round
+        )
     }
 }
