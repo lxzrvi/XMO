@@ -2,449 +2,521 @@ package com.xmo.music.ui.nowplaying
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import com.xmo.music.XmoTheme
 import com.xmo.music.data.SongLyrics
 import com.xmo.music.ui.HomeColors
-import com.xmo.music.ui.XmoFont
-import kotlinx.coroutines.delay
-import kotlin.math.abs
 
 @Composable
-internal fun FollowLyrics(
+internal fun ArtworkLyrics(
     lyrics: SongLyrics?,
     position: Long,
     colors: HomeColors,
-    accent: androidx.compose.ui.graphics.Color,
-    fullscreen: Boolean,
+    accent: Color,
+    theme: XmoTheme,
+    pickLyrics: () -> Unit,
+    fullscreenLyrics: () -> Unit,
+    showArtwork: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (
-        lyrics == null ||
-        lyrics.lines.isEmpty()
-    ) {
-        Box(
-            modifier =
-                modifier,
-            contentAlignment =
-                Alignment.Center
+    val surfaceTarget =
+        when (
+            theme
         ) {
-            Text(
-                text =
-                    "No local lyrics found.\n" +
-                        "Tap + to choose an LRC file.",
-                color =
-                    colors.sub,
-                fontFamily =
-                    XmoFont.medium,
-                fontSize =
-                    if (
-                        fullscreen
-                    ) {
-                        18.sp
-                    } else {
-                        15.sp
-                    },
-                lineHeight =
-                    if (
-                        fullscreen
-                    ) {
-                        27.sp
-                    } else {
-                        22.sp
-                    },
-                textAlign =
-                    TextAlign.Center,
-                modifier =
-                    Modifier.padding(
-                        horizontal =
-                            28.dp
-                    )
-            )
+            XmoTheme.Light ->
+                Color(
+                    0xFFF6F7F9
+                ).copy(
+                    alpha =
+                        .88f
+                )
+
+            XmoTheme.Dark ->
+                Color(
+                    0xFF1C1E23
+                ).copy(
+                    alpha =
+                        .88f
+                )
+
+            XmoTheme.Amoled ->
+                Color(
+                    0xFF08090B
+                ).copy(
+                    alpha =
+                        .91f
+                )
         }
 
-        return
-    }
+    val foregroundTarget =
+        when (
+            theme
+        ) {
+            XmoTheme.Light ->
+                Color(
+                    0xFF17181C
+                )
 
-    val active =
-        currentLyricIndex(
-            lyrics,
-            position
+            XmoTheme.Dark,
+            XmoTheme.Amoled ->
+                Color.White
+        }
+
+    /*
+     * Contrast-safe translucent pill.
+     *
+     * No Home button color is reused blindly here.
+     */
+    val toolbarTarget =
+        when (
+            theme
+        ) {
+            XmoTheme.Light ->
+                Color.Black.copy(
+                    alpha =
+                        .075f
+                )
+
+            XmoTheme.Dark ->
+                Color.White.copy(
+                    alpha =
+                        .11f
+                )
+
+            XmoTheme.Amoled ->
+                Color.White.copy(
+                    alpha =
+                        .12f
+                )
+        }
+
+    val surface by
+        animateColorAsState(
+            targetValue =
+                surfaceTarget,
+            animationSpec =
+                tween(
+                    durationMillis =
+                        320
+                ),
+            label =
+                "lyricsSurface"
         )
 
-    val listState =
-        rememberLazyListState()
+    val foreground by
+        animateColorAsState(
+            targetValue =
+                foregroundTarget,
+            animationSpec =
+                tween(
+                    durationMillis =
+                        320
+                ),
+            label =
+                "lyricsForeground"
+        )
 
-    var viewportHeight by
-        remember {
-            mutableStateOf(
-                0
-            )
-        }
+    val lyricColors =
+        HomeColors(
+            bg =
+                Color.Transparent,
+            surface =
+                Color.Transparent,
+            text =
+                foreground,
+            sub =
+                foreground.copy(
+                    alpha =
+                        .55f
+                ),
+            button =
+                toolbarTarget,
+            icon =
+                foreground,
+            border =
+                foreground.copy(
+                    alpha =
+                        .12f
+                )
+        )
 
-    var userBrowsing by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    var interactionToken by
-        remember {
-            mutableLongStateOf(
-                0L
-            )
-        }
-
-    /*
-     * Preserve manual browsing for approximately four seconds
-     * after the user's scroll finishes.
-     */
-    LaunchedEffect(
-        listState.isScrollInProgress
-    ) {
-        if (
-            listState.isScrollInProgress
-        ) {
-            userBrowsing =
-                true
-
-            interactionToken++
-        } else if (
-            userBrowsing
-        ) {
-            val token =
-                ++interactionToken
-
-            delay(
-                4_000L
-            )
-
-            if (
-                token ==
-                interactionToken &&
-                !listState.isScrollInProgress
-            ) {
-                userBrowsing =
-                    false
-            }
-        }
-    }
-
-    /*
-     * The list has no giant artificial top/bottom padding.
-     * Exact item geometry is measured and centered directly.
-     */
-    LazyColumn(
-        state =
-            listState,
+    Box(
         modifier =
             modifier
-                .fillMaxSize()
-                .onSizeChanged {
-                    viewportHeight =
-                        it.height
-                },
-        verticalArrangement =
-            Arrangement.spacedBy(
-                if (
-                    fullscreen
-                ) {
-                    8.dp
-                } else {
-                    5.dp
-                }
-            ),
-        horizontalAlignment =
-            Alignment.CenterHorizontally
-    ) {
-        itemsIndexed(
-            items =
-                lyrics.lines,
-            key = {
-                    index,
-                    line ->
-
-                "$index:${line.timeMs}:${line.text}"
-            }
-        ) {
-                index,
-                line ->
-
-            val selected =
-                lyrics.synced &&
-                    index ==
-                    active
-
-            val lineColor by
-                animateColorAsState(
-                    targetValue =
-                        if (
-                            selected
-                        ) {
-                            accent
-                        } else {
-                            colors.text.copy(
-                                alpha =
-                                    if (
-                                        fullscreen
-                                    ) {
-                                        .40f
-                                    } else {
-                                        .36f
-                                    }
-                            )
-                        },
-                    animationSpec =
-                        tween(
-                            durationMillis =
-                                260
-                        ),
-                    label =
-                        "lyricColor$index"
+                .clip(
+                    RoundedCornerShape(
+                        24.dp
+                    )
                 )
+                .background(
+                    surface
+                )
+    ) {
+        FollowLyrics(
+            lyrics =
+                lyrics,
+            position =
+                position,
+            colors =
+                lyricColors,
+            accent =
+                accent,
+            fullscreen =
+                false,
+            modifier =
+                Modifier.fillMaxSize()
+        )
 
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal =
-                                if (
-                                    fullscreen
-                                ) {
-                                    32.dp
-                                } else {
-                                    22.dp
-                                },
-                            vertical =
-                                if (
-                                    selected
-                                ) {
-                                    10.dp
-                                } else {
-                                    7.dp
-                                }
-                        ),
-                contentAlignment =
-                    Alignment.Center
+        XmoCapsule(
+            background =
+                toolbarTarget,
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.TopEnd
+                    )
+                    .padding(
+                        10.dp
+                    )
+        ) {
+            CapsuleButton(
+                size =
+                    38.dp,
+                onClick =
+                    pickLyrics
             ) {
-                Text(
-                    text =
-                        line.text,
+                LyricsAddIcon(
                     color =
-                        lineColor,
-                    fontFamily =
-                        if (
-                            selected
-                        ) {
-                            XmoFont.bold
-                        } else {
-                            XmoFont.medium
-                        },
-                    fontSize =
-                        when {
-                            fullscreen &&
-                                selected ->
-                                25.sp
-
-                            fullscreen ->
-                                18.sp
-
-                            selected ->
-                                21.sp
-
-                            else ->
-                                16.sp
-                        },
-                    lineHeight =
-                        when {
-                            fullscreen &&
-                                selected ->
-                                33.sp
-
-                            fullscreen ->
-                                26.sp
-
-                            selected ->
-                                29.sp
-
-                            else ->
-                                23.sp
-                        },
-                    textAlign =
-                        TextAlign.Center,
-                    softWrap =
-                        true,
-                    overflow =
-                        TextOverflow.Visible,
+                        foreground,
                     modifier =
-                        Modifier.fillMaxWidth()
+                        Modifier.size(
+                            18.dp
+                        )
+                )
+            }
+
+            CapsuleButton(
+                size =
+                    38.dp,
+                onClick =
+                    fullscreenLyrics
+            ) {
+                LyricsExpandIcon(
+                    color =
+                        foreground,
+                    modifier =
+                        Modifier.size(
+                            18.dp
+                        )
+                )
+            }
+
+            CapsuleButton(
+                size =
+                    38.dp,
+                onClick =
+                    showArtwork
+            ) {
+                LyricsCloseIcon(
+                    color =
+                        foreground,
+                    modifier =
+                        Modifier.size(
+                            18.dp
+                        )
                 )
             }
         }
     }
+}
 
-    LaunchedEffect(
-        active,
-        userBrowsing,
-        viewportHeight,
-        lyrics
+@Composable
+private fun LyricsAddIcon(
+    color: Color,
+    modifier: Modifier
+) {
+    Canvas(
+        modifier
     ) {
-        if (
-            !lyrics.synced ||
-            active < 0 ||
-            viewportHeight <= 0 ||
-            userBrowsing
-        ) {
-            return@LaunchedEffect
-        }
+        val stroke =
+            size.minDimension *
+                .12f
 
-        withFrameNanos { }
+        drawLine(
+            color =
+                color,
+            start =
+                Offset(
+                    size.width *
+                        .50f,
+                    size.height *
+                        .20f
+                ),
+            end =
+                Offset(
+                    size.width *
+                        .50f,
+                    size.height *
+                        .80f
+                ),
+            strokeWidth =
+                stroke,
+            cap =
+                StrokeCap.Round
+        )
 
-        centerMeasuredLyric(
-            state =
-                listState,
-            index =
-                active
+        drawLine(
+            color =
+                color,
+            start =
+                Offset(
+                    size.width *
+                        .20f,
+                    size.height *
+                        .50f
+                ),
+            end =
+                Offset(
+                    size.width *
+                        .80f,
+                    size.height *
+                        .50f
+                ),
+            strokeWidth =
+                stroke,
+            cap =
+                StrokeCap.Round
         )
     }
 }
 
-private suspend fun centerMeasuredLyric(
-    state: LazyListState,
-    index: Int
+@Composable
+private fun LyricsExpandIcon(
+    color: Color,
+    modifier: Modifier
 ) {
-    if (
-        index < 0
+    Canvas(
+        modifier
     ) {
-        return
-    }
+        val stroke =
+            size.minDimension *
+                .105f
 
-    var target =
-        state.layoutInfo
-            .visibleItemsInfo
-            .firstOrNull {
-                it.index ==
-                    index
+        val style =
+            Stroke(
+                width =
+                    stroke,
+                cap =
+                    StrokeCap.Round
+            )
+
+        val topLeft =
+            Path().apply {
+                moveTo(
+                    size.width *
+                        .18f,
+                    size.height *
+                        .39f
+                )
+
+                lineTo(
+                    size.width *
+                        .18f,
+                    size.height *
+                        .18f
+                )
+
+                lineTo(
+                    size.width *
+                        .39f,
+                    size.height *
+                        .18f
+                )
             }
 
-    /*
-     * Bring item into measurement range first.
-     */
-    if (
-        target == null
-    ) {
-        state.scrollToItem(
-            index =
-                index
+        drawPath(
+            path =
+                topLeft,
+            color =
+                color,
+            style =
+                style
         )
 
-        withFrameNanos { }
-
-        target =
-            state.layoutInfo
-                .visibleItemsInfo
-                .firstOrNull {
-                    it.index ==
-                        index
-                }
-                ?: return
-    }
-
-    suspend fun correction(): Float? {
-        val layout =
-            state.layoutInfo
-
-        val item =
-            layout
-                .visibleItemsInfo
-                .firstOrNull {
-                    it.index ==
-                        index
-                }
-                ?: return null
-
-        val viewportCenter =
-            (
-                layout.viewportStartOffset +
-                    layout.viewportEndOffset
-                ) /
-                2f
-
-        val itemCenter =
-            item.offset +
-                item.size /
-                2f
-
-        return itemCenter -
-            viewportCenter
-    }
-
-    val initial =
-        correction()
-            ?: return
-
-    if (
-        abs(initial) >
-        .5f
-    ) {
-        state.animateScrollBy(
-            value =
-                initial,
-            animationSpec =
-                tween(
-                    durationMillis =
-                        420
+        val topRight =
+            Path().apply {
+                moveTo(
+                    size.width *
+                        .61f,
+                    size.height *
+                        .18f
                 )
+
+                lineTo(
+                    size.width *
+                        .82f,
+                    size.height *
+                        .18f
+                )
+
+                lineTo(
+                    size.width *
+                        .82f,
+                    size.height *
+                        .39f
+                )
+            }
+
+        drawPath(
+            path =
+                topRight,
+            color =
+                color,
+            style =
+                style
+        )
+
+        val bottomRight =
+            Path().apply {
+                moveTo(
+                    size.width *
+                        .82f,
+                    size.height *
+                        .61f
+                )
+
+                lineTo(
+                    size.width *
+                        .82f,
+                    size.height *
+                        .82f
+                )
+
+                lineTo(
+                    size.width *
+                        .61f,
+                    size.height *
+                        .82f
+                )
+            }
+
+        drawPath(
+            path =
+                bottomRight,
+            color =
+                color,
+            style =
+                style
+        )
+
+        val bottomLeft =
+            Path().apply {
+                moveTo(
+                    size.width *
+                        .39f,
+                    size.height *
+                        .82f
+                )
+
+                lineTo(
+                    size.width *
+                        .18f,
+                    size.height *
+                        .82f
+                )
+
+                lineTo(
+                    size.width *
+                        .18f,
+                    size.height *
+                        .61f
+                )
+            }
+
+        drawPath(
+            path =
+                bottomLeft,
+            color =
+                color,
+            style =
+                style
         )
     }
+}
 
-    withFrameNanos { }
-
-    /*
-     * Multiline/font-layout rounding correction.
-     */
-    val final =
-        correction()
-            ?: return
-
-    if (
-        abs(final) >
-        1f
+@Composable
+private fun LyricsCloseIcon(
+    color: Color,
+    modifier: Modifier
+) {
+    Canvas(
+        modifier
     ) {
-        state.animateScrollBy(
-            value =
-                final,
-            animationSpec =
-                tween(
-                    durationMillis =
-                        120
-                )
+        val stroke =
+            size.minDimension *
+                .115f
+
+        drawLine(
+            color =
+                color,
+            start =
+                Offset(
+                    size.width *
+                        .24f,
+                    size.height *
+                        .24f
+                ),
+            end =
+                Offset(
+                    size.width *
+                        .76f,
+                    size.height *
+                        .76f
+                ),
+            strokeWidth =
+                stroke,
+            cap =
+                StrokeCap.Round
+        )
+
+        drawLine(
+            color =
+                color,
+            start =
+                Offset(
+                    size.width *
+                        .76f,
+                    size.height *
+                        .24f
+                ),
+            end =
+                Offset(
+                    size.width *
+                        .24f,
+                    size.height *
+                        .76f
+                ),
+            strokeWidth =
+                stroke,
+            cap =
+                StrokeCap.Round
         )
     }
 }
