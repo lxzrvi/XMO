@@ -269,3 +269,96 @@ internal fun playerThemeColors(
             }
     )
 }
+internal fun liftArtworkColor(
+    color: Color
+): Color {
+    val minimum = .22f
+
+    val maximum =
+        maxOf(
+            color.red,
+            color.green,
+            color.blue
+        )
+
+    if (maximum >= minimum) {
+        return color
+    }
+
+    if (maximum <= .001f) {
+        return Color(
+            0xFF4A4D55
+        )
+    }
+
+    val multiplier =
+        minimum / maximum
+
+    return Color(
+        red =
+            (
+                color.red *
+                    multiplier
+                )
+                .coerceIn(
+                    0f,
+                    1f
+                ),
+        green =
+            (
+                color.green *
+                    multiplier
+                )
+                .coerceIn(
+                    0f,
+                    1f
+                ),
+        blue =
+            (
+                color.blue *
+                    multiplier
+                )
+                .coerceIn(
+                    0f,
+                    1f
+                ),
+        alpha = 1f
+    )
+}
+
+internal fun mixColor(
+    from: Color,
+    to: Color,
+    fraction: Float
+): Color {
+    val value =
+        fraction.coerceIn(
+            0f,
+            1f
+        )
+
+    return Color(
+        red =
+            from.red +
+                (
+                    to.red -
+                        from.red
+                    ) *
+                value,
+        green =
+            from.green +
+                (
+                    to.green -
+                        from.green
+                    ) *
+                value,
+        blue =
+            from.blue +
+                (
+                    to.blue -
+                        from.blue
+                    ) *
+                value,
+        alpha = 1f
+    )
+}
