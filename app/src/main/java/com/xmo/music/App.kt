@@ -1124,6 +1124,8 @@ fun App() {
                             queue =
                                 player.queue(),
 
+                            songs = songs,
+
                             liked =
                                 id != null &&
                                     id in likedSongIds,
