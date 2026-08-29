@@ -18,11 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -75,8 +75,8 @@ internal fun PlayerArtwork(
         }
 
     /*
-     * Keep neighbour metadata fresh only while this is still the
-     * visual-current song.
+     * Refresh neighbor metadata only while Media3 and visual
+     * current are still the same song.
      */
     LaunchedEffect(
         currentId,
@@ -85,6 +85,19 @@ internal fun PlayerArtwork(
         previous,
         next
     ) {
+        carousel.initializeIfEmpty(
+            id =
+                currentId,
+            index =
+                currentIndex,
+            current =
+                current,
+            previous =
+                previous,
+            next =
+                next
+        )
+
         carousel.updateIdleWindow(
             id =
                 currentId,
@@ -100,8 +113,11 @@ internal fun PlayerArtwork(
     }
 
     /*
-     * Media3 current ID is the real confirmation signal.
+     * =========================================================
+     * REAL MEDIA3 SONG CONFIRMATION
+     * =========================================================
      */
+
     LaunchedEffect(
         currentId
     ) {
@@ -111,7 +127,8 @@ internal fun PlayerArtwork(
         if (
             currentId == null ||
             oldId == null ||
-            currentId == oldId
+            currentId ==
+            oldId
         ) {
             return@LaunchedEffect
         }
@@ -123,14 +140,15 @@ internal fun PlayerArtwork(
                 )
 
         /*
-         * Manual swipe:
+         * MANUAL SWIPE CONFIRMED
          *
-         * cover is already centered at +/-pageWidth and remains
-         * there until this real Media3 confirmation arrives.
+         * The destination cover already reached the center.
          */
         if (
-            carousel.manualDirection != 0 &&
-            carousel.manualSongId == oldId
+            carousel.manualDirection !=
+            0 &&
+            carousel.manualSongId ==
+            oldId
         ) {
             carousel.finishManual(
                 id =
@@ -146,8 +164,8 @@ internal fun PlayerArtwork(
             )
 
             /*
-             * PlayerColors already committed destination when x
-             * reached the page edge. Reset cannot reveal old color.
+             * PlayerColors commits destination at the page edge.
+             * This reset therefore cannot expose old song color.
              */
             carousel.x.snapTo(
                 0f
@@ -157,9 +175,7 @@ internal fun PlayerArtwork(
         }
 
         /*
-         * Button / natural / external Media3 transition.
-         *
-         * The old frozen queue window is still intact.
+         * NATURAL / TRANSPORT BUTTON / EXTERNAL CHANGE
          */
         if (
             !carousel.transactionActive
@@ -178,9 +194,10 @@ internal fun PlayerArtwork(
                         1
                 }
 
-            val available =
+            val adjacentAvailable =
                 if (
-                    direction > 0
+                    direction >
+                    0
                 ) {
                     carousel.visualNext !=
                         null
@@ -189,26 +206,13 @@ internal fun PlayerArtwork(
                         null
                 }
 
-            /*
-             * Normally a real adjacent cover exists. If an
-             * external queue replacement jumps outside that
-             * window, don't animate a fake neighbour.
-             */
             if (
-                available
+                adjacentAvailable
             ) {
                 carousel.beginAutomatic(
-                    direction
+                    direction =
+                        direction
                 )
-
-                val target =
-                    if (
-                        direction > 0
-                    ) {
-                        -pageWidth
-                    } else {
-                        pageWidth
-                    }
 
                 carousel.x.snapTo(
                     0f
@@ -216,44 +220,75 @@ internal fun PlayerArtwork(
 
                 carousel.x.animateTo(
                     targetValue =
-                        target,
+                        if (
+                            direction >
+                            0
+                        ) {
+                            -pageWidth
+                        } else {
+                            pageWidth
+                        },
                     animationSpec =
                         tween(
                             durationMillis =
                                 340
                         )
                 )
+
+                /*
+                 * Old neighbor is exactly centered now.
+                 */
+                carousel.finishAutomatic(
+                    id =
+                        currentId,
+                    index =
+                        currentIndex,
+                    current =
+                        current,
+                    previous =
+                        previous,
+                    next =
+                        next
+                )
+
+                carousel.x.snapTo(
+                    0f
+                )
+            } else {
+                /*
+                 * Real external queue jump not represented by the
+                 * frozen adjacent window. Do not animate a fake
+                 * cover.
+                 */
+                carousel.adoptExternalWindow(
+                    id =
+                        currentId,
+                    index =
+                        currentIndex,
+                    current =
+                        current,
+                    previous =
+                        previous,
+                    next =
+                        next
+                )
+
+                carousel.x.snapTo(
+                    0f
+                )
             }
-
-            /*
-             * Adopt only after old visual transaction completes.
-             */
-            carousel.finishAutomatic(
-                id =
-                    currentId,
-                index =
-                    currentIndex,
-                current =
-                    current,
-                previous =
-                    previous,
-                next =
-                    next
-            )
-
-            carousel.x.snapTo(
-                0f
-            )
         }
     }
 
     /*
-     * Exact square visual host.
+     * =========================================================
+     * EXACT ARTWORK-SIZED HOST
+     * =========================================================
      *
-     * There is no fixed 382dp rectangle around a differently
-     * sized square anymore. Artwork and small lyrics own exactly
-     * the same measured bounds.
+     * The host itself is square.
+     * Artwork and small lyrics share these exact bounds.
      */
+
     BoxWithConstraints(
         modifier =
             Modifier
@@ -267,12 +302,8 @@ internal fun PlayerArtwork(
                 )
     ) {
         /*
-         * Restore original page geometry:
-         *
-         * one visual page == complete square host width.
-         *
-         * This fixes previous/current/next covers appearing stuck
-         * together after subtracting artwork padding twice.
+         * Original carousel geometry restored:
+         * adjacent covers are one entire page apart.
          */
         val pageWidth =
             constraints.maxWidth
@@ -287,6 +318,50 @@ internal fun PlayerArtwork(
             carousel.width =
                 pageWidth
         }
+
+        /*
+         * Artwork <-> lyrics transition has one Animatable and
+         * does not use AnimatedContent size transforms.
+         */
+        val lyricsTransition =
+            remember {
+                Animatable(
+                    if (
+                        showLyrics
+                    ) {
+                        1f
+                    } else {
+                        0f
+                    }
+                )
+            }
+
+        LaunchedEffect(
+            showLyrics
+        ) {
+            lyricsTransition.animateTo(
+                targetValue =
+                    if (
+                        showLyrics
+                    ) {
+                        1f
+                    } else {
+                        0f
+                    },
+                animationSpec =
+                    tween(
+                        durationMillis =
+                            340
+                    )
+            )
+        }
+
+        val lyricsFraction =
+            lyricsTransition.value
+                .coerceIn(
+                    0f,
+                    1f
+                )
 
         Box(
             modifier =
@@ -332,7 +407,9 @@ internal fun PlayerArtwork(
                                     drag.x
 
                                 if (
-                                    abs(rawDragX) >
+                                    abs(
+                                        rawDragX
+                                    ) >
                                     6f
                                 ) {
                                     change.consume()
@@ -341,16 +418,20 @@ internal fun PlayerArtwork(
                                         carousel.x.value +
                                             drag.x
 
-                                    val resisted =
+                                    val target =
                                         when {
-                                            candidate < 0f &&
+                                            candidate <
+                                                0f &&
                                                 !canNext ->
+
                                                 carousel.x.value +
                                                     drag.x *
                                                     .14f
 
-                                            candidate > 0f &&
+                                            candidate >
+                                                0f &&
                                                 !canPrevious ->
+
                                                 carousel.x.value +
                                                     drag.x *
                                                     .14f
@@ -361,7 +442,7 @@ internal fun PlayerArtwork(
 
                                     scope.launch {
                                         carousel.x.snapTo(
-                                            resisted.coerceIn(
+                                            target.coerceIn(
                                                 -pageWidth,
                                                 pageWidth
                                             )
@@ -400,6 +481,9 @@ internal fun PlayerArtwork(
                                                     )
                                             )
 
+                                            /*
+                                             * Real playback call.
+                                             */
                                             nextSong()
                                         }
 
@@ -471,54 +555,11 @@ internal fun PlayerArtwork(
                     }
         ) {
             /*
-             * Carousel and lyrics remain composed in exactly the
-             * same square. Only alpha/scale transition changes.
-             *
-             * No AnimatedContent size transform -> no clipped card.
+             * =================================================
+             * ARTWORK LAYER
+             * =================================================
              */
-            val transition =
-                remember {
-                    Animatable(
-                        if (
-                            showLyrics
-                        ) {
-                            1f
-                        } else {
-                            0f
-                        }
-                    )
-                }
 
-            LaunchedEffect(
-                showLyrics
-            ) {
-                transition.animateTo(
-                    targetValue =
-                        if (
-                            showLyrics
-                        ) {
-                            1f
-                        } else {
-                            0f
-                        },
-                    animationSpec =
-                        tween(
-                            durationMillis =
-                                340
-                        )
-                )
-            }
-
-            val lyricsFraction =
-                transition.value
-                    .coerceIn(
-                        0f,
-                        1f
-                    )
-
-            /*
-             * Artwork carousel.
-             */
             Box(
                 modifier =
                     Modifier
@@ -559,11 +600,13 @@ internal fun PlayerArtwork(
             }
 
             /*
-             * Small lyrics surface.
+             * =================================================
+             * SMALL LYRICS LAYER
+             * =================================================
              *
-             * The card itself is the square. Nothing outside this
-             * layer clips it during animation.
+             * Exact same square bounds as artwork.
              */
+
             if (
                 showLyrics ||
                 lyricsFraction >
@@ -702,7 +745,8 @@ private fun Cover(
                 )
                 .background(
                     Color.Black.copy(
-                        alpha = .06f
+                        alpha =
+                            .06f
                     )
                 )
     ) {
