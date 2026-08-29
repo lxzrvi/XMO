@@ -13,8 +13,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -28,7 +26,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
-import com.xmo.music.data.AccentMode
 import com.xmo.music.data.Library
 import com.xmo.music.data.LibraryPreferences
 import com.xmo.music.data.PlaybackPreferences
@@ -50,10 +47,11 @@ import com.xmo.music.ui.ProvideXmoAccent
 import com.xmo.music.ui.Search
 import com.xmo.music.ui.Settings
 import com.xmo.music.ui.Setup
-import com.xmo.music.ui.homeColors
 import com.xmo.music.ui.blur.liveBlurSource
 import com.xmo.music.ui.blur.rememberLiveBlurState
+import com.xmo.music.ui.homeColors
 import kotlinx.coroutines.launch
+import java.util.UUID
 
 enum class XmoTheme {
     Dark,
@@ -63,37 +61,30 @@ enum class XmoTheme {
 
 @Composable
 fun App() {
-    val context =
-        LocalContext.current
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val stateHolder = rememberSaveableStateHolder()
+    val configuration = LocalConfiguration.current
 
-    val scope =
-        rememberCoroutineScope()
-
-    val stateHolder =
-        rememberSaveableStateHolder()
-
-    val configuration =
-        LocalConfiguration.current
-
+    /*
+     * Still retained while older Home/MiniPlayer components use
+     * LiveBlur. NavBar + NowPlaying no longer depend on it.
+     */
     val hazeState =
         rememberLiveBlurState()
 
     /*
      * =========================================================
-     * MEDIA3
+     * PLAYER
      * =========================================================
      */
 
     val player =
         remember {
-            XmoPlayer(
-                context
-            )
+            XmoPlayer(context)
         }
 
-    DisposableEffect(
-        player
-    ) {
+    DisposableEffect(player) {
         player.connect()
 
         onDispose {
@@ -102,151 +93,98 @@ fun App() {
     }
 
     val playback by
-        player.state
-            .collectAsState()
+        player.state.collectAsState()
 
     /*
      * =========================================================
-     * PERMISSION
+     * AUDIO PERMISSION
      * =========================================================
      */
 
     val audioPermission =
-        if (
-            Build.VERSION.SDK_INT >=
-            33
-        ) {
-            Manifest.permission
-                .READ_MEDIA_AUDIO
+        if (Build.VERSION.SDK_INT >= 33) {
+            Manifest.permission.READ_MEDIA_AUDIO
         } else {
-            Manifest.permission
-                .READ_EXTERNAL_STORAGE
+            Manifest.permission.READ_EXTERNAL_STORAGE
         }
 
-    var allowed by
-        remember {
-            mutableStateOf(
-                ContextCompat
-                    .checkSelfPermission(
-                        context,
-                        audioPermission
-                    ) ==
-                    PackageManager.PERMISSION_GRANTED
-            )
-        }
+    var allowed by remember {
+        mutableStateOf(
+            ContextCompat.checkSelfPermission(
+                context,
+                audioPermission
+            ) == PackageManager.PERMISSION_GRANTED
+        )
+    }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
-            ActivityResultContracts
-                .RequestPermission()
+            ActivityResultContracts.RequestPermission()
         ) {
-            allowed =
-                it
+            allowed = it
         }
 
     /*
      * =========================================================
-     * PERSISTED APP STATE
+     * PERSISTED STATE
      * =========================================================
      */
 
-    var loaded by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var loaded by remember {
+        mutableStateOf(false)
+    }
 
-    var setupComplete by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var setupComplete by remember {
+        mutableStateOf(false)
+    }
 
-    var profile by
-        remember {
-            mutableStateOf(
-                XmoProfile()
-            )
-        }
+    var profile by remember {
+        mutableStateOf(XmoProfile())
+    }
 
-    var appearance by
-        remember {
-            mutableStateOf(
-                XmoAppearance()
-            )
-        }
+    var appearance by remember {
+        mutableStateOf(XmoAppearance())
+    }
 
-    var libraryPreferences by
-        remember {
-            mutableStateOf(
-                LibraryPreferences()
-            )
-        }
+    var libraryPreferences by remember {
+        mutableStateOf(LibraryPreferences())
+    }
 
-    var playbackPreferences by
-        remember {
-            mutableStateOf(
-                PlaybackPreferences()
-            )
-        }
+    var playbackPreferences by remember {
+        mutableStateOf(PlaybackPreferences())
+    }
 
-    var resumeOnHeadphones by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var resumeOnHeadphones by remember {
+        mutableStateOf(false)
+    }
 
-    var songs by
-        remember {
-            mutableStateOf<List<Song>>(
-                emptyList()
-            )
-        }
+    var songs by remember {
+        mutableStateOf<List<Song>>(emptyList())
+    }
 
-    var order by
-        remember {
-            mutableStateOf(
-                Store.defaults
-            )
-        }
+    var order by remember {
+        mutableStateOf(Store.defaults)
+    }
 
-    var categories by
-        remember {
-            mutableStateOf<List<UserCategory>>(
-                emptyList()
-            )
-        }
+    var categories by remember {
+        mutableStateOf<List<UserCategory>>(emptyList())
+    }
 
-    var likedSongIds by
-        remember {
-            mutableStateOf<Set<Long>>(
-                emptySet()
-            )
-        }
+    var likedSongIds by remember {
+        mutableStateOf<Set<Long>>(emptySet())
+    }
 
-    var recentPlays by
-        remember {
-            mutableStateOf<List<RecentPlay>>(
-                emptyList()
-            )
-        }
+    var recentPlays by remember {
+        mutableStateOf<List<RecentPlay>>(emptyList())
+    }
 
-    var lyricsFiles by
-        remember {
-            mutableStateOf<Map<Long, String>>(
-                emptyMap()
-            )
-        }
+    var lyricsFiles by remember {
+        mutableStateOf<Map<Long, String>>(emptyMap())
+    }
 
-    var scanning by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var scanning by remember {
+        mutableStateOf(false)
+    }
 
     /*
      * =========================================================
@@ -254,84 +192,57 @@ fun App() {
      * =========================================================
      */
 
-    var tab by
-        remember {
-            mutableIntStateOf(
-                0
-            )
-        }
+    var tab by remember {
+        mutableIntStateOf(0)
+    }
 
-    var profileOpen by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var profileOpen by remember {
+        mutableStateOf(false)
+    }
 
     /*
      * =========================================================
-     * PLAYER UI
+     * NOW PLAYING
      * =========================================================
      */
 
-    var showNowPlaying by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var showNowPlaying by remember {
+        mutableStateOf(false)
+    }
 
-    var miniVisible by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var miniVisible by remember {
+        mutableStateOf(false)
+    }
 
-    var miniRiseKey by
-        remember {
-            mutableIntStateOf(
-                0
-            )
-        }
+    var miniRiseKey by remember {
+        mutableIntStateOf(0)
+    }
 
-    var playingSource by
-        remember {
-            mutableStateOf(
-                "All Songs"
-            )
-        }
+    var playingSource by remember {
+        mutableStateOf("All Songs")
+    }
 
-    var playingSourceIsCategory by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
+    var playingSourceIsCategory by remember {
+        mutableStateOf(false)
+    }
 
     /*
      * =========================================================
-     * THEME RESOLUTION
+     * THEME
      * =========================================================
      */
 
     val systemDark =
         (
             configuration.uiMode and
-                android.content.res.Configuration
-                    .UI_MODE_NIGHT_MASK
+                android.content.res.Configuration.UI_MODE_NIGHT_MASK
             ) ==
-            android.content.res.Configuration
-                .UI_MODE_NIGHT_YES
+            android.content.res.Configuration.UI_MODE_NIGHT_YES
 
     val theme =
-        when (
-            appearance.themeMode
-        ) {
+        when (appearance.themeMode) {
             ThemeMode.System ->
-                if (
-                    systemDark
-                ) {
+                if (systemDark) {
                     XmoTheme.Dark
                 } else {
                     XmoTheme.Light
@@ -349,116 +260,110 @@ fun App() {
 
     /*
      * =========================================================
-     * INITIAL LOAD
-     *
-     * DataStore values are loaded together before normal UI is
-     * shown. Library scan runs only after setup + permission.
+     * INITIAL DATA
      * =========================================================
      */
 
     LaunchedEffect(Unit) {
         profile =
-            Store.profile(
-                context
-            )
+            Store.profile(context)
 
         appearance =
-            Store.appearance(
-                context
-            )
+            Store.appearance(context)
 
         categories =
-            Store.categories(
-                context
-            )
+            Store.categories(context)
 
         order =
-            Store.order(
-                context
-            )
+            Store.order(context)
 
         likedSongIds =
-            Store.likedSongIds(
-                context
-            )
+            Store.likedSongIds(context)
 
         recentPlays =
-            Store.recentPlays(
-                context
-            )
+            Store.recentPlays(context)
 
         lyricsFiles =
-            Store.lyricsFiles(
-                context
-            )
+            Store.lyricsFiles(context)
 
         libraryPreferences =
-            Store.libraryPreferences(
-                context
-            )
+            Store.libraryPreferences(context)
 
         playbackPreferences =
-            Store.playbackPreferences(
-                context
-            )
+            Store.playbackPreferences(context)
 
         resumeOnHeadphones =
-            Store.resumeOnHeadphones(
-                context
-            )
+            Store.resumeOnHeadphones(context)
 
         setupComplete =
-            Store.setupComplete(
-                context
-            )
+            Store.setupComplete(context)
 
-        loaded =
-            true
+        loaded = true
     }
 
     /*
-     * Apply persisted player state after MediaController connects.
+     * =========================================================
+     * PLAYER PREFERENCES
+     * =========================================================
      */
+
     LaunchedEffect(
         playback.connected,
         playbackPreferences
     ) {
-        if (
-            playback.connected
-        ) {
+        if (playback.connected) {
             player.setPlaybackParameters(
                 speed =
                     playbackPreferences.playbackSpeed,
-
                 pitch =
                     playbackPreferences.playbackPitch
             )
         }
     }
 
-    LaunchedEffect(
-        playback.connected
-    ) {
-        if (
-            playback.connected
-        ) {
+    LaunchedEffect(playback.connected) {
+        if (playback.connected) {
             player.setShuffle(
-                Store.shuffleEnabled(
-                    context
-                )
+                Store.shuffleEnabled(context)
             )
 
             player.setRepeatMode(
-                Store.repeatMode(
-                    context
-                )
+                Store.repeatMode(context)
+            )
+        }
+    }
+
+    var playerPersistenceReady by remember {
+        mutableStateOf(false)
+    }
+
+    LaunchedEffect(playback.connected) {
+        if (playback.connected) {
+            playerPersistenceReady = true
+        }
+    }
+
+    LaunchedEffect(
+        playback.shuffleEnabled,
+        playback.repeatMode,
+        playerPersistenceReady
+    ) {
+        if (playerPersistenceReady) {
+            Store.saveShuffleEnabled(
+                context,
+                playback.shuffleEnabled
+            )
+
+            Store.saveRepeatMode(
+                context,
+                playback.repeatMode
             )
         }
     }
 
     /*
      * =========================================================
-     * LIBRARY LOAD / FILTER
+     * LIBRARY
      * =========================================================
      */
 
@@ -470,30 +375,25 @@ fun App() {
             return
         }
 
-        scanning =
-            true
+        scanning = true
 
         try {
-            val scanned =
-                Library.songs(
-                    context
-                )
+            val result =
+                Library.songs(context)
 
             songs =
                 if (
                     libraryPreferences.ignoreShortAudio
                 ) {
-                    scanned.filter {
+                    result.filter {
                         it.duration >=
-                            libraryPreferences
-                                .minimumDurationMs
+                            libraryPreferences.minimumDurationMs
                     }
                 } else {
-                    scanned
+                    result
                 }
         } finally {
-            scanning =
-                false
+            scanning = false
         }
     }
 
@@ -512,12 +412,7 @@ fun App() {
         }
     }
 
-    /*
-     * Re-filter/reload when user changes the library filter.
-     */
-    LaunchedEffect(
-        libraryPreferences
-    ) {
+    LaunchedEffect(libraryPreferences) {
         if (
             loaded &&
             setupComplete &&
@@ -529,36 +424,24 @@ fun App() {
 
     /*
      * =========================================================
-     * RECENT PLAY EVENT
-     *
-     * currentSongId changes only when Media3 actually changes
-     * the current media item.
+     * RECENT PLAYBACK
      * =========================================================
      */
 
-    var recordedSongId by
-        remember {
-            mutableStateOf<Long?>(
-                null
-            )
-        }
+    var recordedSongId by remember {
+        mutableStateOf<Long?>(null)
+    }
 
-    LaunchedEffect(
-        playback.currentSongId
-    ) {
+    LaunchedEffect(playback.currentSongId) {
         val id =
             playback.currentSongId
                 ?: return@LaunchedEffect
 
-        if (
-            id ==
-            recordedSongId
-        ) {
+        if (id == recordedSongId) {
             return@LaunchedEffect
         }
 
-        recordedSongId =
-            id
+        recordedSongId = id
 
         recentPlays =
             Store.recordPlay(
@@ -568,58 +451,20 @@ fun App() {
     }
 
     /*
-     * Persist Media3 shuffle/repeat after a genuine state change.
-     */
-    var playbackPersistenceReady by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    LaunchedEffect(
-        playback.connected
-    ) {
-        if (
-            playback.connected
-        ) {
-            playbackPersistenceReady =
-                true
-        }
-    }
-
-    LaunchedEffect(
-        playback.shuffleEnabled,
-        playback.repeatMode,
-        playbackPersistenceReady
-    ) {
-        if (
-            playbackPersistenceReady
-        ) {
-            Store.saveShuffleEnabled(
-                context,
-                playback.shuffleEnabled
-            )
-
-            Store.saveRepeatMode(
-                context,
-                playback.repeatMode
-            )
-        }
-    }
-
-    /*
      * =========================================================
-     * INITIAL SKELETON
+     * FIRST LOAD
      * =========================================================
      */
 
-    if (
-        !loaded
-    ) {
-        FirstLoadSkeleton(
-            theme =
-                XmoTheme.Dark
+    if (!loaded) {
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    homeColors(
+                        XmoTheme.Dark
+                    ).bg
+                )
         )
 
         return
@@ -627,13 +472,11 @@ fun App() {
 
     /*
      * =========================================================
-     * FIRST-RUN SETUP
+     * SETUP
      * =========================================================
      */
 
-    if (
-        !setupComplete
-    ) {
+    if (!setupComplete) {
         Setup(
             initialProfile =
                 profile,
@@ -641,11 +484,8 @@ fun App() {
             existingCategories =
                 categories,
 
-            onCategoriesChanged = {
-                    next ->
-
-                categories =
-                    next
+            onCategoriesChanged = { next ->
+                categories = next
 
                 scope.launch {
                     Store.saveCategories(
@@ -660,55 +500,44 @@ fun App() {
 
                     val builtIns =
                         order.filter {
-                            it in
-                                Store.defaults
+                            it in Store.defaults
                         }
 
                     val existingCustom =
                         order.filter {
-                            it !in
-                                Store.defaults &&
-                                it in
-                                customIds
+                            it !in Store.defaults &&
+                                it in customIds
                         }
 
                     val missing =
                         customIds.filterNot {
-                            it in
-                                existingCustom
+                            it in existingCustom
                         }
 
-                    order =
+                    val nextOrder =
                         builtIns +
                             existingCustom +
                             missing
 
+                    order = nextOrder
+
                     Store.saveOrder(
                         context,
-                        order
+                        nextOrder
                     )
                 }
             },
 
-            finish = {
-                    result ->
-
+            finish = { result ->
                 scope.launch {
-                    /*
-                     * Setup.kt already blocks completion without
-                     * audio access; verify again at the boundary.
-                     */
                     allowed =
-                        ContextCompat
-                            .checkSelfPermission(
-                                context,
-                                audioPermission
-                            ) ==
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            audioPermission
+                        ) ==
                             PackageManager.PERMISSION_GRANTED
 
-                    if (
-                        !allowed
-                    ) {
+                    if (!allowed) {
                         permissionLauncher.launch(
                             audioPermission
                         )
@@ -716,36 +545,29 @@ fun App() {
                         return@launch
                     }
 
-                    profile =
-                        result
+                    profile = result
 
                     Store.finishSetup(
                         context,
                         result
                     )
 
-                    setupComplete =
-                        true
+                    setupComplete = true
 
                     loadLibrary()
                 }
             },
 
-            setupLater = {
-                    result ->
-
+            setupLater = { result ->
                 scope.launch {
                     allowed =
-                        ContextCompat
-                            .checkSelfPermission(
-                                context,
-                                audioPermission
-                            ) ==
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            audioPermission
+                        ) ==
                             PackageManager.PERMISSION_GRANTED
 
-                    if (
-                        !allowed
-                    ) {
+                    if (!allowed) {
                         permissionLauncher.launch(
                             audioPermission
                         )
@@ -753,16 +575,14 @@ fun App() {
                         return@launch
                     }
 
-                    profile =
-                        result
+                    profile = result
 
                     Store.finishSetup(
                         context,
                         result
                     )
 
-                    setupComplete =
-                        true
+                    setupComplete = true
 
                     loadLibrary()
                 }
@@ -774,7 +594,7 @@ fun App() {
 
     /*
      * =========================================================
-     * SHARED COMMANDS
+     * COMMANDS
      * =========================================================
      */
 
@@ -786,35 +606,20 @@ fun App() {
     ) {
         val index =
             queue.indexOfFirst {
-                it.id ==
-                    song.id
+                it.id == song.id
             }
 
-        if (
-            index <
-            0
-        ) {
-            return
-        }
+        if (index < 0) return
 
-        playingSource =
-            source
-
-        playingSourceIsCategory =
-            isCategory
+        playingSource = source
+        playingSourceIsCategory = isCategory
 
         player.play(
             queue,
             index
         )
 
-        /*
-         * SongTile may open NowPlaying directly.
-         * Existing MiniPlayer is removed only when player entrance
-         * reports completion.
-         */
-        showNowPlaying =
-            true
+        showNowPlaying = true
     }
 
     fun toggleLike(
@@ -839,17 +644,83 @@ fun App() {
                 Store.setSongInCategory(
                     context =
                         context,
-
                     categoryId =
                         categoryId,
-
                     songId =
                         song.id,
-
                     added =
                         added
                 )
         }
+    }
+
+    /*
+     * Real category creation used by NowPlaying XmoCenterBox.
+     *
+     * Newly created categories are also appended to Home's
+     * persisted reorderable section order.
+     */
+    fun createCategory(
+        name: String,
+        song: Song?
+    ): UserCategory? {
+        val clean =
+            name.trim()
+                .replace("\n", " ")
+                .take(24)
+
+        if (clean.isBlank()) {
+            return null
+        }
+
+        val category =
+            UserCategory(
+                id =
+                    "cat_${UUID.randomUUID()}",
+                name =
+                    clean,
+                icon =
+                    categories.size % 4,
+                songIds =
+                    if (song != null) {
+                        setOf(song.id)
+                    } else {
+                        emptySet()
+                    }
+            )
+
+        val nextCategories =
+            categories + category
+
+        val nextOrder =
+            (
+                order +
+                    category.id
+                ).distinct()
+
+        /*
+         * Compose state updates immediately, persistence follows
+         * without making the options UI wait on disk.
+         */
+        categories =
+            nextCategories
+
+        order =
+            nextOrder
+
+        scope.launch {
+            Store.saveCategories(
+                context,
+                nextCategories
+            )
+
+            Store.saveOrder(
+                context,
+                nextOrder
+            )
+        }
+
+        return category
     }
 
     fun currentSong():
@@ -859,19 +730,13 @@ fun App() {
                 ?: return null
 
         return songs.firstOrNull {
-            it.id ==
-                id
+            it.id == id
         } ?: player.currentSong()
     }
 
     /*
      * =========================================================
-     * BACK POLICY
-     *
-     * NowPlaying handles itself internally.
-     * Profile -> owning Home.
-     * Search / Settings -> Home.
-     * Home -> Android exits Activity naturally.
+     * APP BACK
      * =========================================================
      */
 
@@ -880,62 +745,54 @@ fun App() {
             !showNowPlaying &&
                 (
                     profileOpen ||
-                        tab !=
-                        0
+                        tab != 0
                     )
     ) {
         when {
             profileOpen ->
-                profileOpen =
-                    false
+                profileOpen = false
 
-            tab !=
-                0 ->
-                tab =
-                    0
+            tab != 0 ->
+                tab = 0
         }
     }
 
     CompositionLocalProvider(
-        LocalXmoProfile provides
-            profile
+        LocalXmoProfile provides profile
     ) {
         ProvideXmoAccent(
-            appearance =
-                appearance
+            appearance = appearance
         ) {
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(
-                        homeColors(
-                            theme
-                        ).bg
+                        homeColors(theme).bg
                     )
+                    /*
+                     * Temporary while remaining older layouts
+                     * still depend on LiveBlur.
+                     */
                     .liveBlurSource(
                         hazeState
                     )
             ) {
                 /*
                  * =================================================
-                 * TAB CONTENT
+                 * SCREENS
                  * =================================================
                  */
 
                 Box(
                     Modifier
                         .fillMaxSize()
-                        .zIndex(
-                            0f
-                        )
+                        .zIndex(0f)
                 ) {
                     stateHolder.SaveableStateProvider(
                         key =
                             "tab_$tab"
                     ) {
-                        when (
-                            tab
-                        ) {
+                        when (tab) {
                             0 -> {
                                 Home(
                                     songs =
@@ -966,9 +823,7 @@ fun App() {
                                         scanning,
 
                                     refresh = {
-                                        if (
-                                            !allowed
-                                        ) {
+                                        if (!allowed) {
                                             permissionLauncher.launch(
                                                 audioPermission
                                             )
@@ -980,13 +835,11 @@ fun App() {
                                     },
 
                                     openProfile = {
-                                        profileOpen =
-                                            true
+                                        profileOpen = true
                                     },
 
                                     saveOrder = {
-                                        order =
-                                            it
+                                        order = it
 
                                         scope.launch {
                                             Store.saveOrder(
@@ -997,8 +850,7 @@ fun App() {
                                     },
 
                                     saveCategories = {
-                                        categories =
-                                            it
+                                        categories = it
 
                                         scope.launch {
                                             Store.saveCategories(
@@ -1009,9 +861,7 @@ fun App() {
                                     },
 
                                     toggleLike = {
-                                        toggleLike(
-                                            it.id
-                                        )
+                                        toggleLike(it.id)
                                     },
 
                                     setSongInCategory =
@@ -1056,8 +906,7 @@ fun App() {
                                         resumeOnHeadphones,
 
                                     onAppearanceChanged = {
-                                        appearance =
-                                            it
+                                        appearance = it
 
                                         scope.launch {
                                             Store.saveAppearance(
@@ -1068,8 +917,7 @@ fun App() {
                                     },
 
                                     onLibraryPreferencesChanged = {
-                                        libraryPreferences =
-                                            it
+                                        libraryPreferences = it
 
                                         scope.launch {
                                             Store.saveLibraryPreferences(
@@ -1080,13 +928,11 @@ fun App() {
                                     },
 
                                     onPlaybackPreferencesChanged = {
-                                        playbackPreferences =
-                                            it
+                                        playbackPreferences = it
 
                                         player.setPlaybackParameters(
                                             speed =
                                                 it.playbackSpeed,
-
                                             pitch =
                                                 it.playbackPitch
                                         )
@@ -1100,8 +946,7 @@ fun App() {
                                     },
 
                                     onResumeHeadphonesChanged = {
-                                        resumeOnHeadphones =
-                                            it
+                                        resumeOnHeadphones = it
 
                                         scope.launch {
                                             Store.saveResumeOnHeadphones(
@@ -1112,9 +957,7 @@ fun App() {
                                     },
 
                                     rescan = {
-                                        if (
-                                            !allowed
-                                        ) {
+                                        if (!allowed) {
                                             permissionLauncher.launch(
                                                 audioPermission
                                             )
@@ -1152,8 +995,7 @@ fun App() {
                  */
 
                 if (
-                    playback.currentSongId !=
-                        null &&
+                    playback.currentSongId != null &&
                     miniVisible &&
                     !showNowPlaying &&
                     !profileOpen
@@ -1164,9 +1006,7 @@ fun App() {
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .zIndex(
-                                20f
-                            )
+                            .zIndex(20f)
                     ) {
                         MiniPlayer(
                             state =
@@ -1185,16 +1025,9 @@ fun App() {
                                 playback.currentSongId in
                                     likedSongIds,
 
-                            /*
-                             * MiniPlayer itself completes its
-                             * downward exit before this callback.
-                             */
                             openPlayer = {
-                                miniVisible =
-                                    false
-
-                                showNowPlaying =
-                                    true
+                                miniVisible = false
+                                showNowPlaying = true
                             },
 
                             togglePlay = {
@@ -1203,9 +1036,7 @@ fun App() {
 
                             toggleLike = {
                                 song?.let {
-                                    toggleLike(
-                                        it.id
-                                    )
+                                    toggleLike(it.id)
                                 }
                             },
 
@@ -1226,15 +1057,11 @@ fun App() {
                  * =================================================
                  */
 
-                if (
-                    profileOpen
-                ) {
+                if (profileOpen) {
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .zIndex(
-                                80f
-                            )
+                            .zIndex(80f)
                     ) {
                         ProfileEditor(
                             profile =
@@ -1244,8 +1071,7 @@ fun App() {
                                 theme,
 
                             apply = {
-                                profile =
-                                    it
+                                profile = it
 
                                 scope.launch {
                                     Store.saveProfile(
@@ -1254,13 +1080,11 @@ fun App() {
                                     )
                                 }
 
-                                profileOpen =
-                                    false
+                                profileOpen = false
                             },
 
                             cancel = {
-                                profileOpen =
-                                    false
+                                profileOpen = false
                             }
                         )
                     }
@@ -1272,9 +1096,7 @@ fun App() {
                  * =================================================
                  */
 
-                if (
-                    showNowPlaying
-                ) {
+                if (showNowPlaying) {
                     val song =
                         currentSong()
 
@@ -1284,9 +1106,7 @@ fun App() {
                     Box(
                         Modifier
                             .fillMaxSize()
-                            .zIndex(
-                                100f
-                            )
+                            .zIndex(100f)
                     ) {
                         NowPlaying(
                             state =
@@ -1305,27 +1125,23 @@ fun App() {
                                 player.queue(),
 
                             liked =
-                                id !=
-                                null &&
-                                    id in
-                                    likedSongIds,
+                                id != null &&
+                                    id in likedSongIds,
 
                             lyricsUri =
                                 id?.let {
-                                    lyricsFiles[
-                                        it
-                                    ]
+                                    lyricsFiles[it]
                                 },
 
                             /*
-                             * SongTile opening may leave an existing
-                             * MiniPlayer behind during entrance.
-                             * Remove it only when full player reaches
-                             * its final position.
+                             * Real categories exposed to
+                             * XmoCenterBox.
                              */
+                            categories =
+                                categories,
+
                             onOpened = {
-                                miniVisible =
-                                    false
+                                miniVisible = false
                             },
 
                             refreshPosition = {
@@ -1349,16 +1165,17 @@ fun App() {
                             },
 
                             seekTo = {
-                                player.seekTo(
-                                    it
-                                )
+                                player.seekTo(it)
                             },
 
+                            /*
+                             * Current media item is resolved when
+                             * action fires, not captured from a
+                             * stale composition.
+                             */
                             toggleLike = {
-                                id?.let {
-                                    toggleLike(
-                                        it
-                                    )
+                                playback.currentSongId?.let {
+                                    toggleLike(it)
                                 }
                             },
 
@@ -1371,9 +1188,7 @@ fun App() {
                             },
 
                             setSleepTimer = {
-                                player.setSleepTimer(
-                                    it
-                                )
+                                player.setSleepTimer(it)
                             },
 
                             cancelSleepTimer = {
@@ -1381,14 +1196,14 @@ fun App() {
                             },
 
                             saveLyricsUri = {
-                                if (
-                                    id !=
-                                    null
-                                ) {
+                                val songId =
+                                    playback.currentSongId
+
+                                if (songId != null) {
                                     scope.launch {
                                         Store.saveLyricsUri(
                                             context,
-                                            id,
+                                            songId,
                                             it
                                         )
 
@@ -1401,121 +1216,65 @@ fun App() {
                             },
 
                             /*
-                             * Called only after NowPlaying is fully
-                             * below the screen.
+                             * REAL category membership.
                              */
+                            setSongInCategory = {
+                                    categoryId,
+                                    added ->
+
+                                currentSong()?.let {
+                                    updateCategoryMembership(
+                                        it,
+                                        categoryId,
+                                        added
+                                    )
+                                }
+                            },
+
+                            /*
+                             * REAL category creation.
+                             * Created category includes the current
+                             * song immediately.
+                             */
+                            createCategory = { name ->
+                                createCategory(
+                                    name,
+                                    currentSong()
+                                )
+                            },
+
                             dismiss = {
-                                showNowPlaying =
-                                    false
+                                showNowPlaying = false
 
                                 miniRiseKey++
 
                                 miniVisible =
-                                    playback.currentSongId !=
-                                        null
+                                    playback.currentSongId != null
                             }
                         )
                     }
                 }
 
                 /*
-                 * First playback without NowPlaying still gets a
-                 * MiniPlayer.
+                 * =================================================
+                 * MINIPLAYER RECOVERY
+                 * =================================================
                  */
+
                 LaunchedEffect(
                     playback.currentSongId,
                     showNowPlaying,
                     profileOpen
                 ) {
                     if (
-                        playback.currentSongId !=
-                            null &&
+                        playback.currentSongId != null &&
                         !showNowPlaying &&
                         !profileOpen &&
                         !miniVisible
                     ) {
-                        miniVisible =
-                            true
+                        miniVisible = true
                     }
                 }
-            }
-        }
-    }
-}
-
-/*
- * =============================================================
- * FIRST INITIAL LOAD ONLY
- * =============================================================
- */
-
-@Composable
-private fun FirstLoadSkeleton(
-    theme: XmoTheme
-) {
-    val c =
-        homeColors(
-            theme
-        )
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .background(
-                c.bg
-            )
-    ) {
-        androidx.compose.foundation.layout.Column(
-            Modifier
-                .fillMaxSize()
-                .padding(
-                    start = 18.dp,
-                    top = 72.dp,
-                    end = 18.dp
-                )
-        ) {
-            Box(
-                Modifier
-                    .fillMaxSize(
-                        .08f
-                    )
-                    .background(
-                        c.button,
-                        androidx.compose.foundation.shape
-                            .CircleShape
-                    )
-            )
-
-            androidx.compose.foundation.layout.Spacer(
-                Modifier
-                    .fillMaxSize(
-                        .025f
-                    )
-            )
-
-            repeat(
-                4
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxSize(
-                            .10f
-                        )
-                        .background(
-                            c.button,
-                            androidx.compose.foundation.shape
-                                .RoundedCornerShape(
-                                    18.dp
-                                )
-                        )
-                )
-
-                androidx.compose.foundation.layout.Spacer(
-                    Modifier
-                        .fillMaxSize(
-                            .018f
-                        )
-                )
             }
         }
     }
