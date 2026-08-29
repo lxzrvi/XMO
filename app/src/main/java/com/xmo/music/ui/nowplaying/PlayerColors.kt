@@ -78,27 +78,36 @@ internal fun rememberPlayerColors(
         )
     }
 
+    /*
+     * =========================================================
+     * CURRENT
+     * =========================================================
+     *
+     * Do NOT directly commit this result here.
+     *
+     * Media3 can update currentSongId/currentArtwork while the
+     * carousel is still visually moving. Directly changing the
+     * committed origin during that transaction is what can cause
+     * the old/new background color flash.
+     */
+
     LaunchedEffect(
+        currentSongId,
         currentArtwork,
         fallbackArtwork
     ) {
-        val result =
+        state.current =
             extract(
                 currentArtwork
                     ?: fallbackArtwork
             )
-
-        state.current =
-            result
-
-        if (
-            abs(coverX.value) <
-            1f
-        ) {
-            state.committed =
-                result
-        }
     }
+
+    /*
+     * =========================================================
+     * PREVIOUS
+     * =========================================================
+     */
 
     LaunchedEffect(
         previousArtwork
@@ -111,6 +120,12 @@ internal fun rememberPlayerColors(
                 ?: state.current
     }
 
+    /*
+     * =========================================================
+     * NEXT
+     * =========================================================
+     */
+
     LaunchedEffect(
         nextArtwork
     ) {
@@ -122,8 +137,20 @@ internal fun rememberPlayerColors(
                 ?: state.current
     }
 
+    /*
+     * =========================================================
+     * VISUAL COMMIT
+     * =========================================================
+     *
+     * Playback state is not the visual transaction boundary.
+     * Carousel rest is.
+     *
+     * When x returns to zero, whatever MediaStore artwork color
+     * is now current becomes the origin for the next gesture.
+     */
+
     LaunchedEffect(
-        currentSongId,
+        coverX.value,
         state.current
     ) {
         if (
@@ -138,22 +165,34 @@ internal fun rememberPlayerColors(
     return state
 }
 
+/*
+ * =============================================================
+ * DISPLAY COLOR
+ * =============================================================
+ */
+
 internal fun playerDisplayColor(
     colors: PlayerColorState,
     coverX: Float,
     coverWidth: Float
 ): Color {
+    val width =
+        coverWidth
+            .coerceAtLeast(1f)
+
     val fraction =
         (
             coverX /
-                coverWidth
-                    .coerceAtLeast(1f)
+                width
             )
             .coerceIn(
                 -1f,
                 1f
             )
 
+    /*
+     * At rest use real current artwork color.
+     */
     if (
         abs(fraction) <=
         .001f
@@ -161,8 +200,16 @@ internal fun playerDisplayColor(
         return colors.current
     }
 
+    /*
+     * Artwork carousel convention:
+     *
+     * x < 0 -> moving towards Next
+     * x > 0 -> moving towards Previous
+     */
     val destination =
-        if (fraction < 0f) {
+        if (
+            fraction < 0f
+        ) {
             colors.next
         } else {
             colors.previous
@@ -178,6 +225,12 @@ internal fun playerDisplayColor(
     )
 }
 
+/*
+ * =============================================================
+ * THEME COLORS
+ * =============================================================
+ */
+
 internal data class PlayerThemeColors(
     val overlayText: Color,
     val controls: Color,
@@ -190,12 +243,12 @@ internal fun playerThemeColors(
     theme: XmoTheme,
     displayColor: Color
 ): PlayerThemeColors {
-    val bright =
+    val artworkBright =
         displayColor.luminance() >
             .58f
 
-    val overlay =
-        if (bright) {
+    val overlayText =
+        if (artworkBright) {
             Color(0xFF111214)
         } else {
             Color.White
@@ -213,66 +266,91 @@ internal fun playerThemeColors(
             Color.White
         }
 
+    val playBackground =
+        when (theme) {
+            XmoTheme.Light ->
+                Color.Black.copy(
+                    alpha = .10f
+                )
+
+            XmoTheme.Dark ->
+                Color.White.copy(
+                    alpha = .13f
+                )
+
+            XmoTheme.Amoled ->
+                Color.White.copy(
+                    alpha = .15f
+                )
+        }
+
+    val panel =
+        when (theme) {
+            XmoTheme.Light ->
+                Color.White.copy(
+                    alpha = .40f
+                )
+
+            XmoTheme.Dark ->
+                Color.Black.copy(
+                    alpha = .27f
+                )
+
+            XmoTheme.Amoled ->
+                Color.Black.copy(
+                    alpha = .45f
+                )
+        }
+
+    val border =
+        when (theme) {
+            XmoTheme.Light ->
+                Color.Black.copy(
+                    alpha = .14f
+                )
+
+            XmoTheme.Dark ->
+                Color.White.copy(
+                    alpha = .16f
+                )
+
+            XmoTheme.Amoled ->
+                Color.White.copy(
+                    alpha = .22f
+                )
+        }
+
     return PlayerThemeColors(
-        overlayText = overlay,
-        controls = controls,
+        overlayText =
+            overlayText,
+        controls =
+            controls,
         playBackground =
-            when (theme) {
-                XmoTheme.Light ->
-                    Color.Black.copy(
-                        alpha = .10f
-                    )
-
-                XmoTheme.Dark ->
-                    Color.White.copy(
-                        alpha = .13f
-                    )
-
-                XmoTheme.Amoled ->
-                    Color.White.copy(
-                        alpha = .15f
-                    )
-            },
+            playBackground,
         panel =
-            when (theme) {
-                XmoTheme.Light ->
-                    Color.White.copy(
-                        alpha = .40f
-                    )
-
-                XmoTheme.Dark ->
-                    Color.Black.copy(
-                        alpha = .27f
-                    )
-
-                XmoTheme.Amoled ->
-                    Color.Black.copy(
-                        alpha = .45f
-                    )
-            },
+            panel,
         border =
-            when (theme) {
-                XmoTheme.Light ->
-                    Color.Black.copy(
-                        alpha = .14f
-                    )
-
-                XmoTheme.Dark ->
-                    Color.White.copy(
-                        alpha = .16f
-                    )
-
-                XmoTheme.Amoled ->
-                    Color.White.copy(
-                        alpha = .22f
-                    )
-            }
+            border
     )
 }
+
+/*
+ * =============================================================
+ * ARTWORK COLOR LIFT
+ * =============================================================
+ */
+
 internal fun liftArtworkColor(
     color: Color
 ): Color {
-    val minimum = .22f
+    /*
+     * Palette can legitimately return very dark colors.
+     * Preserve hue while preventing a near-black artwork color
+     * from becoming unusable as the player's accent field.
+     */
+
+    val minimum =
+        .22f
 
     val maximum =
         maxOf(
@@ -281,18 +359,23 @@ internal fun liftArtworkColor(
             color.blue
         )
 
-    if (maximum >= minimum) {
+    if (
+        maximum >= minimum
+    ) {
         return color
     }
 
-    if (maximum <= .001f) {
+    if (
+        maximum <= .001f
+    ) {
         return Color(
             0xFF4A4D55
         )
     }
 
     val multiplier =
-        minimum / maximum
+        minimum /
+            maximum
 
     return Color(
         red =
@@ -325,6 +408,12 @@ internal fun liftArtworkColor(
         alpha = 1f
     )
 }
+
+/*
+ * =============================================================
+ * COLOR INTERPOLATION
+ * =============================================================
+ */
 
 internal fun mixColor(
     from: Color,
