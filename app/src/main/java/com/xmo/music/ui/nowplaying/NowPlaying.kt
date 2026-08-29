@@ -82,6 +82,7 @@ fun NowPlaying(
     source: String,
     sourceIsCategory: Boolean,
     queue: List<Song>,
+    songs: List<Song>,
     liked: Boolean,
     lyricsUri: String?,
     categories: List<UserCategory>,
@@ -137,6 +138,31 @@ fun NowPlaying(
         queue.getOrNull(
             currentIndex
         )
+
+    val artistTrackCount =
+    remember(
+        songs,
+        currentSong?.artist
+    ) {
+        val artist =
+            currentSong
+                ?.artist
+                ?.trim()
+                .orEmpty()
+
+        if (artist.isBlank()) {
+            0
+        } else {
+            songs.count { song ->
+                song.artist
+                    .trim()
+                    .equals(
+                        artist,
+                        ignoreCase = true
+                    )
+            }
+        }
+    }
 
     val previousSong =
         queue.getOrNull(
@@ -972,21 +998,30 @@ fun NowPlaying(
                         )
 
                         Text(
-                            text =
-                                state.artist
-                                    .ifBlank {
-                                        "Unknown artist"
-                                    },
-                            color =
-                                colors.sub,
-                            fontFamily =
-                                XmoFont.normal,
-                            fontSize = 12.sp,
-                            maxLines = 1,
-                            overflow =
-                                TextOverflow.Ellipsis
-                        )
-                    }
+                            PressButton(
+                                modifier =
+                                    Modifier.fillMaxWidth(),
+                                onClick = {
+                                    overlay =
+                                        PlayerOverlay.Artist
+                                }
+                            ) {
+                                Text(
+                                    text =
+                                        state.artist.ifBlank {
+                                            "Unknown artist"
+                                        },
+                                    color = colors.sub,
+                                    fontFamily =
+                                        XmoFont.normal,
+                                    fontSize = 12.sp,
+                                    maxLines = 1,
+                                    overflow =
+                                        TextOverflow.Ellipsis,
+                                    modifier =
+                                        Modifier.fillMaxWidth()
+                                )
+                            }
 
                     /*
                      * Requested one connected capsule:
