@@ -26,7 +26,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.ChevronDown
-import com.composables.icons.lucide.EllipsisVertical
+import com.composables.icons.lucide.Ellipsis
 import com.composables.icons.lucide.Lucide
 import com.composables.icons.lucide.Share2
 import com.xmo.music.ui.XmoFont
@@ -48,12 +48,19 @@ internal fun PlayerHeader(
     val scope =
         rememberCoroutineScope()
 
+    /*
+     * Longer than the previous switch so header labels blend
+     * naturally with the artwork-derived background transition.
+     */
     val animatedForeground by
         animateColorAsState(
             targetValue =
                 foreground,
             animationSpec =
-                tween(360),
+                tween(
+                    durationMillis =
+                        500
+                ),
             label =
                 "headerForeground"
         )
@@ -64,19 +71,22 @@ internal fun PlayerHeader(
         )
 
     Box(
-        Modifier
-            .fillMaxWidth()
-            .height(68.dp)
-            .padding(
-                horizontal = 14.dp
-            )
-            .headerDownGesture(
-                y = playerY,
-                height =
-                    screenHeight,
-                dismiss =
-                    dismissAfterDrag
-            )
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(
+                    68.dp
+                )
+                .padding(
+                    horizontal = 14.dp
+                )
+                .headerDownGesture(
+                    y = playerY,
+                    height =
+                        screenHeight,
+                    dismiss =
+                        dismissAfterDrag
+                )
     ) {
         PremiumCircle(
             size = 40.dp,
@@ -100,16 +110,21 @@ internal fun PlayerHeader(
                 tint =
                     animatedForeground,
                 modifier =
-                    Modifier.size(22.dp)
+                    Modifier.size(
+                        23.dp
+                    )
             )
         }
 
         Column(
-            Modifier
-                .align(
-                    Alignment.Center
-                )
-                .width(180.dp),
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.Center
+                    )
+                    .width(
+                        180.dp
+                    ),
             horizontalAlignment =
                 Alignment.CenterHorizontally
         ) {
@@ -124,23 +139,26 @@ internal fun PlayerHeader(
                     },
                 color =
                     animatedForeground.copy(
-                        alpha = .66f
+                        alpha = .72f
                     ),
                 fontFamily =
                     XmoFont.medium,
-                fontSize = 12.sp,
+                fontSize =
+                    12.sp,
                 textAlign =
                     TextAlign.Center,
                 maxLines = 1
             )
 
             Text(
-                text = source,
+                text =
+                    source,
                 color =
                     animatedForeground,
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 16.sp,
+                fontSize =
+                    16.sp,
                 textAlign =
                     TextAlign.Center,
                 maxLines = 1,
@@ -159,7 +177,8 @@ internal fun PlayerHeader(
         ) {
             CapsuleButton(
                 size = 40.dp,
-                onClick = share
+                onClick =
+                    share
             ) {
                 Icon(
                     imageVector =
@@ -169,23 +188,28 @@ internal fun PlayerHeader(
                     tint =
                         animatedForeground,
                     modifier =
-                        Modifier.size(18.dp)
+                        Modifier.size(
+                            18.dp
+                        )
                 )
             }
 
             CapsuleButton(
                 size = 40.dp,
-                onClick = options
+                onClick =
+                    options
             ) {
                 Icon(
                     imageVector =
-                        Lucide.EllipsisVertical,
+                        Lucide.Ellipsis,
                     contentDescription =
                         "Options",
                     tint =
                         animatedForeground,
                     modifier =
-                        Modifier.size(19.dp)
+                        Modifier.size(
+                            21.dp
+                        )
                 )
             }
         }
@@ -197,7 +221,9 @@ private fun Modifier.headerDownGesture(
     height: Float,
     dismiss: () -> Unit
 ): Modifier =
-    pointerInput(height) {
+    pointerInput(
+        height
+    ) {
         coroutineScope {
             detectDragGestures(
                 onDrag = {
@@ -229,13 +255,17 @@ private fun Modifier.headerDownGesture(
                     launch {
                         if (
                             y.value >
-                            height * .13f
+                            height *
+                            .13f
                         ) {
                             y.animateTo(
                                 targetValue =
                                     height,
                                 animationSpec =
-                                    tween(300)
+                                    tween(
+                                        durationMillis =
+                                            300
+                                    )
                             )
 
                             dismiss()
@@ -261,7 +291,10 @@ private fun Modifier.headerDownGesture(
                             targetValue =
                                 0f,
                             animationSpec =
-                                tween(180)
+                                tween(
+                                    durationMillis =
+                                        180
+                                )
                         )
                     }
                 }
