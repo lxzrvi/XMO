@@ -1,7 +1,6 @@
 package com.xmo.music.ui.nowplaying
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -17,175 +16,337 @@ internal fun PlayerBackground(
     theme: XmoTheme
 ) {
     /*
-     * The neutral base itself is deliberately lighter than the
-     * previous implementation. Artwork contributes tint, not a
-     * dark solid backdrop.
+     * dominant is already transaction-controlled by
+     * PlayerColors.kt.
+     *
+     * Do not animate/change Palette state independently here.
+     * Every field is calculated from the SAME rendered dominant
+     * color so next/previous cannot produce separate flashes.
+     */
+
+    val brightDominant =
+        brightenBackgroundColor(
+            dominant,
+            when (theme) {
+                XmoTheme.Light -> .16f
+                XmoTheme.Dark -> .09f
+                XmoTheme.Amoled -> .05f
+            }
+        )
+
+    /*
+     * Keep deep related to the exact same dominant family.
+     *
+     * We intentionally pull deep strongly toward dominant.
+     * This prevents a Palette "deep" value from suddenly looking
+     * like a second unrelated background during transitions.
+     */
+    val relatedDeep =
+        mixColor(
+            from = deep,
+            to = brightDominant,
+            fraction = .72f
+        )
+
+    /*
+     * Unlike the old implementation, artwork itself contributes
+     * to the actual base color rather than sitting as a weak
+     * transparent glow above a neutral screen.
      */
     val base =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFFF4F6F9)
+                mixColor(
+                    from = Color(0xFFF8F9FB),
+                    to = brightDominant,
+                    fraction = .23f
+                )
 
             XmoTheme.Dark ->
-                Color(0xFF24262B)
+                mixColor(
+                    from = Color(0xFF17181C),
+                    to = brightDominant,
+                    fraction = .32f
+                )
 
             XmoTheme.Amoled ->
-                Color(0xFF090A0C)
+                mixColor(
+                    from = Color(0xFF030405),
+                    to = brightDominant,
+                    fraction = .21f
+                )
         }
 
-    val primary =
+    val topColor =
         when (theme) {
             XmoTheme.Light ->
-                .30f
+                mixColor(
+                    from = base,
+                    to = brightDominant,
+                    fraction = .48f
+                )
 
             XmoTheme.Dark ->
-                .30f
+                mixColor(
+                    from = base,
+                    to = brightDominant,
+                    fraction = .50f
+                )
 
             XmoTheme.Amoled ->
-                .25f
+                mixColor(
+                    from = base,
+                    to = brightDominant,
+                    fraction = .44f
+                )
         }
 
-    val secondary =
-        primary * .55f
+    val lowerColor =
+        when (theme) {
+            XmoTheme.Light ->
+                mixColor(
+                    from = base,
+                    to = brightDominant,
+                    fraction = .26f
+                )
 
-    /*
-     * Mix the raw deep color back towards dominant. This stops a
-     * very dark Palette-derived "deep" field from muddying the
-     * screen.
-     */
-    val softDeep =
-        mixColor(
-            from = deep,
-            to = dominant,
-            fraction = .58f
-        )
+            XmoTheme.Dark ->
+                mixColor(
+                    from = base,
+                    to = relatedDeep,
+                    fraction = .35f
+                )
+
+            XmoTheme.Amoled ->
+                mixColor(
+                    from = base,
+                    to = relatedDeep,
+                    fraction = .24f
+                )
+        }
 
     Canvas(
-        Modifier
-            .fillMaxSize()
-            .background(base)
+        modifier =
+            Modifier.fillMaxSize()
     ) {
+        /*
+         * Actual artwork-derived base.
+         */
         drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        dominant.copy(
-                            alpha = primary
-                        ),
-                        dominant.copy(
-                            alpha =
-                                primary *
-                                    .10f
-                        ),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .12f,
-                        size.height * .12f
-                    ),
-                radius =
-                    size.width * 1.22f
-            )
-        )
-
-        drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        softDeep.copy(
-                            alpha =
-                                secondary
-                        ),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .90f,
-                        size.height * .25f
-                    ),
-                radius =
-                    size.width * 1.30f
-            )
-        )
-
-        drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        dominant.copy(
-                            alpha =
-                                primary *
-                                    .72f
-                        ),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .10f,
-                        size.height * .58f
-                    ),
-                radius =
-                    size.width * 1.34f
-            )
-        )
-
-        drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        softDeep.copy(
-                            alpha =
-                                secondary *
-                                    .64f
-                        ),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .88f,
-                        size.height * .78f
-                    ),
-                radius =
-                    size.width * 1.38f
-            )
+            color = base
         )
 
         /*
-         * Gentle light veil rather than a dark veil.
+         * Large top field.
+         *
+         * This makes the area behind header + artwork strongly
+         * identify with the current cover.
+         */
+        drawRect(
+            brush =
+                Brush.radialGradient(
+                    colors =
+                        listOf(
+                            topColor.copy(
+                                alpha = .94f
+                            ),
+                            topColor.copy(
+                                alpha = .48f
+                            ),
+                            Color.Transparent
+                        ),
+                    center =
+                        Offset(
+                            x = size.width * .20f,
+                            y = size.height * .05f
+                        ),
+                    radius =
+                        size.width * 1.35f
+                )
+        )
+
+        /*
+         * Opposite soft color field adds depth without creating
+         * an unrelated Palette color.
+         */
+        drawRect(
+            brush =
+                Brush.radialGradient(
+                    colors =
+                        listOf(
+                            relatedDeep.copy(
+                                alpha =
+                                    when (theme) {
+                                        XmoTheme.Light -> .24f
+                                        XmoTheme.Dark -> .34f
+                                        XmoTheme.Amoled -> .27f
+                                    }
+                            ),
+                            Color.Transparent
+                        ),
+                    center =
+                        Offset(
+                            x = size.width * .98f,
+                            y = size.height * .28f
+                        ),
+                    radius =
+                        size.width * 1.18f
+                )
+        )
+
+        /*
+         * Artwork color underneath the lower controls/panel.
+         * This is important because the panel itself is now
+         * translucent.
+         */
+        drawRect(
+            brush =
+                Brush.radialGradient(
+                    colors =
+                        listOf(
+                            brightDominant.copy(
+                                alpha =
+                                    when (theme) {
+                                        XmoTheme.Light -> .30f
+                                        XmoTheme.Dark -> .35f
+                                        XmoTheme.Amoled -> .28f
+                                    }
+                            ),
+                            Color.Transparent
+                        ),
+                    center =
+                        Offset(
+                            x = size.width * .08f,
+                            y = size.height * .68f
+                        ),
+                    radius =
+                        size.width * 1.46f
+                )
+        )
+
+        /*
+         * Bottom field prevents a hard neutral/black-looking
+         * lower screen.
+         */
+        drawRect(
+            brush =
+                Brush.radialGradient(
+                    colors =
+                        listOf(
+                            lowerColor.copy(
+                                alpha =
+                                    when (theme) {
+                                        XmoTheme.Light -> .50f
+                                        XmoTheme.Dark -> .52f
+                                        XmoTheme.Amoled -> .44f
+                                    }
+                            ),
+                            Color.Transparent
+                        ),
+                    center =
+                        Offset(
+                            x = size.width * .82f,
+                            y = size.height * .94f
+                        ),
+                    radius =
+                        size.width * 1.30f
+                )
+        )
+
+        /*
+         * Theme finishing layer.
+         *
+         * Keep this extremely light. A strong black/white veil
+         * would destroy the artwork-derived color.
          */
         when (theme) {
             XmoTheme.Light -> {
                 drawRect(
-                    Brush.verticalGradient(
-                        colors =
-                            listOf(
-                                Color.White.copy(
-                                    alpha = .05f
-                                ),
-                                Color.White.copy(
-                                    alpha = .13f
+                    brush =
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    Color.White.copy(
+                                        alpha = .08f
+                                    ),
+                                    Color.White.copy(
+                                        alpha = .025f
+                                    ),
+                                    Color.White.copy(
+                                        alpha = .07f
+                                    )
                                 )
-                            )
-                    )
+                        )
                 )
             }
 
             XmoTheme.Dark -> {
                 drawRect(
-                    Color.White.copy(
-                        alpha = .018f
-                    )
+                    brush =
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    Color.White.copy(
+                                        alpha = .018f
+                                    ),
+                                    Color.Transparent,
+                                    Color.Black.copy(
+                                        alpha = .045f
+                                    )
+                                )
+                        )
                 )
             }
 
             XmoTheme.Amoled -> {
                 /*
-                 * AMOLED remains black-based, but artwork fields
-                 * stay visible rather than being covered by an
-                 * additional dark gradient.
+                 * AMOLED keeps true black influence around the
+                 * artwork fields while still allowing their hue
+                 * to remain visible.
                  */
+                drawRect(
+                    brush =
+                        Brush.verticalGradient(
+                            colors =
+                                listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(
+                                        alpha = .05f
+                                    ),
+                                    Color.Black.copy(
+                                        alpha = .11f
+                                    )
+                                )
+                        )
+                )
             }
         }
     }
+}
+
+private fun brightenBackgroundColor(
+    color: Color,
+    amount: Float
+): Color {
+    val value =
+        amount.coerceIn(
+            0f,
+            1f
+        )
+
+    return Color(
+        red =
+            color.red +
+                (1f - color.red) * value,
+
+        green =
+            color.green +
+                (1f - color.green) * value,
+
+        blue =
+            color.blue +
+                (1f - color.blue) * value,
+
+        alpha = 1f
+    )
 }
