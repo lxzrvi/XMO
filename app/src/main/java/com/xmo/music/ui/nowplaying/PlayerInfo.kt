@@ -2,10 +2,12 @@ package com.xmo.music.ui.nowplaying
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,27 +39,27 @@ internal fun PlayerInfo(
     openDetails: () -> Unit,
     openArtist: () -> Unit
 ) {
-    /*
-     * Fixed-height region lets the action capsule remain anchored
-     * at the top while title/artist independently move downward.
-     */
     Box(
         Modifier
             .fillMaxWidth()
-            .height(102.dp)
+            .height(100.dp)
     ) {
-        XmoCapsule(
-            background =
-                colors.button,
-            modifier =
-                Modifier
-                    .align(
-                        Alignment.TopEnd
-                    )
-                    .padding(end = 4.dp)
+        /*
+         * Controls keep their existing upper-right position.
+         */
+        Row(
+            Modifier
+                .align(
+                    Alignment.TopEnd
+                )
+                .padding(end = 4.dp),
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
-            CapsuleButton(
+            PremiumCircle(
                 size = 40.dp,
+                background =
+                    colors.button,
                 onClick = toggleLike
             ) {
                 FilledHeart(
@@ -71,8 +73,14 @@ internal fun PlayerInfo(
                 )
             }
 
-            CapsuleButton(
+            androidx.compose.foundation.layout.Spacer(
+                Modifier.width(5.dp)
+            )
+
+            PremiumCircle(
                 size = 40.dp,
+                background =
+                    colors.button,
                 onClick =
                     openCategories
             ) {
@@ -88,57 +96,77 @@ internal fun PlayerInfo(
                 )
             }
 
-            CapsuleButton(
-                size = 40.dp,
-                onClick = openSleep
-            ) {
-                Icon(
-                    imageVector =
-                        Lucide.Clock3,
-                    contentDescription =
-                        "Sleep timer",
-                    tint =
-                        if (sleepActive) {
-                            accent
-                        } else {
-                            colors.icon
-                        },
-                    modifier =
-                        Modifier.size(18.dp)
-                )
-            }
+            androidx.compose.foundation.layout.Spacer(
+                Modifier.width(5.dp)
+            )
 
-            CapsuleButton(
-                size = 40.dp,
-                onClick = openQueue
+            XmoCapsule(
+                background =
+                    colors.button
             ) {
-                Icon(
-                    imageVector =
-                        Lucide.ListMusic,
-                    contentDescription =
-                        "Queue",
-                    tint = colors.icon,
-                    modifier =
-                        Modifier.size(18.dp)
-                )
-            }
+                CapsuleButton(
+                    size = 40.dp,
+                    onClick =
+                        openSleep
+                ) {
+                    Icon(
+                        imageVector =
+                            Lucide.Clock3,
+                        contentDescription =
+                            "Sleep timer",
+                        tint =
+                            if (
+                                sleepActive
+                            ) {
+                                accent
+                            } else {
+                                colors.icon
+                            },
+                        modifier =
+                            Modifier.size(
+                                18.dp
+                            )
+                    )
+                }
 
-            CapsuleButton(
-                size = 40.dp,
-                onClick = openDetails
-            ) {
-                Text(
-                    text = "?",
-                    color = colors.icon,
-                    fontFamily =
-                        XmoFont.bold,
-                    fontSize = 18.sp
-                )
+                CapsuleButton(
+                    size = 40.dp,
+                    onClick =
+                        openQueue
+                ) {
+                    Icon(
+                        imageVector =
+                            Lucide.ListMusic,
+                        contentDescription =
+                            "Queue",
+                        tint = colors.icon,
+                        modifier =
+                            Modifier.size(
+                                18.dp
+                            )
+                    )
+                }
+
+                CapsuleButton(
+                    size = 40.dp,
+                    onClick =
+                        openDetails
+                ) {
+                    Text(
+                        text = "?",
+                        color =
+                            colors.icon,
+                        fontFamily =
+                            XmoFont.bold,
+                        fontSize = 18.sp
+                    )
+                }
             }
         }
 
         /*
-         * This block is deliberately lower than the capsule.
+         * Text remains exactly in its lower independent region.
+         * Artist has no press-scale animation now.
          */
         Column(
             Modifier
@@ -148,8 +176,7 @@ internal fun PlayerInfo(
                 .fillMaxWidth()
                 .padding(
                     start = 4.dp,
-                    end = 8.dp,
-                    bottom = 2.dp
+                    end = 8.dp
                 )
         ) {
             Text(
@@ -166,32 +193,25 @@ internal fun PlayerInfo(
                     TextOverflow.Ellipsis
             )
 
-            PressButton(
+            Text(
+                text =
+                    artist.ifBlank {
+                        "Unknown artist"
+                    },
+                color = colors.sub,
+                fontFamily =
+                    XmoFont.medium,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow =
+                    TextOverflow.Ellipsis,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .padding(
-                            top = 1.dp
-                        ),
-                onClick =
-                    openArtist
-            ) {
-                Text(
-                    text =
-                        artist.ifBlank {
-                            "Unknown artist"
-                        },
-                    color = colors.sub,
-                    fontFamily =
-                        XmoFont.medium,
-                    fontSize = 14.sp,
-                    maxLines = 1,
-                    overflow =
-                        TextOverflow.Ellipsis,
-                    modifier =
-                        Modifier.fillMaxWidth()
-                )
-            }
+                        .simpleTap(
+                            openArtist
+                        )
+            )
         }
     }
 }
