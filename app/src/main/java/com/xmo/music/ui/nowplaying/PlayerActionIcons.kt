@@ -31,10 +31,6 @@ internal fun FilledHeart(
         val h =
             size.height
 
-        /*
-         * Softer heart with broader curved lobes and a less
-         * needle-like bottom point.
-         */
         val path =
             Path().apply {
                 moveTo(
@@ -103,13 +99,17 @@ internal fun FilledHeart(
             filled
         ) {
             drawPath(
-                path = path,
-                color = color
+                path =
+                    path,
+                color =
+                    color
             )
         } else {
             drawPath(
-                path = path,
-                color = color,
+                path =
+                    path,
+                color =
+                    color,
                 style =
                     Stroke(
                         width =
@@ -137,23 +137,19 @@ internal fun FilledStar(
     ) {
         val center =
             Offset(
-                x =
-                    size.width / 2f,
-                y =
-                    size.height / 2f
+                size.width /
+                    2f,
+                size.height /
+                    2f
             )
 
-        /*
-         * Slightly shallower inner radius makes the category star
-         * fuller and less sharp/pin-like.
-         */
         val outer =
             size.minDimension *
-                .45f
+                .44f
 
         val inner =
             outer *
-                .50f
+                .51f
 
         val path =
             Path()
@@ -163,7 +159,9 @@ internal fun FilledStar(
         ) { index ->
             val radius =
                 if (
-                    index % 2 == 0
+                    index %
+                    2 ==
+                    0
                 ) {
                     outer
                 } else {
@@ -202,7 +200,8 @@ internal fun FilledStar(
                 )
 
             if (
-                index == 0
+                index ==
+                0
             ) {
                 path.moveTo(
                     point.x,
@@ -222,13 +221,17 @@ internal fun FilledStar(
             filled
         ) {
             drawPath(
-                path = path,
-                color = color
+                path =
+                    path,
+                color =
+                    color
             )
         } else {
             drawPath(
-                path = path,
-                color = color,
+                path =
+                    path,
+                color =
+                    color,
                 style =
                     Stroke(
                         width =
