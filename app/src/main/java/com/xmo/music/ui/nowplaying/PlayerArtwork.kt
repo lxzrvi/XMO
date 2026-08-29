@@ -6,8 +6,6 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -78,11 +76,10 @@ internal fun PlayerArtwork(
     }
 
     /*
-     * These are visual snapshots, not playback state.
+     * Visual queue window.
      *
-     * They intentionally remain on the old song until a carousel
-     * transaction reaches the point where the new artwork should
-     * become visible.
+     * It deliberately does not immediately follow recomposition
+     * while a carousel transaction is active.
      */
     var snapshotCurrent by remember {
         mutableStateOf(current)
@@ -96,65 +93,59 @@ internal fun PlayerArtwork(
         mutableStateOf(next)
     }
 
-    var previousKnownId by remember {
+    var knownId by remember {
         mutableStateOf(currentId)
     }
 
-    var previousKnownIndex by remember {
+    var knownIndex by remember {
         mutableStateOf(currentIndex)
     }
 
     /*
      * =========================================================
-     * REAL MEDIA3 SONG CHANGE
+     * MEDIA3 CONFIRMATION / AUTO CHANGE
      * =========================================================
-     *
-     * Covers:
-     * - natural track completion
-     * - notification controls
-     * - Bluetooth/headset commands
-     * - external MediaController changes
-     *
-     * Manual artwork swipes are handled separately below and do
-     * not receive a second animation after Media3 confirms them.
      */
 
     LaunchedEffect(
         currentId
     ) {
         val oldId =
-            previousKnownId
+            knownId
 
         val oldIndex =
-            previousKnownIndex
+            knownIndex
 
         if (
             currentId == null ||
             oldId == null ||
             currentId == oldId
         ) {
-            previousKnownId =
+            knownId =
                 currentId
 
-            previousKnownIndex =
+            knownIndex =
                 currentIndex
 
             return@LaunchedEffect
         }
 
+        val width =
+            carousel.width
+                .coerceAtLeast(1f)
+
         /*
-         * Manual transaction confirmation.
+         * -----------------------------------------------------
+         * MANUAL SWIPE CONFIRMED
+         * -----------------------------------------------------
          *
-         * The outgoing cover is already at ±width because the
-         * user's swipe completed before nextSong/previousSong was
-         * sent to Media3.
+         * User has already moved the old/current and neighbor
+         * together by one complete width. No second animation.
          */
         if (
             carousel.manualDirection != 0 &&
             carousel.manualSongId == oldId
         ) {
-            carousel.x.snapTo(0f)
-
             snapshotCurrent =
                 current
 
@@ -163,6 +154,13 @@ internal fun PlayerArtwork(
 
             snapshotNext =
                 next
+
+            /*
+             * At ±width the incoming neighbor is already exactly
+             * in the center. Swap visual window and reset x in the
+             * same snapshot transaction; no second visible slide.
+             */
+            carousel.x.snapTo(0f)
 
             carousel.manualDirection =
                 0
@@ -170,18 +168,23 @@ internal fun PlayerArtwork(
             carousel.manualSongId =
                 null
 
-            previousKnownId =
+            knownId =
                 currentId
 
-            previousKnownIndex =
+            knownIndex =
                 currentIndex
 
             return@LaunchedEffect
         }
 
         /*
-         * A real song change occurred outside an active manual
-         * artwork transaction.
+         * -----------------------------------------------------
+         * AUTO / EXTERNAL MEDIA3 CHANGE
+         * -----------------------------------------------------
+         *
+         * ExoPlayer may already report the new song before this
+         * visual animation starts. We retain old snapshots and
+         * use the real old neighbour as the incoming cover.
          */
         if (
             !carousel.transactionActive
@@ -189,40 +192,40 @@ internal fun PlayerArtwork(
             carousel.autoAnimating =
                 true
 
-            val width =
-                carousel.width
-                    .coerceAtLeast(1f)
-
             /*
-             * Queue moved forward:
-             * old cover exits left.
+             * Natural next / higher queue index:
+             * move carousel left.
              *
-             * Queue moved backward:
-             * old cover exits right.
+             * Previous / lower queue index:
+             * move carousel right.
              */
-            val exitDirection =
+            val target =
                 if (
                     currentIndex <
                     oldIndex
                 ) {
-                    1f
+                    width
                 } else {
-                    -1f
+                    -width
                 }
 
+            /*
+             * ONE continuous adjacent-cover movement.
+             *
+             * snapshotCurrent remains old.
+             * snapshotNext/Previous is already beside it.
+             */
             carousel.x.snapTo(0f)
 
             carousel.x.animateTo(
-                targetValue =
-                    exitDirection *
-                        width,
+                targetValue = target,
                 animationSpec =
-                    tween(250)
+                    tween(330)
             )
 
             /*
-             * Adopt the new Media3-confirmed visual window only
-             * while the old cover is outside the viewport.
+             * Incoming neighbour is now exactly centered.
+             * Adopt Media3-confirmed window and reset x atomically.
              */
             snapshotCurrent =
                 current
@@ -233,19 +236,7 @@ internal fun PlayerArtwork(
             snapshotNext =
                 next
 
-            /*
-             * New cover enters from the opposite edge.
-             */
-            carousel.x.snapTo(
-                -exitDirection *
-                    width
-            )
-
-            carousel.x.animateTo(
-                targetValue = 0f,
-                animationSpec =
-                    tween(285)
-            )
+            carousel.x.snapTo(0f)
 
             carousel.autoAnimating =
                 false
@@ -260,26 +251,24 @@ internal fun PlayerArtwork(
                 next
         }
 
-        previousKnownId =
+        knownId =
             currentId
 
-        previousKnownIndex =
+        knownIndex =
             currentIndex
     }
 
     /*
-     * Neighbour artwork can change while current song remains the
-     * same, e.g. queue mutation. Do not replace visual snapshots
-     * during a carousel transaction.
+     * Queue neighbor metadata may update independently.
      */
     LaunchedEffect(
         current,
         previous,
-        next,
-        currentId
+        next
     ) {
         if (
-            !carousel.transactionActive
+            !carousel.transactionActive &&
+            currentId == knownId
         ) {
             snapshotCurrent =
                 current
@@ -316,10 +305,6 @@ internal fun PlayerArtwork(
                     canNext,
                     showLyrics
                 ) {
-                    /*
-                     * Lyrics own touch/vertical scrolling while
-                     * that side of the card is visible.
-                     */
                     if (showLyrics) {
                         return@pointerInput
                     }
@@ -360,9 +345,6 @@ internal fun PlayerArtwork(
                                         carousel.x.value +
                                             amount.x
 
-                                    /*
-                                     * Edge resistance.
-                                     */
                                     if (
                                         target < 0f &&
                                         !canNext
@@ -370,7 +352,7 @@ internal fun PlayerArtwork(
                                         target =
                                             carousel.x.value +
                                                 amount.x *
-                                                    .17f
+                                                    .16f
                                     }
 
                                     if (
@@ -380,7 +362,7 @@ internal fun PlayerArtwork(
                                         target =
                                             carousel.x.value +
                                                 amount.x *
-                                                    .17f
+                                                    .16f
                                     }
 
                                     carousel.x.snapTo(
@@ -417,7 +399,7 @@ internal fun PlayerArtwork(
                                             targetValue =
                                                 -width,
                                             animationSpec =
-                                                tween(220)
+                                                tween(245)
                                         )
 
                                         nextSong()
@@ -437,7 +419,7 @@ internal fun PlayerArtwork(
                                             targetValue =
                                                 width,
                                             animationSpec =
-                                                tween(220)
+                                                tween(245)
                                         )
 
                                         previousSong()
@@ -452,7 +434,7 @@ internal fun PlayerArtwork(
                                                     dampingRatio =
                                                         .84f,
                                                     stiffness =
-                                                        430f
+                                                        420f
                                                 )
                                         )
                                     }
@@ -483,10 +465,12 @@ internal fun PlayerArtwork(
                 }
         ) {
             /*
-             * Artwork <-> cover-size lyrics.
+             * =================================================
+             * ARTWORK <-> LYRICS CARD
+             * =================================================
              *
-             * Small scaling range avoids the old visible clipping
-             * where the artwork appeared to be cut during the
+             * Fade only. Scaling the clipped cover itself was the
+             * source of the visible artwork cropping during this
              * transition.
              */
             AnimatedContent(
@@ -495,29 +479,15 @@ internal fun PlayerArtwork(
                 modifier =
                     Modifier.fillMaxSize(),
                 transitionSpec = {
-                    (
-                        fadeIn(
-                            animationSpec =
-                                tween(300)
-                        ) +
-                            scaleIn(
-                                initialScale =
-                                    .985f,
-                                animationSpec =
-                                    tween(330)
-                            )
-                        )
+                    fadeIn(
+                        animationSpec =
+                            tween(320)
+                    )
                         .togetherWith(
                             fadeOut(
                                 animationSpec =
-                                    tween(250)
-                            ) +
-                                scaleOut(
-                                    targetScale =
-                                        1.015f,
-                                    animationSpec =
-                                        tween(290)
-                                )
+                                    tween(280)
+                            )
                         )
                 },
                 label =
@@ -544,13 +514,7 @@ internal fun PlayerArtwork(
                             showArtwork =
                                 toggleLyrics,
                             modifier =
-                                Modifier
-                                    .padding(
-                                        horizontal =
-                                            17.dp
-                                    )
-                                    .fillMaxWidth()
-                                    .aspectRatio(1f)
+                                coverSizeModifier()
                         )
                     }
                 } else {
@@ -585,11 +549,11 @@ private fun ArtworkCarousel(
     Box(
         Modifier.fillMaxSize()
     ) {
-        previous?.let { uri ->
+        previous?.let {
             Cover(
-                uri = uri,
+                uri = it,
                 modifier =
-                    coverModifier()
+                    coverSizeModifier()
                         .align(
                             Alignment.Center
                         )
@@ -600,35 +564,33 @@ private fun ArtworkCarousel(
             )
         }
 
-        val interaction =
-            remember {
-                MutableInteractionSource()
-            }
-
         Cover(
             uri = current,
             modifier =
-                coverModifier()
+                coverSizeModifier()
                     .align(
                         Alignment.Center
                     )
                     .graphicsLayer {
-                        translationX = x
+                        translationX =
+                            x
                     }
                     .clickable(
                         interactionSource =
-                            interaction,
+                            remember {
+                                MutableInteractionSource()
+                            },
                         indication = null,
                         onClick =
                             toggleLyrics
                     )
         )
 
-        next?.let { uri ->
+        next?.let {
             Cover(
-                uri = uri,
+                uri = it,
                 modifier =
-                    coverModifier()
+                    coverSizeModifier()
                         .align(
                             Alignment.Center
                         )
@@ -641,7 +603,7 @@ private fun ArtworkCarousel(
     }
 }
 
-private fun coverModifier(): Modifier =
+private fun coverSizeModifier(): Modifier =
     Modifier
         .padding(
             horizontal = 17.dp
@@ -657,11 +619,13 @@ private fun Cover(
     Box(
         modifier
             .clip(
-                RoundedCornerShape(24.dp)
+                RoundedCornerShape(
+                    24.dp
+                )
             )
             .background(
                 Color.Black.copy(
-                    alpha = .07f
+                    alpha = .06f
                 )
             )
     ) {
