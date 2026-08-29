@@ -13,36 +13,37 @@ import kotlin.math.abs
 internal class PlayerCarouselState {
 
     val x =
-        Animatable(0f)
+        Animatable(
+            0f
+        )
 
     /*
-     * Actual artwork width in pixels.
-     *
-     * Keep setter public for compatibility with existing
-     * PlayerArtwork usage.
+     * Real square artwork width in pixels.
      */
     var width by
-        mutableStateOf(1f)
+        mutableStateOf(
+            1f
+        )
 
     /*
-     *  0 = idle
+     *  0 = no manual transaction
      *  1 = next
      * -1 = previous
      */
     var manualDirection by
-        mutableIntStateOf(0)
+        mutableIntStateOf(
+            0
+        )
 
-    /*
-     * Song that was current when manual navigation started.
-     */
     var manualSongId by
-        mutableStateOf<Long?>(null)
+        mutableStateOf<Long?>(
+            null
+        )
 
-    /*
-     * True while Media3/external transition is visually moving.
-     */
     var autoAnimating by
-        mutableStateOf(false)
+        mutableStateOf(
+            false
+        )
 
     /*
      *  0 = none
@@ -50,27 +51,24 @@ internal class PlayerCarouselState {
      * -1 = previous
      */
     var autoDirection by
-        mutableIntStateOf(0)
+        mutableIntStateOf(
+            0
+        )
 
-    /*
-     * Explicit visual transaction IDs.
-     *
-     * They are intentionally independent from the live queue
-     * window because Media3 may publish the new song before the
-     * visual carousel has completed.
-     */
     var visualFromSongId by
-        mutableStateOf<Long?>(null)
+        mutableStateOf<Long?>(
+            null
+        )
 
     var visualToSongId by
-        mutableStateOf<Long?>(null)
+        mutableStateOf<Long?>(
+            null
+        )
 
-    /*
-     * Lets consumers distinguish consecutive transactions
-     * without timers.
-     */
     var transactionGeneration by
-        mutableLongStateOf(0L)
+        mutableLongStateOf(
+            0L
+        )
         private set
 
     val transactionActive: Boolean
