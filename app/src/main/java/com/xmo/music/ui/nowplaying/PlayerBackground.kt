@@ -16,51 +16,73 @@ internal fun PlayerBackground(
     theme: XmoTheme
 ) {
     /*
-     * Neutral/theme base stays neutral.
-     *
-     * Artwork is painted as large overlapping fields instead of
-     * turning the entire screen into one solid dominant color.
+     * Neutral base remains visible between large artwork-derived
+     * clouds. Dominant color is NOT used as a solid full-screen
+     * background.
      */
     val base =
-        when (theme) {
+        when (
+            theme
+        ) {
             XmoTheme.Light ->
-                Color(0xFFF5F6F8)
+                Color(
+                    0xFFF5F6F8
+                )
 
             XmoTheme.Dark ->
-                Color(0xFF191A1E)
+                Color(
+                    0xFF191A1E
+                )
 
             XmoTheme.Amoled ->
-                Color(0xFF020203)
+                Color(
+                    0xFF020203
+                )
         }
 
     val bright =
         brightenSplash(
-            dominant,
-            when (theme) {
-                XmoTheme.Light ->
-                    .17f
+            color =
+                dominant,
+            amount =
+                when (
+                    theme
+                ) {
+                    XmoTheme.Light ->
+                        .17f
 
-                XmoTheme.Dark ->
-                    .11f
+                    XmoTheme.Dark ->
+                        .11f
 
-                XmoTheme.Amoled ->
-                    .08f
-            }
+                    XmoTheme.Amoled ->
+                        .08f
+                }
         )
 
-    val second =
+    /*
+     * Deep remains in the same color family rather than becoming
+     * a second muddy/black Palette field.
+     */
+    val secondary =
         mixColor(
-            from = deep,
-            to = bright,
-            fraction = .64f
+            from =
+                deep,
+            to =
+                bright,
+            fraction =
+                .64f
         )
 
     val soft =
         mixColor(
-            from = bright,
-            to = Color.White,
+            from =
+                bright,
+            to =
+                Color.White,
             fraction =
-                when (theme) {
+                when (
+                    theme
+                ) {
                     XmoTheme.Light ->
                         .20f
 
@@ -82,7 +104,7 @@ internal fun PlayerBackground(
         )
 
         /*
-         * Upper-left cloud.
+         * Broad top-left splash.
          */
         drawRect(
             brush =
@@ -91,7 +113,9 @@ internal fun PlayerBackground(
                         listOf(
                             bright.copy(
                                 alpha =
-                                    when (theme) {
+                                    when (
+                                        theme
+                                    ) {
                                         XmoTheme.Light ->
                                             .44f
 
@@ -103,7 +127,8 @@ internal fun PlayerBackground(
                                     }
                             ),
                             bright.copy(
-                                alpha = .20f
+                                alpha =
+                                    .20f
                             ),
                             Color.Transparent
                         ),
@@ -123,16 +148,18 @@ internal fun PlayerBackground(
         )
 
         /*
-         * Upper-right secondary cloud.
+         * Upper-right secondary splash.
          */
         drawRect(
             brush =
                 Brush.radialGradient(
                     colors =
                         listOf(
-                            second.copy(
+                            secondary.copy(
                                 alpha =
-                                    when (theme) {
+                                    when (
+                                        theme
+                                    ) {
                                         XmoTheme.Light ->
                                             .33f
 
@@ -143,8 +170,9 @@ internal fun PlayerBackground(
                                             .29f
                                     }
                             ),
-                            second.copy(
-                                alpha = .12f
+                            secondary.copy(
+                                alpha =
+                                    .12f
                             ),
                             Color.Transparent
                         ),
@@ -164,8 +192,8 @@ internal fun PlayerBackground(
         )
 
         /*
-         * Broad middle field spreads artwork hue instead of
-         * leaving one obvious radial circle.
+         * Oversized center cloud prevents obvious circular spots
+         * and distributes the cover hue through the screen.
          */
         drawRect(
             brush =
@@ -174,7 +202,9 @@ internal fun PlayerBackground(
                         listOf(
                             soft.copy(
                                 alpha =
-                                    when (theme) {
+                                    when (
+                                        theme
+                                    ) {
                                         XmoTheme.Light ->
                                             .30f
 
@@ -186,7 +216,8 @@ internal fun PlayerBackground(
                                     }
                             ),
                             soft.copy(
-                                alpha = .11f
+                                alpha =
+                                    .11f
                             ),
                             Color.Transparent
                         ),
@@ -206,17 +237,19 @@ internal fun PlayerBackground(
         )
 
         /*
-         * Lower-left field remains visible through the translucent
-         * information/transport panel.
+         * Lower-left cloud remains visible through the translucent
+         * player panel.
          */
         drawRect(
             brush =
                 Brush.radialGradient(
                     colors =
                         listOf(
-                            second.copy(
+                            secondary.copy(
                                 alpha =
-                                    when (theme) {
+                                    when (
+                                        theme
+                                    ) {
                                         XmoTheme.Light ->
                                             .26f
 
@@ -245,7 +278,7 @@ internal fun PlayerBackground(
         )
 
         /*
-         * Lower-right balancing field.
+         * Lower-right balancing cloud.
          */
         drawRect(
             brush =
@@ -254,7 +287,9 @@ internal fun PlayerBackground(
                         listOf(
                             bright.copy(
                                 alpha =
-                                    when (theme) {
+                                    when (
+                                        theme
+                                    ) {
                                         XmoTheme.Light ->
                                             .25f
 
@@ -283,23 +318,28 @@ internal fun PlayerBackground(
         )
 
         /*
-         * Very light finishing veil. It never replaces artwork
-         * color with a solid theme block.
+         * Tiny finishing veil keeps Light, Dark and AMOLED
+         * distinct without covering artwork color.
          */
-        when (theme) {
+        when (
+            theme
+        ) {
             XmoTheme.Light -> {
                 drawRect(
                     brush =
                         Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(
-                                    alpha = .04f
-                                ),
-                                Color.Transparent,
-                                Color.White.copy(
-                                    alpha = .07f
+                            colors =
+                                listOf(
+                                    Color.White.copy(
+                                        alpha =
+                                            .04f
+                                    ),
+                                    Color.Transparent,
+                                    Color.White.copy(
+                                        alpha =
+                                            .07f
+                                    )
                                 )
-                            )
                         )
                 )
             }
@@ -308,15 +348,18 @@ internal fun PlayerBackground(
                 drawRect(
                     brush =
                         Brush.verticalGradient(
-                            listOf(
-                                Color.White.copy(
-                                    alpha = .012f
-                                ),
-                                Color.Transparent,
-                                Color.Black.copy(
-                                    alpha = .035f
+                            colors =
+                                listOf(
+                                    Color.White.copy(
+                                        alpha =
+                                            .012f
+                                    ),
+                                    Color.Transparent,
+                                    Color.Black.copy(
+                                        alpha =
+                                            .035f
+                                    )
                                 )
-                            )
                         )
                 )
             }
@@ -325,15 +368,18 @@ internal fun PlayerBackground(
                 drawRect(
                     brush =
                         Brush.verticalGradient(
-                            listOf(
-                                Color.Transparent,
-                                Color.Black.copy(
-                                    alpha = .035f
-                                ),
-                                Color.Black.copy(
-                                    alpha = .075f
+                            colors =
+                                listOf(
+                                    Color.Transparent,
+                                    Color.Black.copy(
+                                        alpha =
+                                            .035f
+                                    ),
+                                    Color.Black.copy(
+                                        alpha =
+                                            .075f
+                                    )
                                 )
-                            )
                         )
                 )
             }
@@ -359,6 +405,7 @@ private fun brightenSplash(
                         color.red
                     ) *
                 value,
+
         green =
             color.green +
                 (
@@ -366,6 +413,7 @@ private fun brightenSplash(
                         color.green
                     ) *
                 value,
+
         blue =
             color.blue +
                 (
@@ -373,6 +421,8 @@ private fun brightenSplash(
                         color.blue
                     ) *
                 value,
-        alpha = 1f
+
+        alpha =
+            1f
     )
 }
