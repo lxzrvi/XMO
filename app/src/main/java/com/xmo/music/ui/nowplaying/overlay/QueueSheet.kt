@@ -4,12 +4,15 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,14 +20,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -37,12 +41,12 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
-import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
 @Composable
@@ -50,6 +54,7 @@ internal fun QueueSheet(
     queue: List<Song>,
     currentSongId: Long?,
     colors: HomeColors,
+    playIndex: (Int) -> Unit,
     dismiss: () -> Unit
 ) {
     val scope =
@@ -60,8 +65,14 @@ internal fun QueueSheet(
             Animatable(0f)
         }
 
-    var measuredHeight by remember {
+    var sheetHeightPx by remember {
         mutableFloatStateOf(1f)
+    }
+
+    var menuIndex by remember {
+        mutableStateOf<Int?>(
+            null
+        )
     }
 
     val sheetHeight =
@@ -70,33 +81,35 @@ internal fun QueueSheet(
             .72f
 
     Box(
-        Modifier
-            .fillMaxSize()
-            .background(
-                Color.Black.copy(
-                    alpha = .12f
-                )
-            )
-            /*
-             * Passive full-screen hit target:
-             * no ripple, no press dim, no fake long-press state.
-             */
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent()
-                    }
-                }
-            },
-        contentAlignment =
-            Alignment.BottomCenter
+        Modifier.fillMaxSize()
     ) {
+        /*
+         * Backdrop closes the queue.
+         *
+         * No Material indication/press effect.
+         */
+        Box(
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Color.Black.copy(
+                        alpha = .10f
+                    )
+                )
+                .simpleTap(
+                    dismiss
+                )
+        )
+
         Column(
             Modifier
+                .align(
+                    Alignment.BottomCenter
+                )
                 .fillMaxWidth()
                 .height(sheetHeight)
                 .onSizeChanged {
-                    measuredHeight =
+                    sheetHeightPx =
                         it.height
                             .toFloat()
                             .coerceAtLeast(
@@ -122,7 +135,7 @@ internal fun QueueSheet(
                     .fillMaxWidth()
                     .height(38.dp)
                     .pointerInput(
-                        measuredHeight
+                        sheetHeightPx
                     ) {
                         detectDragGestures(
                             onDrag = {
@@ -144,7 +157,7 @@ internal fun QueueSheet(
                                                 )
                                                 .coerceIn(
                                                     0f,
-                                                    measuredHeight
+                                                    sheetHeightPx
                                                 )
                                         )
                                     }
@@ -155,12 +168,12 @@ internal fun QueueSheet(
                                 scope.launch {
                                     if (
                                         sheetY.value >
-                                        measuredHeight *
+                                        sheetHeightPx *
                                             .13f
                                     ) {
                                         sheetY.animateTo(
                                             targetValue =
-                                                measuredHeight,
+                                                sheetHeightPx,
                                             animationSpec =
                                                 tween(280)
                                         )
@@ -221,13 +234,10 @@ internal fun QueueSheet(
 
             Text(
                 text = "Queue",
-                color =
-                    colors.text,
+                color = colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize =
-                    androidx.compose.ui.unit
-                        .TextUnit.Unspecified,
+                fontSize = 19.sp,
                 modifier =
                     Modifier.padding(
                         start = 18.dp,
@@ -250,22 +260,51 @@ internal fun QueueSheet(
                         6.dp
                     )
             ) {
-                items(
+                itemsIndexed(
                     items = queue,
                     key = {
-                        it.id
+                            _,
+                            song ->
+
+                        song.id
                     }
-                ) { song ->
+                ) {
+                        index,
+                        song ->
+
                     QueueRow(
                         song = song,
                         active =
                             song.id ==
                                 currentSongId,
-                        colors =
-                            colors
+                        colors = colors,
+                        onClick = {
+                            playIndex(index)
+                        },
+                        onLongClick = {
+                            menuIndex =
+                                index
+                        }
                     )
                 }
             }
+        }
+
+        menuIndex?.let { index ->
+            queue.getOrNull(index)
+                ?.let { song ->
+                    QueueActionMenu(
+                        song = song,
+                        colors = colors,
+                        play = {
+                            playIndex(index)
+                            menuIndex = null
+                        },
+                        dismiss = {
+                            menuIndex = null
+                        }
+                    )
+                }
         }
     }
 }
@@ -274,10 +313,17 @@ internal fun QueueSheet(
 private fun QueueRow(
     song: Song,
     active: Boolean,
-    colors: HomeColors
+    colors: HomeColors,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
 ) {
     val accent =
         LocalXmoAccent.current
+
+    val interaction =
+        remember {
+            MutableInteractionSource()
+        }
 
     Row(
         Modifier
@@ -296,6 +342,15 @@ private fun QueueRow(
                 } else {
                     colors.button
                 }
+            )
+            .combinedClickable(
+                interactionSource =
+                    interaction,
+                indication = null,
+                onClick =
+                    onClick,
+                onLongClick =
+                    onLongClick
             )
             .padding(5.dp),
         verticalAlignment =
@@ -339,9 +394,7 @@ private fun QueueRow(
                     },
                 fontFamily =
                     XmoFont.bold,
-                fontSize =
-                    androidx.compose.ui.unit
-                        .TextUnit.Unspecified,
+                fontSize = 12.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis
@@ -354,13 +407,102 @@ private fun QueueRow(
                     colors.sub,
                 fontFamily =
                     XmoFont.normal,
-                fontSize =
-                    androidx.compose.ui.unit
-                        .TextUnit.Unspecified,
+                fontSize = 10.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis
             )
+        }
+    }
+}
+
+@Composable
+private fun QueueActionMenu(
+    song: Song,
+    colors: HomeColors,
+    play: () -> Unit,
+    dismiss: () -> Unit
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .simpleTap(
+                dismiss
+            ),
+        contentAlignment =
+            Alignment.Center
+    ) {
+        Column(
+            Modifier
+                .padding(
+                    horizontal = 42.dp
+                )
+                .fillMaxWidth()
+                .clip(
+                    RoundedCornerShape(
+                        22.dp
+                    )
+                )
+                .background(
+                    colors.surface
+                )
+                .padding(14.dp)
+        ) {
+            Text(
+                text = song.title,
+                color = colors.text,
+                fontFamily =
+                    XmoFont.bold,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow =
+                    TextOverflow.Ellipsis
+            )
+
+            Text(
+                text = song.artist,
+                color = colors.sub,
+                fontFamily =
+                    XmoFont.normal,
+                fontSize = 10.sp,
+                maxLines = 1
+            )
+
+            Spacer(
+                Modifier.height(10.dp)
+            )
+
+            PressButton(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(44.dp),
+                onClick = play
+            ) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .clip(
+                            RoundedCornerShape(
+                                13.dp
+                            )
+                        )
+                        .background(
+                            colors.button
+                        ),
+                    contentAlignment =
+                        Alignment.Center
+                ) {
+                    Text(
+                        text = "Play",
+                        color =
+                            colors.text,
+                        fontFamily =
+                            XmoFont.medium,
+                        fontSize = 12.sp
+                    )
+                }
+            }
         }
     }
 }
