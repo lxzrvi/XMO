@@ -212,6 +212,9 @@ fun NowPlaying(
                 displayColor
         )
 
+    var sleepTotalMs by remember {
+        mutableStateOf<Long?>(null)
+    }
     /*
      * =========================================================
      * POSITION
@@ -219,21 +222,13 @@ fun NowPlaying(
      */
 
     LaunchedEffect(
-        state.currentSongId,
-        state.isPlaying
+        state.sleepTimerRemainingMs
     ) {
-        while (isActive) {
-            refreshPosition()
-
-            delay(
-                if (
-                    state.isPlaying
-                ) {
-                    250L
-                } else {
-                    500L
-                }
-            )
+        if (
+            state.sleepTimerRemainingMs <=
+            0L
+        ) {
+            sleepTotalMs = null
         }
     }
 
@@ -594,9 +589,10 @@ fun NowPlaying(
                     liked = liked,
                     inCategory =
                         inCategory,
-                    sleepActive =
-                        state.sleepTimerRemainingMs >
-                            0L,
+                    sleepRemainingMs =
+                        state.sleepTimerRemainingMs,
+                    sleepTotalMs =
+                        sleepTotalMs,
                     colors = colors,
                     accent = accent,
                     toggleLike = {
@@ -771,26 +767,23 @@ fun NowPlaying(
                     dismiss = {
                         overlay = null
                     },
-                    setTimer = {
-                            duration,
-                            label ->
-
-                        setSleepTimer(
-                            duration
-                        )
-
+                    setTimer = { duration, label ->
+                        sleepTotalMs = duration
+                        setSleepTimer(duration)
+                    
                         overlay = null
-
+                    
                         pop =
                             PopMessage(
                                 "Sleep timer set for $label"
                             )
                     },
                     cancel = {
+                        sleepTotalMs = null
                         cancelSleepTimer()
-
+                    
                         overlay = null
-
+                    
                         pop =
                             PopMessage(
                                 "Sleep timer cancelled"
