@@ -40,6 +40,7 @@ import com.xmo.music.data.SongLyrics
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
+import com.xmo.music.XmoTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 
