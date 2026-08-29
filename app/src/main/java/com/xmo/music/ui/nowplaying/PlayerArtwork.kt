@@ -43,6 +43,13 @@ import com.xmo.music.ui.XmoFont
 import com.xmo.music.XmoTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 
 @Composable
 internal fun PlayerArtwork(
@@ -289,18 +296,65 @@ internal fun PlayerArtwork(
                     )
                 }
         ) {
-            if (showLyrics) {
-                ArtworkLyrics(
-                    lyrics = lyrics,
-                    position = position,
-                    colors = colors,
-                    accent = accent,
-                    theme = theme,
-                    pickLyrics = pickLyrics,
-                    fullscreenLyrics =
-                        fullscreenLyrics,
-                    showArtwork =
-                        toggleLyrics,
+            AnimatedContent(
+    targetState = showLyrics,
+    transitionSpec = {
+        (
+            fadeIn(
+                animationSpec =
+                    tween(260)
+            ) +
+                scaleIn(
+                    initialScale = .965f,
+                    animationSpec =
+                        tween(300)
+                )
+            )
+            .togetherWith(
+                fadeOut(
+                    animationSpec =
+                        tween(210)
+                ) +
+                    scaleOut(
+                        targetScale = 1.025f,
+                        animationSpec =
+                            tween(240)
+                    )
+            )
+    },
+    label = "artworkLyrics"
+) { lyricsVisible ->
+
+    if (lyricsVisible) {
+        ArtworkLyrics(
+            lyrics = lyrics,
+            position = position,
+            colors = colors,
+            accent = accent,
+            theme = theme,
+            pickLyrics = pickLyrics,
+            fullscreenLyrics =
+                fullscreenLyrics,
+            showArtwork =
+                toggleLyrics,
+            modifier =
+                Modifier
+                    .padding(
+                        horizontal = 17.dp
+                    )
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .align(
+                        Alignment.Center
+                    )
+        )
+    } else {
+        Box(
+            Modifier.fillMaxSize()
+        ) {
+            snapshotPrevious?.let { uri ->
+                Cover(
+                    uri = uri,
                     modifier =
                         Modifier
                             .padding(
@@ -311,29 +365,65 @@ internal fun PlayerArtwork(
                             .align(
                                 Alignment.Center
                             )
+                            .graphicsLayer {
+                                translationX =
+                                    x.value -
+                                        width
+                            }
                 )
-            } else {
-                snapshotPrevious?.let { uri ->
-                    Cover(
-                        uri = uri,
-                        modifier =
-                            Modifier
-                                .padding(
-                                    horizontal =
-                                        17.dp
-                                )
-                                .fillMaxWidth()
-                                .aspectRatio(1f)
-                                .align(
-                                    Alignment.Center
-                                )
-                                .graphicsLayer {
-                                    translationX =
-                                        x.value -
-                                            width
-                                }
-                    )
-                }
+            }
+
+            Cover(
+                uri =
+                    snapshotCurrent,
+                modifier =
+                    Modifier
+                        .padding(
+                            horizontal = 17.dp
+                        )
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .align(
+                            Alignment.Center
+                        )
+                        .graphicsLayer {
+                            translationX =
+                                x.value
+                        }
+                        .clickable(
+                            interactionSource =
+                                remember {
+                                    MutableInteractionSource()
+                                },
+                            indication = null,
+                            onClick =
+                                toggleLyrics
+                        )
+            )
+
+            snapshotNext?.let { uri ->
+                Cover(
+                    uri = uri,
+                    modifier =
+                        Modifier
+                            .padding(
+                                horizontal = 17.dp
+                            )
+                            .fillMaxWidth()
+                            .aspectRatio(1f)
+                            .align(
+                                Alignment.Center
+                            )
+                            .graphicsLayer {
+                                translationX =
+                                    x.value +
+                                        width
+                            }
+                )
+            }
+        }
+    }
+}
 
                 Cover(
                     uri = snapshotCurrent,
