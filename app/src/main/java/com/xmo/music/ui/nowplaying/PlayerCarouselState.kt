@@ -18,69 +18,134 @@ internal class PlayerCarouselState(
     initialNext: Uri?
 ) {
     val x =
-        Animatable(0f)
+        Animatable(
+            0f
+        )
 
     /*
-     * Carousel page width.
-     *
-     * Important:
-     * This is the HOST width again, not artwork width.
-     *
-     * The artwork itself keeps its 17dp inset. Previous and next
-     * covers therefore retain the original visual separation.
+     * One page is the complete square artwork host.
      */
     var width by
-        mutableStateOf(1f)
-
-    var manualDirection by
-        mutableIntStateOf(0)
-
-    var manualSongId by
-        mutableStateOf<Long?>(null)
-
-    var autoAnimating by
-        mutableStateOf(false)
-
-    var autoDirection by
-        mutableIntStateOf(0)
+        mutableStateOf(
+            1f
+        )
 
     /*
-     * ONE frozen visual queue window.
+     *  0 = idle
+     *  1 = next
+     * -1 = previous
+     */
+    var manualDirection by
+        mutableIntStateOf(
+            0
+        )
+
+    var manualSongId by
+        mutableStateOf<Long?>(
+            null
+        )
+
+    var autoAnimating by
+        mutableStateOf(
+            false
+        )
+
+    var autoDirection by
+        mutableIntStateOf(
+            0
+        )
+
+    /*
+     * =========================================================
+     * FROZEN VISUAL QUEUE WINDOW
+     * =========================================================
      *
-     * Artwork and Palette both consume these values. Live queue
-     * recomposition cannot replace the destination halfway
-     * through an animation.
+     * Both artwork rendering and Palette extraction consume this
+     * exact same window.
      */
     var visualSongId by
-        mutableStateOf(initialId)
+        mutableStateOf(
+            initialId
+        )
         private set
 
     var visualIndex by
-        mutableIntStateOf(initialIndex)
+        mutableIntStateOf(
+            initialIndex
+        )
         private set
 
     var visualCurrent by
-        mutableStateOf(initialCurrent)
+        mutableStateOf(
+            initialCurrent
+        )
         private set
 
     var visualPrevious by
-        mutableStateOf(initialPrevious)
+        mutableStateOf(
+            initialPrevious
+        )
         private set
 
     var visualNext by
-        mutableStateOf(initialNext)
+        mutableStateOf(
+            initialNext
+        )
         private set
 
     val transactionActive: Boolean
         get() =
-            manualDirection != 0 ||
+            manualDirection !=
+                0 ||
                 autoAnimating
 
     val isResting: Boolean
         get() =
             !transactionActive &&
-                abs(x.value) < 1f
+                abs(
+                    x.value
+                ) <
+                1f
 
+    /*
+     * Handles first composition if Media3 current item was not
+     * available when this state object was created.
+     */
+    fun initializeIfEmpty(
+        id: Long?,
+        index: Int,
+        current: Uri?,
+        previous: Uri?,
+        next: Uri?
+    ) {
+        if (
+            transactionActive ||
+            id == null ||
+            visualSongId !=
+            null
+        ) {
+            return
+        }
+
+        adoptWindow(
+            id =
+                id,
+            index =
+                index,
+            current =
+                current,
+            previous =
+                previous,
+            next =
+                next
+        )
+    }
+
+    /*
+     * Artwork/neighbor metadata may refresh for the SAME visual
+     * song. A different live Media3 song cannot overwrite the
+     * frozen transaction window through this method.
+     */
     fun updateIdleWindow(
         id: Long?,
         index: Int,
@@ -88,24 +153,33 @@ internal class PlayerCarouselState(
         previous: Uri?,
         next: Uri?
     ) {
-        if (transactionActive) {
+        if (
+            transactionActive ||
+            id !=
+            visualSongId
+        ) {
             return
         }
 
-        if (id != visualSongId) {
-            return
-        }
+        visualIndex =
+            index
 
-        visualIndex = index
-        visualCurrent = current
-        visualPrevious = previous
-        visualNext = next
+        visualCurrent =
+            current
+
+        visualPrevious =
+            previous
+
+        visualNext =
+            next
     }
 
     fun beginManual(
         direction: Int
     ) {
-        if (transactionActive) {
+        if (
+            transactionActive
+        ) {
             return
         }
 
@@ -115,7 +189,10 @@ internal class PlayerCarouselState(
                 1
             )
 
-        if (normalized == 0) {
+        if (
+            normalized ==
+            0
+        ) {
             return
         }
 
@@ -134,36 +211,60 @@ internal class PlayerCarouselState(
         next: Uri?
     ) {
         adoptWindow(
-            id = id,
-            index = index,
-            current = current,
-            previous = previous,
-            next = next
+            id =
+                id,
+            index =
+                index,
+            current =
+                current,
+            previous =
+                previous,
+            next =
+                next
         )
 
-        manualDirection = 0
-        manualSongId = null
+        manualDirection =
+            0
+
+        manualSongId =
+            null
     }
 
     fun cancelManual() {
-        manualDirection = 0
-        manualSongId = null
+        manualDirection =
+            0
+
+        manualSongId =
+            null
     }
 
     fun beginAutomatic(
         direction: Int
     ) {
-        if (transactionActive) {
+        if (
+            transactionActive
+        ) {
             return
         }
 
-        autoDirection =
+        val normalized =
             direction.coerceIn(
                 -1,
                 1
             )
 
-        autoAnimating = true
+        if (
+            normalized ==
+            0
+        ) {
+            return
+        }
+
+        autoDirection =
+            normalized
+
+        autoAnimating =
+            true
     }
 
     fun finishAutomatic(
@@ -174,15 +275,54 @@ internal class PlayerCarouselState(
         next: Uri?
     ) {
         adoptWindow(
-            id = id,
-            index = index,
-            current = current,
-            previous = previous,
-            next = next
+            id =
+                id,
+            index =
+                index,
+            current =
+                current,
+            previous =
+                previous,
+            next =
+                next
         )
 
-        autoDirection = 0
-        autoAnimating = false
+        autoDirection =
+            0
+
+        autoAnimating =
+            false
+    }
+
+    /*
+     * For a real external queue jump where the new item is not
+     * one of the frozen adjacent covers.
+     */
+    fun adoptExternalWindow(
+        id: Long?,
+        index: Int,
+        current: Uri?,
+        previous: Uri?,
+        next: Uri?
+    ) {
+        if (
+            transactionActive
+        ) {
+            return
+        }
+
+        adoptWindow(
+            id =
+                id,
+            index =
+                index,
+            current =
+                current,
+            previous =
+                previous,
+            next =
+                next
+        )
     }
 
     private fun adoptWindow(
@@ -192,10 +332,19 @@ internal class PlayerCarouselState(
         previous: Uri?,
         next: Uri?
     ) {
-        visualSongId = id
-        visualIndex = index
-        visualCurrent = current
-        visualPrevious = previous
-        visualNext = next
+        visualSongId =
+            id
+
+        visualIndex =
+            index
+
+        visualCurrent =
+            current
+
+        visualPrevious =
+            previous
+
+        visualNext =
+            next
     }
 }
