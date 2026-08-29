@@ -27,7 +27,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -163,13 +162,9 @@ fun NowPlaying(
      * =========================================================
      */
 
-    val coverX =
-        remember {
-            Animatable(0f)
-        }
-
-    var coverWidth by remember {
-        mutableFloatStateOf(1f)
+    val carousel =
+    remember {
+        PlayerCarouselState()
     }
 
     val fallbackArtwork =
@@ -189,14 +184,14 @@ fun NowPlaying(
                 nextSong?.artwork,
             currentSongId =
                 state.currentSongId,
-            coverX = coverX
+            coverX = carousel.x
         )
 
     val displayColor =
         playerDisplayColor(
             colors = artworkColors,
-            coverX = coverX.value,
-            coverWidth = coverWidth
+            coverX = carousel.x.value,
+            coverWidth = carousel.width
         )
 
     val deep =
@@ -519,13 +514,8 @@ fun NowPlaying(
                     state.hasPrevious,
                 canNext =
                     state.hasNext,
-                x = coverX,
-                setWidth = {
-                    coverWidth =
-                        it.coerceAtLeast(
-                            1f
-                        )
-                },
+                currentIndex = currentIndex,
+                carousel = carousel,
                 showLyrics =
                     artworkLyrics,
                 lyrics = lyrics,
