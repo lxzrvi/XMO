@@ -477,8 +477,13 @@ internal fun formatBytes(
     internal fun Modifier.simpleTap(
         action: () -> Unit
     ): Modifier =
-        clickable(
-            interactionSource = null,
-            indication = null,
-            onClick = action
-        )
+        composed {
+            clickable(
+                interactionSource =
+                    remember {
+                        MutableInteractionSource()
+                    },
+                indication = null,
+                onClick = action
+            )
+        }
