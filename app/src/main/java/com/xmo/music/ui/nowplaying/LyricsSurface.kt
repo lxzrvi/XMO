@@ -58,9 +58,12 @@ internal fun ArtworkLyrics(
 
     val surface by
         animateColorAsState(
-            targetValue = targetSurface,
+            targetValue =
+                targetSurface,
             animationSpec =
-                tween(400),
+                tween(
+                    durationMillis = 400
+                ),
             label =
                 "lyricsSurface"
         )
@@ -73,14 +76,14 @@ internal fun ArtworkLyrics(
                         24.dp
                     )
                 )
-                .background(surface)
+                .background(
+                    surface
+                )
     ) {
         /*
-         * List gets the complete card viewport.
-         *
-         * Controls float above it instead of changing the list
-         * height, therefore its mathematical center remains the
-         * artwork card center.
+         * Controls float over the lyrics instead of consuming
+         * list height. The list viewport centre therefore remains
+         * exactly the artwork-card centre.
          */
         FollowLyrics(
             lyrics = lyrics,
@@ -102,20 +105,26 @@ internal fun ArtworkLyrics(
                     .align(
                         Alignment.TopEnd
                     )
-                    .padding(10.dp)
+                    .padding(
+                        10.dp
+                    )
         ) {
             CapsuleButton(
                 size = 38.dp,
-                onClick = pickLyrics
+                onClick =
+                    pickLyrics
             ) {
                 Icon(
                     imageVector =
                         Lucide.Plus,
                     contentDescription =
                         "Choose local lyrics",
-                    tint = colors.text,
+                    tint =
+                        colors.text,
                     modifier =
-                        Modifier.size(18.dp)
+                        Modifier.size(
+                            18.dp
+                        )
                 )
             }
 
@@ -129,24 +138,31 @@ internal fun ArtworkLyrics(
                         Lucide.Expand,
                     contentDescription =
                         "Fullscreen lyrics",
-                    tint = colors.text,
+                    tint =
+                        colors.text,
                     modifier =
-                        Modifier.size(18.dp)
+                        Modifier.size(
+                            18.dp
+                        )
                 )
             }
 
             CapsuleButton(
                 size = 38.dp,
-                onClick = showArtwork
+                onClick =
+                    showArtwork
             ) {
                 Icon(
                     imageVector =
                         Lucide.X,
                     contentDescription =
                         "Show artwork",
-                    tint = colors.text,
+                    tint =
+                        colors.text,
                     modifier =
-                        Modifier.size(18.dp)
+                        Modifier.size(
+                            18.dp
+                        )
                 )
             }
         }
