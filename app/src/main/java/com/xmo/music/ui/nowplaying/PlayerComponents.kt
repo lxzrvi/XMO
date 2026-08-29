@@ -53,11 +53,15 @@ internal fun PremiumCircle(
     val scale by
         animateFloatAsState(
             targetValue =
-                if (pressed) .90f else 1f,
+                if (pressed) {
+                    .88f
+                } else {
+                    1f
+                },
             animationSpec =
                 spring(
                     dampingRatio = .62f,
-                    stiffness = 700f
+                    stiffness = 720f
                 ),
             label = "premiumPress"
         )
@@ -71,17 +75,76 @@ internal fun PremiumCircle(
 
                 alpha =
                     when {
-                        !enabled -> .40f
+                        !enabled -> .35f
                         pressed -> .78f
                         else -> 1f
                     }
             }
             .background(
-                background,
-                CircleShape
+                color = background,
+                shape = CircleShape
             )
             .clickable(
-                interactionSource = interaction,
+                interactionSource =
+                    interaction,
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            ),
+        contentAlignment =
+            Alignment.Center
+    ) {
+        content()
+    }
+}
+
+@Composable
+internal fun PressButton(
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    onClick: () -> Unit,
+    content: @Composable () -> Unit
+) {
+    val interaction =
+        remember {
+            MutableInteractionSource()
+        }
+
+    val pressed by
+        interaction.collectIsPressedAsState()
+
+    val scale by
+        animateFloatAsState(
+            targetValue =
+                if (pressed) {
+                    .88f
+                } else {
+                    1f
+                },
+            animationSpec =
+                spring(
+                    dampingRatio = .62f,
+                    stiffness = 720f
+                ),
+            label = "pressButton"
+        )
+
+    Box(
+        modifier
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+
+                alpha =
+                    when {
+                        !enabled -> .35f
+                        pressed -> .76f
+                        else -> 1f
+                    }
+            }
+            .clickable(
+                interactionSource =
+                    interaction,
                 indication = null,
                 enabled = enabled,
                 onClick = onClick
@@ -101,48 +164,13 @@ internal fun BarePlayerButton(
     onClick: () -> Unit,
     content: @Composable () -> Unit
 ) {
-    val interaction =
-        remember {
-            MutableInteractionSource()
-        }
-
-    val pressed by
-        interaction.collectIsPressedAsState()
-
-    val scale by
-        animateFloatAsState(
-            targetValue =
-                if (pressed) .86f else 1f,
-            animationSpec =
-                spring(
-                    dampingRatio = .64f,
-                    stiffness = 720f
-                ),
-            label = "playerPress"
-        )
-
-    Box(
-        modifier
-            .size(size)
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-
-                alpha =
-                    if (enabled) 1f
-                    else .30f
-            }
-            .clickable(
-                interactionSource = interaction,
-                indication = null,
-                enabled = enabled,
-                onClick = onClick
-            ),
-        contentAlignment =
-            Alignment.Center
-    ) {
-        content()
-    }
+    PressButton(
+        modifier =
+            modifier.size(size),
+        enabled = enabled,
+        onClick = onClick,
+        content = content
+    )
 }
 
 @Composable
@@ -155,10 +183,13 @@ internal fun XmoCapsule(
     Row(
         modifier
             .background(
-                background,
-                RoundedCornerShape(23.dp)
+                color = background,
+                shape =
+                    RoundedCornerShape(23.dp)
             )
-            .padding(horizontal = 2.dp),
+            .padding(
+                horizontal = 2.dp
+            ),
         verticalAlignment =
             Alignment.CenterVertically,
         content = content
@@ -174,7 +205,8 @@ internal fun CapsuleButton(
 ) {
     PremiumCircle(
         size = size,
-        background = Color.Transparent,
+        background =
+            Color.Transparent,
         enabled = enabled,
         onClick = onClick,
         content = content
@@ -194,11 +226,11 @@ internal fun RoundedSeekBar(
         mutableStateOf(false)
     }
 
-    var draggedFraction by remember {
+    var dragFraction by remember {
         mutableFloatStateOf(0f)
     }
 
-    val actualFraction =
+    val positionFraction =
         if (duration > 0L) {
             (
                 position.toFloat() /
@@ -211,16 +243,15 @@ internal fun RoundedSeekBar(
 
     val fraction =
         if (dragging) {
-            draggedFraction
+            dragFraction
         } else {
-            actualFraction
+            positionFraction
         }
 
     Canvas(
         modifier
             .fillMaxWidth()
             .height(26.dp)
-            // requested 4dp downward placement
             .padding(top = 4.dp)
             .pointerInput(duration) {
                 detectDragGestures(
@@ -231,17 +262,20 @@ internal fun RoundedSeekBar(
 
                         dragging = true
 
-                        draggedFraction =
+                        dragFraction =
                             (
                                 offset.x /
                                     size.width
                                 )
-                                .coerceIn(0f, 1f)
+                                .coerceIn(
+                                    0f,
+                                    1f
+                                )
 
                         seekTo(
                             (
                                 duration *
-                                    draggedFraction
+                                    dragFraction
                                 ).toLong()
                         )
                     },
@@ -256,17 +290,20 @@ internal fun RoundedSeekBar(
 
                         change.consume()
 
-                        draggedFraction =
+                        dragFraction =
                             (
                                 change.position.x /
                                     size.width
                                 )
-                                .coerceIn(0f, 1f)
+                                .coerceIn(
+                                    0f,
+                                    1f
+                                )
 
                         seekTo(
                             (
                                 duration *
-                                    draggedFraction
+                                    dragFraction
                                 ).toLong()
                         )
                     },
@@ -279,7 +316,7 @@ internal fun RoundedSeekBar(
                             seekTo(
                                 (
                                     duration *
-                                        draggedFraction
+                                        dragFraction
                                     ).toLong()
                             )
                         }
@@ -298,17 +335,20 @@ internal fun RoundedSeekBar(
                         return@detectTapGestures
                     }
 
-                    val value =
+                    val target =
                         (
                             offset.x /
                                 size.width
                             )
-                            .coerceIn(0f, 1f)
+                            .coerceIn(
+                                0f,
+                                1f
+                            )
 
                     seekTo(
                         (
                             duration *
-                                value
+                                target
                             ).toLong()
                     )
                 }
@@ -322,13 +362,15 @@ internal fun RoundedSeekBar(
 
         drawLine(
             color = inactive,
-            start = Offset(0f, y),
+            start =
+                Offset(0f, y),
             end =
                 Offset(
                     size.width,
                     y
                 ),
-            strokeWidth = stroke,
+            strokeWidth =
+                stroke,
             cap =
                 androidx.compose.ui.graphics
                     .StrokeCap.Round
@@ -337,32 +379,23 @@ internal fun RoundedSeekBar(
         if (fraction > 0f) {
             drawLine(
                 color = active,
-                start = Offset(0f, y),
+                start =
+                    Offset(0f, y),
                 end =
                     Offset(
                         size.width *
                             fraction,
                         y
                     ),
-                strokeWidth = stroke,
+                strokeWidth =
+                    stroke,
                 cap =
                     androidx.compose.ui.graphics
                         .StrokeCap.Round
             )
         }
 
-        if (dragging) {
-            drawCircle(
-                color = active,
-                radius = 5.dp.toPx(),
-                center =
-                    Offset(
-                        size.width *
-                            fraction,
-                        y
-                    )
-            )
-        }
+        // Deliberately no seek thumb/ball.
     }
 }
 
@@ -381,7 +414,7 @@ internal fun playerTime(
         (seconds % 3_600L) /
             60L
 
-    val remaining =
+    val remainder =
         seconds % 60L
 
     return if (hours > 0L) {
@@ -390,13 +423,13 @@ internal fun playerTime(
                 .toString()
                 .padStart(2, '0')
         }:${
-            remaining
+            remainder
                 .toString()
                 .padStart(2, '0')
         }"
     } else {
         "$minutes:${
-            remaining
+            remainder
                 .toString()
                 .padStart(2, '0')
         }"
@@ -409,7 +442,6 @@ internal fun formatBytes(
     when {
         bytes >=
             1024L * 1024L * 1024L ->
-
             String.format(
                 "%.2f GB",
                 bytes.toDouble() /
@@ -422,7 +454,6 @@ internal fun formatBytes(
 
         bytes >=
             1024L * 1024L ->
-
             String.format(
                 "%.1f MB",
                 bytes.toDouble() /
@@ -433,7 +464,6 @@ internal fun formatBytes(
             )
 
         bytes >= 1024L ->
-
             String.format(
                 "%.1f KB",
                 bytes.toDouble() /
