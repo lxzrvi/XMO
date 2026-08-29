@@ -6,25 +6,8 @@ import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,14 +16,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
 import com.xmo.music.data.SongLyrics
@@ -98,6 +74,12 @@ fun NowPlaying(
 
     val accent =
         LocalXmoAccent.current
+
+    /*
+     * =========================================================
+     * REAL QUEUE WINDOW
+     * =========================================================
+     */
 
     val currentIndex =
         state.currentIndex
@@ -160,6 +142,12 @@ fun NowPlaying(
             }
         }
 
+    /*
+     * =========================================================
+     * CAROUSEL + ARTWORK COLORS
+     * =========================================================
+     */
+
     val carousel =
         remember {
             PlayerCarouselState()
@@ -213,10 +201,17 @@ fun NowPlaying(
 
     val themeColors =
         playerThemeColors(
-            theme = theme,
+            theme =
+                theme,
             displayColor =
                 displayColor
         )
+
+    /*
+     * =========================================================
+     * POSITION POLLING
+     * =========================================================
+     */
 
     LaunchedEffect(
         state.currentSongId,
@@ -238,6 +233,12 @@ fun NowPlaying(
             )
         }
     }
+
+    /*
+     * =========================================================
+     * LOCAL LYRICS
+     * =========================================================
+     */
 
     var fileLyrics by
         remember(
@@ -292,6 +293,12 @@ fun NowPlaying(
             }
         }
 
+    /*
+     * =========================================================
+     * PLAYER UI STATE
+     * =========================================================
+     */
+
     var overlay by
         remember {
             mutableStateOf<PlayerOverlay?>(
@@ -300,10 +307,10 @@ fun NowPlaying(
         }
 
     /*
-     * Deliberately NOT keyed to currentSongId.
+     * Intentionally independent from currentSongId.
      *
-     * If artwork-size lyrics are open, changing the real song
-     * keeps the player in the same lyrics mode.
+     * If small lyrics are open while changing song, small lyrics
+     * remain open for the confirmed next/previous song.
      */
     var artworkLyrics by
         remember {
@@ -344,6 +351,12 @@ fun NowPlaying(
                 null
         }
     }
+
+    /*
+     * =========================================================
+     * PLAYER OPEN / CLOSE
+     * =========================================================
+     */
 
     val entrance =
         remember {
@@ -427,6 +440,12 @@ fun NowPlaying(
         dismiss()
     }
 
+    /*
+     * =========================================================
+     * BACK PRIORITY
+     * =========================================================
+     */
+
     BackHandler {
         when {
             fullLyrics -> {
@@ -455,602 +474,163 @@ fun NowPlaying(
         }
     }
 
-    Box(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                /*
-                 * Consume the full overlay input surface so Home
-                 * and NavBar never receive touch-through.
-                 */
-                .pointerInput(
-                    Unit
-                ) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            awaitPointerEvent()
-                        }
-                    }
-                }
-                .onSizeChanged {
-                    screenHeight =
-                        it.height
-                            .toFloat()
-                            .coerceAtLeast(
-                                1f
-                            )
-                }
-                .graphicsLayer {
-                    translationY =
-                        playerY.value +
-                            entrance.value *
-                            screenHeight
-                }
-                .clip(
-                    RoundedCornerShape(
-                        topStart =
-                            (
-                                88f *
-                                    (
-                                        playerY.value /
-                                            screenHeight
-                                        )
-                                        .coerceIn(
-                                            0f,
-                                            1f
-                                        )
-                                ).dp,
-                        topEnd =
-                            (
-                                88f *
-                                    (
-                                        playerY.value /
-                                            screenHeight
-                                        )
-                                        .coerceIn(
-                                            0f,
-                                            1f
-                                        )
-                                ).dp
-                    )
-                )
-    ) {
-        PlayerBackground(
-            dominant =
-                displayColor,
-            deep =
-                deep,
-            theme =
-                theme
-        )
+    /*
+     * =========================================================
+     * SCREEN RENDERING
+     * =========================================================
+     */
 
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .statusBarsPadding()
-        ) {
-            PlayerHeader(
-                source =
-                    source,
-                sourceIsCategory =
-                    sourceIsCategory,
-                foreground =
-                    themeColors
-                        .overlayText,
-                playerY =
-                    playerY,
-                screenHeight =
-                    screenHeight,
-                close = {
-                    closePlayer()
-                },
-                dismissAfterDrag = {
-                    if (
-                        !dismissing
-                    ) {
-                        dismissing =
-                            true
+    NowPlayingContent(
+        state =
+            state,
+        theme =
+            theme,
+        source =
+            source,
+        sourceIsCategory =
+            sourceIsCategory,
+        queue =
+            queue,
+        categories =
+            categories,
+        liked =
+            liked,
+        currentIndex =
+            currentIndex,
+        currentSong =
+            currentSong,
+        previousSong =
+            previousSong,
+        nextSong =
+            nextSong,
+        fallbackArtwork =
+            fallbackArtwork,
+        artistTrackCount =
+            artistTrackCount,
+        inCategory =
+            inCategory,
+        lyrics =
+            lyrics,
+        colors =
+            colors,
+        accent =
+            accent,
+        displayColor =
+            displayColor,
+        deep =
+            deep,
+        themeColors =
+            themeColors,
+        carousel =
+            carousel,
+        overlay =
+            overlay,
+        artworkLyrics =
+            artworkLyrics,
+        fullLyrics =
+            fullLyrics,
+        pop =
+            pop,
+        sleepTotalMs =
+            sleepTotalMs,
+        entrance =
+            entrance,
+        playerY =
+            playerY,
+        screenHeight =
+            screenHeight,
+        dismissing =
+            dismissing,
 
-                        dismiss()
-                    }
-                },
-                share = {
-                    currentSong?.let {
-                        shareSong(
-                            context,
-                            it
-                        )
-                    }
-                },
-                options = {
-                    overlay =
-                        PlayerOverlay
-                            .Options
-                }
-            )
+        updateScreenHeight = {
+            screenHeight =
+                it
+        },
 
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        93.dp
-                    )
-            )
+        closePlayer = {
+            closePlayer()
+        },
 
-            PlayerArtwork(
-                currentId =
-                    state.currentSongId,
-                currentIndex =
-                    currentIndex,
-                current =
-                    currentSong
-                        ?.artwork
-                        ?: fallbackArtwork,
-                previous =
-                    previousSong
-                        ?.artwork,
-                next =
-                    nextSong
-                        ?.artwork,
-                canPrevious =
-                    state.hasPrevious,
-                canNext =
-                    state.hasNext,
-                carousel =
-                    carousel,
-                showLyrics =
-                    artworkLyrics,
-                lyrics =
-                    lyrics,
-                position =
-                    state.position,
-                colors =
-                    colors,
-                accent =
-                    accent,
-                theme =
-                    theme,
-                previousSong =
-                    previousItem,
-                nextSong =
-                    next,
-                toggleLyrics = {
-                    artworkLyrics =
-                        !artworkLyrics
-                },
-                pickLyrics = {
-                    lyricPicker.launch(
-                        arrayOf(
-                            "*/*"
-                        )
-                    )
-                },
-                fullscreenLyrics = {
-                    artworkLyrics =
-                        true
-
-                    fullLyrics =
-                        true
-                }
-            )
-
-            Spacer(
-                modifier =
-                    Modifier.height(
-                        95.dp
-                    )
-            )
-
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(
-                            1f
-                        )
-                        .clip(
-                            RoundedCornerShape(
-                                topStart =
-                                    28.dp,
-                                topEnd =
-                                    28.dp
-                            )
-                        )
-                        .background(
-                            themeColors.panel
-                        )
-                        .padding(
-                            start = 12.dp,
-                            top = 10.dp,
-                            end = 12.dp,
-                            bottom = 2.dp
-                        )
+        dismissAfterDrag = {
+            if (
+                !dismissing
             ) {
-                PlayerInfo(
-                    title =
-                        state.title,
-                    artist =
-                        state.artist,
-                    liked =
-                        liked,
-                    inCategory =
-                        inCategory,
-                    sleepRemainingMs =
-                        state.sleepTimerRemainingMs,
-                    sleepTotalMs =
-                        sleepTotalMs,
-                    colors =
-                        colors,
-                    accent =
-                        accent,
-                    softButton =
-                        themeColors
-                            .softButton,
-                    toggleLike = {
-                        toggleLike()
+                dismissing =
+                    true
 
-                        pop =
-                            PopMessage(
-                                if (liked) {
-                                    "Removed from Liked Songs"
-                                } else {
-                                    "Added to Liked Songs"
-                                }
-                            )
-                    },
-                    openCategories = {
-                        overlay =
-                            PlayerOverlay
-                                .Options
-                    },
-                    openSleep = {
-                        overlay =
-                            PlayerOverlay
-                                .Sleep
-                    },
-                    openQueue = {
-                        overlay =
-                            PlayerOverlay
-                                .Queue
-                    },
-                    openDetails = {
-                        overlay =
-                            PlayerOverlay
-                                .Details
-                    },
-                    openArtist = {
-                        overlay =
-                            PlayerOverlay
-                                .Artist
-                    }
-                )
-
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            3.dp
-                        )
-                )
-
-                PlayerBody(
-                    position =
-                        state.position,
-                    duration =
-                        state.duration,
-                    isPlaying =
-                        state.isPlaying,
-                    hasPrevious =
-                        state.hasPrevious,
-                    hasNext =
-                        state.hasNext,
-                    shuffleEnabled =
-                        state.shuffleEnabled,
-                    repeatMode =
-                        state.repeatMode,
-                    colors =
-                        colors,
-                    accent =
-                        accent,
-                    border =
-                        themeColors.border,
-                    controlForeground =
-                        themeColors.controls,
-                    playBackground =
-                        themeColors
-                            .playBackground,
-                    seekTo =
-                        seekTo,
-                    togglePlay =
-                        togglePlay,
-                    previous =
-                        previous,
-                    next =
-                        next,
-                    toggleShuffle =
-                        toggleShuffle,
-                    cycleRepeat =
-                        cycleRepeat
-                )
+                dismiss()
             }
-        }
+        },
 
-        when (
-            overlay
-        ) {
-            PlayerOverlay.Queue -> {
-                QueueSheet(
-                    queue =
-                        queue,
-                    currentSongId =
-                        state.currentSongId,
-                    colors =
-                        colors,
-                    playIndex =
-                        playQueueIndex,
-                    dismiss = {
-                        overlay =
-                            null
-                    }
+        setOverlay = {
+            overlay =
+                it
+        },
+
+        setArtworkLyrics = {
+            artworkLyrics =
+                it
+        },
+
+        setFullLyrics = {
+            fullLyrics =
+                it
+        },
+
+        setPop = {
+            pop =
+                it
+        },
+
+        setSleepTotalMs = {
+            sleepTotalMs =
+                it
+        },
+
+        pickLyrics = {
+            lyricPicker.launch(
+                arrayOf(
+                    "*/*"
                 )
-            }
-
-            PlayerOverlay.Options -> {
-                SongOptionsBox(
-                    song =
-                        currentSong,
-                    categories =
-                        categories,
-                    colors =
-                        colors,
-                    liked =
-                        liked,
-                    close = {
-                        overlay =
-                            null
-                    },
-                    toggleLike = {
-                        toggleLike()
-                    },
-                    share = {
-                        currentSong?.let {
-                            shareSong(
-                                context,
-                                it
-                            )
-                        }
-
-                        overlay =
-                            null
-                    },
-                    setCategory = {
-                            category,
-                            add ->
-
-                        setSongInCategory(
-                            category.id,
-                            add
-                        )
-                    },
-                    createCategory = {
-                            name ->
-
-                        createCategory(
-                            name
-                        ) != null
-                    }
-                )
-            }
-
-            PlayerOverlay.Sleep -> {
-                SleepTimerBox(
-                    colors =
-                        colors,
-                    active =
-                        state
-                            .sleepTimerRemainingMs >
-                            0L,
-                    dismiss = {
-                        overlay =
-                            null
-                    },
-                    setTimer = {
-                            duration,
-                            label ->
-
-                        sleepTotalMs =
-                            duration
-
-                        setSleepTimer(
-                            duration
-                        )
-
-                        overlay =
-                            null
-
-                        pop =
-                            PopMessage(
-                                "Sleep timer set for $label"
-                            )
-                    },
-                    cancel = {
-                        sleepTotalMs =
-                            null
-
-                        cancelSleepTimer()
-
-                        overlay =
-                            null
-
-                        pop =
-                            PopMessage(
-                                "Sleep timer cancelled"
-                            )
-                    }
-                )
-            }
-
-            PlayerOverlay.Details -> {
-                SongDetailsBox(
-                    song =
-                        currentSong,
-                    album =
-                        state.album,
-                    colors =
-                        colors,
-                    close = {
-                        overlay =
-                            null
-                    }
-                )
-            }
-
-            PlayerOverlay.Artist -> {
-                ArtistInfoBox(
-                    artist =
-                        state.artist,
-                    trackCount =
-                        artistTrackCount,
-                    colors =
-                        colors,
-                    close = {
-                        overlay =
-                            null
-                    }
-                )
-            }
-
-            null ->
-                Unit
-        }
-
-        /*
-         * Small lyrics remains selected underneath this layer.
-         * Closing fullscreen therefore returns directly to the
-         * artwork-sized lyrics surface.
-         */
-        AnimatedVisibility(
-            visible =
-                fullLyrics,
-            enter =
-                fadeIn(
-                    animationSpec =
-                        tween(
-                            durationMillis =
-                                360
-                        )
-                ) +
-                    slideInVertically(
-                        animationSpec =
-                            tween(
-                                durationMillis =
-                                    420
-                            ),
-                        initialOffsetY = {
-                            it / 18
-                        }
-                    ) +
-                    scaleIn(
-                        initialScale =
-                            .965f,
-                        animationSpec =
-                            tween(
-                                durationMillis =
-                                    420
-                            )
-                    ),
-            exit =
-                fadeOut(
-                    animationSpec =
-                        tween(
-                            durationMillis =
-                                260
-                        )
-                ) +
-                    slideOutVertically(
-                        animationSpec =
-                            tween(
-                                durationMillis =
-                                    360
-                            ),
-                        targetOffsetY = {
-                            it / 20
-                        }
-                    ) +
-                    scaleOut(
-                        targetScale =
-                            .975f,
-                        animationSpec =
-                            tween(
-                                durationMillis =
-                                    330
-                            )
-                    )
-        ) {
-            FullLyrics(
-                lyrics =
-                    lyrics,
-                position =
-                    state.position,
-                duration =
-                    state.duration,
-                title =
-                    state.title,
-                artist =
-                    state.artist,
-                artwork =
-                    currentSong
-                        ?.artwork
-                        ?: fallbackArtwork,
-                dominant =
-                    displayColor,
-                deep =
-                    deep,
-                theme =
-                    theme,
-                accent =
-                    accent,
-                isPlaying =
-                    state.isPlaying,
-                canPrevious =
-                    state.hasPrevious,
-                canNext =
-                    state.hasNext,
-                togglePlay =
-                    togglePlay,
-                previous =
-                    previous,
-                next =
-                    next,
-                seekTo =
-                    seekTo,
-                close = {
-                    fullLyrics =
-                        false
-
-                    artworkLyrics =
-                        true
-                }
             )
-        }
+        },
 
-        pop?.let {
-            XmoPop(
-                message =
-                    it.text,
-                theme =
-                    theme,
-                modifier =
-                    Modifier
-                        .align(
-                            Alignment.TopCenter
-                        )
-                        .statusBarsPadding()
-                        .padding(
-                            top = 72.dp
-                        )
-            )
-        }
-    }
+        shareCurrentSong = {
+            currentSong?.let {
+                shareSong(
+                    context,
+                    it
+                )
+            }
+        },
+
+        togglePlay =
+            togglePlay,
+        previous =
+            previous,
+        previousItem =
+            previousItem,
+        next =
+            next,
+        playQueueIndex =
+            playQueueIndex,
+        seekTo =
+            seekTo,
+        toggleLike =
+            toggleLike,
+        toggleShuffle =
+            toggleShuffle,
+        cycleRepeat =
+            cycleRepeat,
+        setSleepTimer =
+            setSleepTimer,
+        cancelSleepTimer =
+            cancelSleepTimer,
+        setSongInCategory =
+            setSongInCategory,
+        createCategory =
+            createCategory
+    )
 }
 
 private fun shareSong(
