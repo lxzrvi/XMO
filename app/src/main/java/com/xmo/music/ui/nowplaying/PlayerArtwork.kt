@@ -2,7 +2,6 @@ package com.xmo.music.ui.nowplaying
 
 import android.net.Uri
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -25,12 +24,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -53,13 +51,13 @@ import kotlin.math.abs
 @Composable
 internal fun PlayerArtwork(
     currentId: Long?,
+    currentIndex: Int,
     current: Uri?,
     previous: Uri?,
     next: Uri?,
     canPrevious: Boolean,
     canNext: Boolean,
-    x: Animatable<Float, *>,
-    setWidth: (Float) -> Unit,
+    carousel: PlayerCarouselState,
     showLyrics: Boolean,
     lyrics: SongLyrics?,
     position: Long,
@@ -79,10 +77,6 @@ internal fun PlayerArtwork(
         mutableFloatStateOf(0f)
     }
 
-    /*
-     * Snapshots remain stable until Media3 confirms the actual
-     * song ID change.
-     */
     var snapshotCurrent by remember {
         mutableStateOf(current)
     }
@@ -95,50 +89,160 @@ internal fun PlayerArtwork(
         mutableStateOf(next)
     }
 
-    var transactionSongId by remember {
-        mutableStateOf<Long?>(null)
+    var previousKnownId by remember {
+        mutableStateOf(currentId)
+    }
+
+    var previousKnownIndex by remember {
+        mutableStateOf(currentIndex)
     }
 
     /*
-     * -1 previous
-     *  0 idle
-     *  1 next
+     * Real Media3 song change.
      */
-    var pending by remember {
-        mutableIntStateOf(0)
+    LaunchedEffect(currentId) {
+        if (
+            currentId == null ||
+            previousKnownId == null ||
+            currentId ==
+            previousKnownId
+        ) {
+            previousKnownId =
+                currentId
+
+            previousKnownIndex =
+                currentIndex
+
+            return@LaunchedEffect
+        }
+
+        /*
+         * Manual swipe confirmation:
+         * carousel is already sitting at ±width.
+         * Adopt new snapshots without a second animation.
+         */
+        if (
+            carousel.manualDirection !=
+            0 &&
+            carousel.manualSongId ==
+            previousKnownId
+        ) {
+            carousel.x.snapTo(0f)
+
+            snapshotCurrent =
+                current
+            snapshotPrevious =
+                previous
+            snapshotNext =
+                next
+
+            carousel.manualDirection =
+                0
+            carousel.manualSongId =
+                null
+
+            previousKnownId =
+                currentId
+            previousKnownIndex =
+                currentIndex
+
+            return@LaunchedEffect
+        }
+
+        /*
+         * External change: natural completion, notification,
+         * headset, MediaSession command etc.
+         */
+        if (
+            !carousel.transactionActive
+        ) {
+            carousel.autoAnimating =
+                true
+
+            val width =
+                carousel.width
+                    .coerceAtLeast(1f)
+
+            val direction =
+                if (
+                    currentIndex <
+                    previousKnownIndex
+                ) {
+                    1
+                } else {
+                    -1
+                }
+
+            /*
+             * Old snapshots are still on screen.
+             */
+            carousel.x.snapTo(0f)
+
+            carousel.x.animateTo(
+                targetValue =
+                    direction *
+                        width,
+                animationSpec =
+                    tween(260)
+            )
+
+            /*
+             * New current only replaces the visual window once
+             * the old cover is off-screen.
+             */
+            snapshotCurrent =
+                current
+            snapshotPrevious =
+                previous
+            snapshotNext =
+                next
+
+            carousel.x.snapTo(
+                -direction *
+                    width
+            )
+
+            carousel.x.animateTo(
+                targetValue = 0f,
+                animationSpec =
+                    tween(280)
+            )
+
+            carousel.autoAnimating =
+                false
+        } else {
+            snapshotCurrent =
+                current
+            snapshotPrevious =
+                previous
+            snapshotNext =
+                next
+        }
+
+        previousKnownId =
+            currentId
+        previousKnownIndex =
+            currentIndex
     }
 
+    /*
+     * Queue neighbors can change without current song changing.
+     */
     LaunchedEffect(
-        currentId,
-        pending,
         current,
         previous,
-        next
+        next,
+        currentId
     ) {
         if (
-            pending != 0 &&
-            transactionSongId != null &&
-            currentId != transactionSongId
+            !carousel.transactionActive
         ) {
-            /*
-             * Media3 confirmation arrived.
-             *
-             * Reset displacement before changing the snapshots so
-             * the newly-current artwork never appears translated
-             * by the old transaction.
-             */
-            x.snapTo(0f)
-
-            pending = 0
-            transactionSongId = null
-
-            snapshotCurrent = current
-            snapshotPrevious = previous
-            snapshotNext = next
-        } else if (pending == 0) {
-            snapshotCurrent = current
-            snapshotPrevious = previous
-            snapshotNext = next
+            snapshotCurrent =
+                current
+            snapshotPrevious =
+                previous
+            snapshotNext =
+                next
         }
     }
 
@@ -153,15 +257,10 @@ internal fun PlayerArtwork(
                 .coerceAtLeast(1f)
 
         LaunchedEffect(width) {
-            setWidth(width)
+            carousel.width =
+                width
         }
 
-        /*
-         * Gesture surface always occupies the artwork viewport.
-         *
-         * Lyrics get their own vertical scroll when visible, so
-         * carousel gestures are disabled on that side.
-         */
         Box(
             Modifier
                 .fillMaxSize()
@@ -177,6 +276,13 @@ internal fun PlayerArtwork(
 
                     detectDragGestures(
                         onDragStart = {
+                            if (
+                                carousel
+                                    .transactionActive
+                            ) {
+                                return@detectDragGestures
+                            }
+
                             rawX = 0f
                         },
 
@@ -184,14 +290,13 @@ internal fun PlayerArtwork(
                                 change,
                                 amount ->
 
-                            if (pending != 0) {
+                            if (
+                                carousel
+                                    .transactionActive
+                            ) {
                                 return@detectDragGestures
                             }
 
-                            /*
-                             * Vertical artwork dragging has no
-                             * player-close behavior anymore.
-                             */
                             rawX += amount.x
 
                             if (
@@ -202,7 +307,8 @@ internal fun PlayerArtwork(
 
                                 scope.launch {
                                     var target =
-                                        x.value +
+                                        carousel
+                                            .x.value +
                                             amount.x
 
                                     if (
@@ -210,7 +316,8 @@ internal fun PlayerArtwork(
                                         !canNext
                                     ) {
                                         target =
-                                            x.value +
+                                            carousel
+                                                .x.value +
                                                 amount.x *
                                                     .17f
                                     }
@@ -220,12 +327,13 @@ internal fun PlayerArtwork(
                                         !canPrevious
                                     ) {
                                         target =
-                                            x.value +
+                                            carousel
+                                                .x.value +
                                                 amount.x *
                                                     .17f
                                     }
 
-                                    x.snapTo(
+                                    carousel.x.snapTo(
                                         target.coerceIn(
                                             -width,
                                             width
@@ -236,18 +344,29 @@ internal fun PlayerArtwork(
                         },
 
                         onDragEnd = {
+                            if (
+                                carousel
+                                    .transactionActive
+                            ) {
+                                return@detectDragGestures
+                            }
+
                             scope.launch {
                                 when {
-                                    x.value <
-                                        -width * .15f &&
+                                    carousel.x.value <
+                                        -width *
+                                            .15f &&
                                         canNext -> {
 
-                                        transactionSongId =
+                                        carousel
+                                            .manualSongId =
                                             currentId
 
-                                        pending = 1
+                                        carousel
+                                            .manualDirection =
+                                            1
 
-                                        x.animateTo(
+                                        carousel.x.animateTo(
                                             targetValue =
                                                 -width,
                                             animationSpec =
@@ -257,16 +376,20 @@ internal fun PlayerArtwork(
                                         nextSong()
                                     }
 
-                                    x.value >
-                                        width * .15f &&
+                                    carousel.x.value >
+                                        width *
+                                            .15f &&
                                         canPrevious -> {
 
-                                        transactionSongId =
+                                        carousel
+                                            .manualSongId =
                                             currentId
 
-                                        pending = -1
+                                        carousel
+                                            .manualDirection =
+                                            -1
 
-                                        x.animateTo(
+                                        carousel.x.animateTo(
                                             targetValue =
                                                 width,
                                             animationSpec =
@@ -277,7 +400,7 @@ internal fun PlayerArtwork(
                                     }
 
                                     else -> {
-                                        x.animateTo(
+                                        carousel.x.animateTo(
                                             targetValue =
                                                 0f,
                                             animationSpec =
@@ -297,12 +420,13 @@ internal fun PlayerArtwork(
 
                         onDragCancel = {
                             scope.launch {
-                                if (pending == 0) {
-                                    x.animateTo(
-                                        targetValue =
-                                            0f,
-                                        animationSpec =
-                                            tween(180)
+                                if (
+                                    !carousel
+                                        .transactionActive
+                                ) {
+                                    carousel.x.animateTo(
+                                        0f,
+                                        tween(180)
                                     )
                                 }
 
@@ -320,26 +444,24 @@ internal fun PlayerArtwork(
                 transitionSpec = {
                     (
                         fadeIn(
-                            animationSpec =
-                                tween(260)
+                            tween(300)
                         ) +
                             scaleIn(
                                 initialScale =
-                                    .965f,
+                                    .985f,
                                 animationSpec =
-                                    tween(300)
+                                    tween(330)
                             )
                         )
                         .togetherWith(
                             fadeOut(
-                                animationSpec =
-                                    tween(210)
+                                tween(250)
                             ) +
                                 scaleOut(
                                     targetScale =
-                                        1.025f,
+                                        1.015f,
                                     animationSpec =
-                                        tween(240)
+                                        tween(290)
                                 )
                         )
                 },
@@ -357,8 +479,7 @@ internal fun PlayerArtwork(
                             lyrics = lyrics,
                             position =
                                 position,
-                            colors =
-                                colors,
+                            colors = colors,
                             accent = accent,
                             theme = theme,
                             pickLyrics =
@@ -385,7 +506,8 @@ internal fun PlayerArtwork(
                             snapshotPrevious,
                         next =
                             snapshotNext,
-                        x = x.value,
+                        x =
+                            carousel.x.value,
                         width = width,
                         toggleLyrics =
                             toggleLyrics
@@ -408,16 +530,11 @@ private fun ArtworkCarousel(
     Box(
         Modifier.fillMaxSize()
     ) {
-        previous?.let { uri ->
+        previous?.let {
             Cover(
-                uri = uri,
+                uri = it,
                 modifier =
-                    Modifier
-                        .padding(
-                            horizontal = 17.dp
-                        )
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
+                    coverModifier()
                         .align(
                             Alignment.Center
                         )
@@ -428,20 +545,10 @@ private fun ArtworkCarousel(
             )
         }
 
-        val interaction =
-            remember {
-                MutableInteractionSource()
-            }
-
         Cover(
             uri = current,
             modifier =
-                Modifier
-                    .padding(
-                        horizontal = 17.dp
-                    )
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
+                coverModifier()
                     .align(
                         Alignment.Center
                     )
@@ -450,23 +557,20 @@ private fun ArtworkCarousel(
                     }
                     .clickable(
                         interactionSource =
-                            interaction,
+                            remember {
+                                MutableInteractionSource()
+                            },
                         indication = null,
                         onClick =
                             toggleLyrics
                     )
         )
 
-        next?.let { uri ->
+        next?.let {
             Cover(
-                uri = uri,
+                uri = it,
                 modifier =
-                    Modifier
-                        .padding(
-                            horizontal = 17.dp
-                        )
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
+                    coverModifier()
                         .align(
                             Alignment.Center
                         )
@@ -478,6 +582,14 @@ private fun ArtworkCarousel(
         }
     }
 }
+
+private fun coverModifier(): Modifier =
+    Modifier
+        .padding(
+            horizontal = 17.dp
+        )
+        .fillMaxWidth()
+        .aspectRatio(1f)
 
 @Composable
 private fun Cover(
