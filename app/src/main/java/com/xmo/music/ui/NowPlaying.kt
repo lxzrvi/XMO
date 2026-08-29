@@ -42,6 +42,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -50,7 +52,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.isActive
+import kotlinx.coroutines.isActive
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -64,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
@@ -84,7 +87,7 @@ import com.composables.icons.lucide.Expand
 import com.composables.icons.lucide.Heart
 import com.composables.icons.lucide.ListMusic
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.MoreVertical
+import com.composables.icons.lucide.EllipsisVertical
 import com.composables.icons.lucide.Pause
 import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Plus
@@ -533,13 +536,11 @@ fun NowPlaying(
         )
 
         Column(
-            Modifier
-                .fillMaxSize()
-                .androidx.compose.foundation.verticalScroll(
-                    androidx.compose.foundation.rememberScrollState()
-                )
-                .statusBarsPadding()
-        ) {
+                Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .statusBarsPadding()
+            ) {
             /*
              * =================================================
              * HEADER
@@ -656,7 +657,7 @@ fun NowPlaying(
                         }
                     ) {
                         Icon(
-                            Lucide.MoreVertical,
+                            Lucide.EllipsisVertical,
                             contentDescription =
                                 "Options",
                             tint = overlayText,
