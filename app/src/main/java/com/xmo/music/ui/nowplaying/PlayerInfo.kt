@@ -5,12 +5,11 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +37,7 @@ internal fun PlayerInfo(
     sleepTotalMs: Long?,
     colors: HomeColors,
     accent: Color,
+    softButton: Color,
     toggleLike: () -> Unit,
     openCategories: () -> Unit,
     openSleep: () -> Unit,
@@ -48,29 +48,21 @@ internal fun PlayerInfo(
     Box(
         Modifier
             .fillMaxWidth()
-            .height(100.dp)
+            .height(104.dp)
     ) {
-        /*
-         * Actions stay at their original upper-right position.
-         *
-         * Like and Category are independent circles.
-         * Timer / Queue / Details remain one capsule.
-         */
         Row(
             Modifier
                 .align(
-                    Alignment.TopEnd
+                    Alignment.TopStart
                 )
-                .padding(
-                    end = 4.dp
-                ),
+                .padding(start = 4.dp),
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
             PremiumCircle(
                 size = 40.dp,
                 background =
-                    colors.button,
+                    softButton,
                 onClick =
                     toggleLike
             ) {
@@ -86,13 +78,13 @@ internal fun PlayerInfo(
             }
 
             Spacer(
-                Modifier.width(5.dp)
+                Modifier.width(7.dp)
             )
 
             PremiumCircle(
                 size = 40.dp,
                 background =
-                    colors.button,
+                    softButton,
                 onClick =
                     openCategories
             ) {
@@ -107,69 +99,64 @@ internal fun PlayerInfo(
                         }
                 )
             }
+        }
 
-            Spacer(
-                Modifier.width(5.dp)
+        XmoCapsule(
+            background =
+                softButton,
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.TopEnd
+                    )
+                    .padding(end = 4.dp)
+        ) {
+            SleepRingButton(
+                remainingMs =
+                    sleepRemainingMs,
+                totalMs =
+                    sleepTotalMs,
+                colors = colors,
+                accent = accent,
+                onClick =
+                    openSleep
             )
 
-            XmoCapsule(
-                background =
-                    colors.button
+            CapsuleButton(
+                size = 40.dp,
+                onClick =
+                    openQueue
             ) {
-                SleepRingButton(
-                    remainingMs =
-                        sleepRemainingMs,
-                    totalMs =
-                        sleepTotalMs,
-                    colors =
-                        colors,
-                    accent =
-                        accent,
-                    onClick =
-                        openSleep
+                Icon(
+                    imageVector =
+                        Lucide.ListMusic,
+                    contentDescription =
+                        "Queue",
+                    tint =
+                        colors.icon,
+                    modifier =
+                        Modifier.size(
+                            18.dp
+                        )
                 )
+            }
 
-                CapsuleButton(
-                    size = 40.dp,
-                    onClick =
-                        openQueue
-                ) {
-                    Icon(
-                        imageVector =
-                            Lucide.ListMusic,
-                        contentDescription =
-                            "Queue",
-                        tint =
-                            colors.icon,
-                        modifier =
-                            Modifier.size(
-                                18.dp
-                            )
-                    )
-                }
-
-                CapsuleButton(
-                    size = 40.dp,
-                    onClick =
-                        openDetails
-                ) {
-                    Text(
-                        text = "?",
-                        color =
-                            colors.icon,
-                        fontFamily =
-                            XmoFont.bold,
-                        fontSize =
-                            18.sp
-                    )
-                }
+            CapsuleButton(
+                size = 40.dp,
+                onClick =
+                    openDetails
+            ) {
+                Text(
+                    text = "?",
+                    color =
+                        colors.icon,
+                    fontFamily =
+                        XmoFont.bold,
+                    fontSize = 18.sp
+                )
             }
         }
 
-        /*
-         * Title + Artist live independently beneath the action
-         * controls. Moving this text does not move the actions.
-         */
         Column(
             Modifier
                 .align(
@@ -190,17 +177,12 @@ internal fun PlayerInfo(
                     colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize =
-                    23.sp,
+                fontSize = 23.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis
             )
 
-            /*
-             * No PressButton:
-             * artist tap intentionally has NO scale-down effect.
-             */
             Text(
                 text =
                     artist.ifBlank {
@@ -210,8 +192,7 @@ internal fun PlayerInfo(
                     colors.sub,
                 fontFamily =
                     XmoFont.medium,
-                fontSize =
-                    14.sp,
+                fontSize = 14.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis,
@@ -237,14 +218,6 @@ private fun SleepRingButton(
     val active =
         remainingMs > 0L
 
-    /*
-     * Null means we genuinely don't know the timer's original
-     * duration, e.g. player screen re-opened after another
-     * component had already started the timer.
-     *
-     * In that case icon remains active but no fake percentage is
-     * drawn.
-     */
     val progress =
         if (
             active &&
@@ -270,8 +243,7 @@ private fun SleepRingButton(
     ) {
         CapsuleButton(
             size = 40.dp,
-            onClick =
-                onClick
+            onClick = onClick
         ) {
             Icon(
                 imageVector =
@@ -285,31 +257,24 @@ private fun SleepRingButton(
                         colors.icon
                     },
                 modifier =
-                    Modifier.size(
-                        18.dp
-                    )
+                    Modifier.size(18.dp)
             )
         }
 
         if (progress != null) {
             Canvas(
-                Modifier
-                    .fillMaxSize()
-                    .padding(1.dp)
+                Modifier.size(32.dp)
             ) {
                 drawArc(
                     color = accent,
-                    startAngle =
-                        -90f,
+                    startAngle = -90f,
                     sweepAngle =
-                        360f *
-                            progress,
-                    useCenter =
-                        false,
+                        360f * progress,
+                    useCenter = false,
                     style =
                         Stroke(
                             width =
-                                1.8.dp.toPx(),
+                                1.5.dp.toPx(),
                             cap =
                                 StrokeCap.Round
                         )
