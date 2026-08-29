@@ -24,20 +24,10 @@ import kotlin.math.max
 internal class PlayerColorState(
     initial: Color
 ) {
-    /*
-     * Latest real Palette result belonging to Media3 current.
-     *
-     * This is NOT automatically the visually committed color.
-     */
     var current by
         mutableStateOf(initial)
         internal set
 
-    /*
-     * Visual adjacent Palette window.
-     *
-     * These remain frozen while a carousel transaction is active.
-     */
     var previous by
         mutableStateOf(initial)
         internal set
@@ -46,16 +36,10 @@ internal class PlayerColorState(
         mutableStateOf(initial)
         internal set
 
-    /*
-     * Last visually completed song color.
-     */
     var committed by
         mutableStateOf(initial)
         internal set
 
-    /*
-     * Actual resting color drawn by Now Playing.
-     */
     var rendered by
         mutableStateOf(initial)
         internal set
@@ -82,13 +66,6 @@ internal fun rememberPlayerColors(
             )
         }
 
-    /*
-     * Compose-side Palette cache.
-     *
-     * Artwork already has caching too, but retaining the lifted
-     * result here prevents repeat processing as the queue window
-     * changes.
-     */
     val paletteCache =
         remember {
             mutableStateMapOf<String, Color>()
@@ -104,10 +81,9 @@ internal fun rememberPlayerColors(
         val key =
             uri.toString()
 
-        paletteCache[key]
-            ?.let {
-                return it
-            }
+        paletteCache[key]?.let {
+            return it
+        }
 
         val raw =
             Artwork.cached(uri)
@@ -117,7 +93,9 @@ internal fun rememberPlayerColors(
                 )
 
         val lifted =
-            liftArtworkColor(raw)
+            liftArtworkColor(
+                raw
+            )
 
         paletteCache[key] =
             lifted
@@ -126,54 +104,44 @@ internal fun rememberPlayerColors(
     }
 
     /*
-     * =========================================================
-     * CURRENT MEDIA3 COLOR
-     * =========================================================
+     * Real Media3-current Palette result.
      *
-     * The Palette result is allowed to become current as soon as
-     * the real song changes, but rendered/committed are not.
+     * This may update before the visual carousel completes, so it
+     * must not directly replace committed/rendered.
      */
     LaunchedEffect(
         currentSongId,
         currentArtwork,
         fallbackArtwork
     ) {
-        val requestedSongId =
+        val requestedId =
             currentSongId
 
-        val requestedArtwork =
+        val artwork =
             currentArtwork
                 ?: fallbackArtwork
 
-        val extracted =
-            if (requestedArtwork != null) {
+        val result =
+            if (artwork != null) {
                 extract(
-                    requestedArtwork
+                    artwork
                 )
             } else {
                 state.committed
             }
 
-        /*
-         * Prevent a stale extraction from replacing the newest
-         * Media3 song color.
-         */
         if (
-            requestedSongId ==
+            requestedId ==
             currentSongId
         ) {
             state.current =
-                extracted
+                result
         }
     }
 
     /*
-     * =========================================================
-     * PREVIOUS PALETTE
-     * =========================================================
-     *
-     * Do not let a newly recomposed queue window replace the old
-     * visual Palette window while the cover is still travelling.
+     * Adjacent Palette window remains frozen for the same period
+     * as PlayerArtwork's visual queue snapshot.
      */
     LaunchedEffect(
         previousArtwork,
@@ -193,11 +161,6 @@ internal fun rememberPlayerColors(
                 ?: state.committed
     }
 
-    /*
-     * =========================================================
-     * NEXT PALETTE
-     * =========================================================
-     */
     LaunchedEffect(
         nextArtwork,
         transactionActive
@@ -217,15 +180,8 @@ internal fun rememberPlayerColors(
     }
 
     /*
-     * =========================================================
-     * RESTING COLOR COMMIT
-     * =========================================================
-     *
-     * No arbitrary delay/timer.
-     *
-     * New current color is accepted only when the real visual
-     * transaction is no longer active and the carousel is at
-     * rest.
+     * Commit only after the actual visual transaction returns to
+     * rest. No arbitrary song-transition timer is used.
      */
     LaunchedEffect(
         currentSongId,
@@ -258,7 +214,11 @@ internal fun rememberPlayerColors(
                 )
         ) { value, _ ->
 
-            val fraction =
+            /*
+             * Kept compatible with the animation callback type in
+             * the existing project.
+             */
+            val raw =
                 value ?: 0f
 
             state.rendered =
@@ -266,20 +226,16 @@ internal fun rememberPlayerColors(
                     from = from,
                     to = to,
                     fraction =
-                        smoothFraction(
-                            fraction
+                        smoothPlayerFraction(
+                            raw
                         )
                 )
         }
 
-        /*
-         * Do not commit an old animation if another song or
-         * visual transaction took ownership in the meantime.
-         */
         if (
             !transactionActive &&
-            currentSongId ==
-            expectedSongId &&
+            expectedSongId ==
+            currentSongId &&
             state.current == to
         ) {
             state.committed =
@@ -293,12 +249,6 @@ internal fun rememberPlayerColors(
     return state
 }
 
-/*
- * =============================================================
- * CURRENT DISPLAY COLOR
- * =============================================================
- */
-
 internal fun playerDisplayColor(
     colors: PlayerColorState,
     coverX: Float,
@@ -306,7 +256,9 @@ internal fun playerDisplayColor(
 ): Color {
     val width =
         coverWidth
-            .coerceAtLeast(1f)
+            .coerceAtLeast(
+                1f
+            )
 
     val fraction =
         (
@@ -318,9 +270,6 @@ internal fun playerDisplayColor(
                 1f
             )
 
-    /*
-     * At rest, only use the controlled rendered color.
-     */
     if (
         abs(fraction) <
         .001f
@@ -328,13 +277,6 @@ internal fun playerDisplayColor(
         return colors.rendered
     }
 
-    /*
-     * x < 0 = Next
-     * x > 0 = Previous
-     *
-     * Adjacent Palette colors remain frozen for the whole visual
-     * transaction.
-     */
     val destination =
         if (
             fraction < 0f
@@ -350,17 +292,11 @@ internal fun playerDisplayColor(
         to =
             destination,
         fraction =
-            smoothFraction(
+            smoothPlayerFraction(
                 abs(fraction)
             )
     )
 }
-
-/*
- * =============================================================
- * THEME COLORS
- * =============================================================
- */
 
 internal data class PlayerThemeColors(
     val overlayText: Color,
@@ -414,7 +350,7 @@ internal fun playerThemeColors(
         }
 
     /*
-     * Translucent lower panel so artwork color remains visible.
+     * Artwork remains visible below the lower controls panel.
      */
     val panel =
         when (theme) {
@@ -470,12 +406,6 @@ internal fun playerThemeColors(
     )
 }
 
-/*
- * =============================================================
- * ARTWORK COLOR LIFT
- * =============================================================
- */
-
 internal fun liftArtworkColor(
     color: Color
 ): Color {
@@ -496,10 +426,6 @@ internal fun liftArtworkColor(
         )
     }
 
-    /*
-     * Dark dominant colors are raised enough to remain clearly
-     * visible in the Now Playing background.
-     */
     val targetPeak =
         when {
             strongest < .18f ->
@@ -556,10 +482,6 @@ internal fun liftArtworkColor(
                 1f
             )
 
-    /*
-     * Small white lift keeps very dark/saturated Palette results
-     * clean without washing out their hue.
-     */
     val whiteLift =
         if (
             strongest < .42f
@@ -601,12 +523,6 @@ internal fun liftArtworkColor(
     )
 }
 
-/*
- * =============================================================
- * COLOR INTERPOLATION
- * =============================================================
- */
-
 internal fun mixColor(
     from: Color,
     to: Color,
@@ -626,7 +542,6 @@ internal fun mixColor(
                         from.red
                     ) *
                 value,
-
         green =
             from.green +
                 (
@@ -634,7 +549,6 @@ internal fun mixColor(
                         from.green
                     ) *
                 value,
-
         blue =
             from.blue +
                 (
@@ -642,12 +556,11 @@ internal fun mixColor(
                         from.blue
                     ) *
                 value,
-
         alpha = 1f
     )
 }
 
-private fun smoothFraction(
+private fun smoothPlayerFraction(
     fraction: Float
 ): Float {
     val value =
