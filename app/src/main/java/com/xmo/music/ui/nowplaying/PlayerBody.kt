@@ -62,7 +62,8 @@ internal fun PlayerBody(
             Text(
                 text =
                     playerTime(position),
-                color = colors.sub,
+                color =
+                    colors.sub,
                 fontFamily =
                     XmoFont.medium,
                 fontSize = 10.sp
@@ -71,7 +72,8 @@ internal fun PlayerBody(
             Text(
                 text =
                     playerTime(duration),
-                color = colors.sub,
+                color =
+                    colors.sub,
                 fontFamily =
                     XmoFont.medium,
                 fontSize = 10.sp
@@ -79,25 +81,32 @@ internal fun PlayerBody(
         }
 
         Spacer(
-            Modifier.height(9.dp)
+            Modifier.height(15.dp)
         )
 
         PlayerControls(
-            isPlaying = isPlaying,
-            hasPrevious = hasPrevious,
-            hasNext = hasNext,
+            isPlaying =
+                isPlaying,
+            hasPrevious =
+                hasPrevious,
+            hasNext =
+                hasNext,
             shuffleEnabled =
                 shuffleEnabled,
-            repeatMode = repeatMode,
+            repeatMode =
+                repeatMode,
             foreground =
                 controlForeground,
-            accent = accent,
+            accent =
+                accent,
             playBackground =
                 playBackground,
             togglePlay =
                 togglePlay,
-            previous = previous,
-            next = next,
+            previous =
+                previous,
+            next =
+                next,
             toggleShuffle =
                 toggleShuffle,
             cycleRepeat =
@@ -105,10 +114,11 @@ internal fun PlayerBody(
         )
 
         /*
-         * Exact requested visual breathing room above branding.
+         * More room below transport controls, while footer itself
+         * sits lower in the panel.
          */
         Spacer(
-            Modifier.height(15.dp)
+            Modifier.height(28.dp)
         )
 
         Column(
@@ -120,7 +130,7 @@ internal fun PlayerBody(
                 text = "XMO",
                 color =
                     colors.text.copy(
-                        alpha = .65f
+                        alpha = .62f
                     ),
                 fontFamily =
                     XmoFont.logo,
@@ -132,7 +142,7 @@ internal fun PlayerBody(
                     "lxzrvi • © 2026",
                 color =
                     colors.sub.copy(
-                        alpha = .52f
+                        alpha = .48f
                     ),
                 fontFamily =
                     XmoFont.normal,
@@ -143,7 +153,7 @@ internal fun PlayerBody(
         Spacer(
             Modifier
                 .navigationBarsPadding()
-                .height(5.dp)
+                .height(2.dp)
         )
     }
 }
