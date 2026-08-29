@@ -29,7 +29,8 @@ internal fun PlayerInfo(
     artist: String,
     liked: Boolean,
     inCategory: Boolean,
-    sleepActive: Boolean,
+    sleepRemainingMs: Long,
+    sleepTotalMs: Long?,
     colors: HomeColors,
     accent: Color,
     toggleLike: () -> Unit,
@@ -104,30 +105,15 @@ internal fun PlayerInfo(
                 background =
                     colors.button
             ) {
-                CapsuleButton(
-                    size = 40.dp,
-                    onClick =
-                        openSleep
-                ) {
-                    Icon(
-                        imageVector =
-                            Lucide.Clock3,
-                        contentDescription =
-                            "Sleep timer",
-                        tint =
-                            if (
-                                sleepActive
-                            ) {
-                                accent
-                            } else {
-                                colors.icon
-                            },
-                        modifier =
-                            Modifier.size(
-                                18.dp
-                            )
-                    )
-                }
+                SleepRingButton(
+                remainingMs =
+                    sleepRemainingMs,
+                totalMs =
+                    sleepTotalMs,
+                colors = colors,
+                accent = accent,
+                onClick = openSleep
+            )
 
                 CapsuleButton(
                     size = 40.dp,
