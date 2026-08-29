@@ -45,6 +45,9 @@ internal fun FollowLyrics(
     fullscreen: Boolean,
     modifier: Modifier = Modifier
 ) {
+    /*
+     * No lyrics state.
+     */
     if (
         lyrics == null ||
         lyrics.lines.isEmpty()
@@ -82,25 +85,43 @@ internal fun FollowLyrics(
         return
     }
 
+    /*
+     * Current lyric index according to the
+     * current playback position.
+     */
     val active =
         currentLyricIndex(
             lyrics = lyrics,
             position = position
         )
 
+    /*
+     * One persistent LazyColumn state.
+     */
     val listState =
         rememberLazyListState()
 
+    /*
+     * When the user manually scrolls lyrics,
+     * automatic centering is temporarily disabled.
+     */
     var userBrowsing by
         remember {
             mutableStateOf(false)
         }
 
+    /*
+     * Used to restart the 4 second timeout whenever
+     * the user interacts with the lyric list.
+     */
     var interactionToken by
         remember {
             mutableLongStateOf(0L)
         }
 
+    /*
+     * Detect manual scrolling.
+     */
     LaunchedEffect(
         listState.isScrollInProgress
     ) {
@@ -110,6 +131,7 @@ internal fun FollowLyrics(
             userBrowsing = true
             interactionToken++
         } else if (userBrowsing) {
+
             val token =
                 ++interactionToken
 
@@ -128,10 +150,12 @@ internal fun FollowLyrics(
         modifier =
             modifier.fillMaxSize()
     ) {
+
         /*
-         * Keep enough space above and below the lyrics
-         * so the first and last line can also physically
-         * reach the exact center of the screen.
+         * Half of the real container height.
+         *
+         * This gives the first and last lyrics enough
+         * empty space to also reach the physical center.
          */
         val centrePadding =
             maxHeight / 2
@@ -156,6 +180,7 @@ internal fun FollowLyrics(
             horizontalAlignment =
                 Alignment.CenterHorizontally
         ) {
+
             itemsIndexed(
                 items = lyrics.lines,
                 key = { index, line ->
@@ -163,16 +188,20 @@ internal fun FollowLyrics(
                 }
             ) { index, line ->
 
+                /*
+                 * Only the currently playing lyric is selected.
+                 */
                 val selected =
                     lyrics.synced &&
                         index == active
 
+                /*
+                 * Keep your existing accent color.
+                 *
+                 * Nothing is hard-coded to red.
+                 */
                 val targetColor =
                     if (selected) {
-                        /*
-                         * Active lyric remains your accent color.
-                         * Nothing changed here.
-                         */
                         accent
                     } else {
                         colors.text.copy(
@@ -185,6 +214,9 @@ internal fun FollowLyrics(
                         )
                     }
 
+                /*
+                 * Smooth color transition.
+                 */
                 val lineColor by
                     animateColorAsState(
                         targetValue =
@@ -197,6 +229,11 @@ internal fun FollowLyrics(
                             "lyricColor$index"
                     )
 
+                /*
+                 * Full-width lyric item.
+                 *
+                 * The Text itself is centered inside this box.
+                 */
                 Box(
                     modifier =
                         Modifier
@@ -218,6 +255,7 @@ internal fun FollowLyrics(
                     contentAlignment =
                         Alignment.Center
                 ) {
+
                     Text(
                         text = line.text,
                         color = lineColor,
@@ -270,10 +308,14 @@ internal fun FollowLyrics(
         }
 
         /*
-         * Automatically move the currently playing lyric
-         * to the physical center of the screen.
+         * Automatically center the currently playing lyric.
          *
-         * User scrolling temporarily disables this.
+         * This runs whenever:
+         *
+         * - active lyric changes
+         * - user browsing ends
+         * - fullscreen changes
+         * - lyrics container size changes
          */
         LaunchedEffect(
             active,
@@ -282,6 +324,10 @@ internal fun FollowLyrics(
             maxHeight,
             lyrics
         ) {
+
+            /*
+             * Nothing to center.
+             */
             if (
                 active < 0 ||
                 !lyrics.synced ||
@@ -291,8 +337,8 @@ internal fun FollowLyrics(
             }
 
             /*
-             * Wait until LazyColumn has measured the
-             * current item before calculating its center.
+             * Give LazyColumn one frame to measure
+             * the current lyric.
              */
             withFrameNanos { }
 
@@ -306,17 +352,23 @@ internal fun FollowLyrics(
 
 
 /*
- * Centers one lyric item against the ACTUAL LazyColumn
- * viewport center.
+ * ============================================================
+ * EXACT LYRIC CENTERING
+ * ============================================================
  *
- * This works for:
- * - normal player
- * - fullscreen
- * - first lyric
- * - middle lyrics
- * - last lyric
- * - multiline lyrics
- * - changing lyric sizes
+ * Centers the complete active lyric item against the
+ * physical center of the LazyColumn.
+ *
+ * Works with:
+ *
+ * - Normal player
+ * - Fullscreen
+ * - First lyric
+ * - Middle lyric
+ * - Last lyric
+ * - Multiline lyrics
+ * - Different selected/unselected font sizes
+ * - Different vertical padding
  */
 private suspend fun centerLyricExactly(
     state: LazyListState,
@@ -327,7 +379,7 @@ private suspend fun centerLyricExactly(
     }
 
     /*
-     * First try to find the lyric in the currently
+     * Try to get the target lyric from currently
      * measured items.
      */
     var target =
@@ -338,15 +390,20 @@ private suspend fun centerLyricExactly(
             }
 
     /*
-     * If it isn't currently visible, jump close to it.
-     * This does NOT define the final position.
-     * We calculate the exact center after measurement.
+     * If the lyric isn't currently measured,
+     * move the list near it first.
+     *
+     * This is NOT the final centering.
      */
     if (target == null) {
+
         state.scrollToItem(
             index = index
         )
 
+        /*
+         * Wait until LazyColumn lays out the item.
+         */
         withFrameNanos { }
 
         target =
@@ -359,51 +416,52 @@ private suspend fun centerLyricExactly(
     }
 
     /*
-     * Re-read layout AFTER measurement.
+     * Get the latest layout information.
      */
     val layout =
         state.layoutInfo
 
     /*
-     * LazyColumn's actual viewport.
+     * IMPORTANT FIX
      *
-     * viewportStartOffset and viewportEndOffset are
-     * used instead of assuming that maxHeight / 2
-     * is enough.
+     * Do NOT use:
+     *
+     * viewportStartOffset + viewportEndOffset
+     *
+     * because contentPadding affects those coordinates.
+     *
+     * viewportSize.height represents the actual
+     * LazyColumn viewport height.
      */
-    val viewportStart =
-        layout.viewportStartOffset.toFloat()
-
-    val viewportEnd =
-        layout.viewportEndOffset.toFloat()
-
     val viewportCenter =
-        (viewportStart + viewportEnd) / 2f
+        layout.viewportSize.height / 2f
 
     /*
-     * Center of the complete lyric item.
+     * Calculate the center of the COMPLETE item.
      *
-     * This includes:
-     * - Text height
-     * - selected vertical padding
-     * - normal vertical padding
+     * target.size includes:
+     *
+     * - text height
+     * - selected padding
+     * - unselected padding
      */
     val itemCenter =
         target.offset +
             target.size / 2f
 
     /*
-     * Positive delta means the lyric is below
-     * the center and needs to move upward.
-     *
-     * Negative delta means it is above the center
-     * and needs to move downward.
+     * Difference between lyric center and physical
+     * viewport center.
      */
     val delta =
         itemCenter -
             viewportCenter
 
+    /*
+     * Only move if there is an actual difference.
+     */
     if (abs(delta) > 0.5f) {
+
         state.animateScrollBy(
             value = delta,
             animationSpec =
@@ -414,13 +472,20 @@ private suspend fun centerLyricExactly(
     }
 
     /*
-     * Wait for the animation/layout to settle.
+     * Wait for the layout after scrolling.
      */
     withFrameNanos { }
 
     /*
-     * Recalculate because multiline text or font
-     * measurement can change the item size.
+     * Re-read the target because the item can have
+     * changed size after being selected.
+     *
+     * This is particularly important for:
+     *
+     * normal lyric -> active lyric
+     *
+     * because font size changes from 16sp to 21sp,
+     * or 18sp to 25sp in fullscreen.
      */
     val corrected =
         state.layoutInfo
@@ -430,31 +495,40 @@ private suspend fun centerLyricExactly(
             }
             ?: return
 
-    val correctedLayout =
-        state.layoutInfo
-
-    val correctedViewportCenter =
-        (
-            correctedLayout.viewportStartOffset +
-                correctedLayout.viewportEndOffset
-            ) / 2f
-
+    /*
+     * Recalculate actual item center.
+     */
     val correctedItemCenter =
         corrected.offset +
             corrected.size / 2f
 
+    /*
+     * Recalculate actual physical viewport center.
+     */
+    val correctedViewportCenter =
+        state.layoutInfo
+            .viewportSize
+            .height / 2f
+
+    /*
+     * Final difference.
+     */
     val correction =
         correctedItemCenter -
             correctedViewportCenter
 
     /*
-     * Small final correction for:
-     * - rounding
-     * - multiline lyrics
-     * - font remeasurement
-     * - padding changes
+     * Tiny final correction.
+     *
+     * Handles:
+     *
+     * - pixel rounding
+     * - multiline remeasurement
+     * - font-size change
+     * - padding change
      */
     if (abs(correction) > 1f) {
+
         state.scrollBy(
             value = correction
         )
