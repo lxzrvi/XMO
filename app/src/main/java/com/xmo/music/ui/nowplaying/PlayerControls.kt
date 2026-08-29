@@ -1,8 +1,9 @@
 package com.xmo.music.ui.nowplaying
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -14,13 +15,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
 import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Pause
-import com.composables.icons.lucide.Play
 import com.composables.icons.lucide.Repeat1
 import com.composables.icons.lucide.Repeat2
 import com.composables.icons.lucide.Shuffle
-import com.composables.icons.lucide.SkipBack
-import com.composables.icons.lucide.SkipForward
 
 @Composable
 internal fun PlayerControls(
@@ -40,10 +37,11 @@ internal fun PlayerControls(
 ) {
     Row(
         Modifier.fillMaxWidth(),
-        horizontalArrangement =
-            Arrangement.Center,
         verticalAlignment =
-            Alignment.CenterVertically
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            androidx.compose.foundation.layout
+                .Arrangement.Center
     ) {
         BarePlayerButton(
             size = 45.dp,
@@ -64,11 +62,13 @@ internal fun PlayerControls(
                         foreground
                     },
                 modifier =
-                    Modifier.size(23.dp)
+                    Modifier.size(
+                        23.dp
+                    )
             )
         }
 
-        androidx.compose.foundation.layout.Spacer(
+        Spacer(
             Modifier.size(12.dp)
         )
 
@@ -76,14 +76,11 @@ internal fun PlayerControls(
             size = 47.dp,
             enabled =
                 hasPrevious,
-            onClick = previous
+            onClick =
+                previous
         ) {
-            Icon(
-                imageVector =
-                    Lucide.SkipBack,
-                contentDescription =
-                    "Previous",
-                tint =
+            XmoPreviousIcon(
+                color =
                     foreground.copy(
                         alpha =
                             if (
@@ -95,12 +92,14 @@ internal fun PlayerControls(
                             }
                     ),
                 modifier =
-                    Modifier.size(29.dp)
+                    Modifier.size(
+                        31.dp
+                    )
             )
         }
 
-        androidx.compose.foundation.layout.Spacer(
-            Modifier.size(5.dp)
+        Spacer(
+            Modifier.size(4.dp)
         )
 
         BarePlayerButton(
@@ -108,7 +107,7 @@ internal fun PlayerControls(
             onClick =
                 togglePlay
         ) {
-            androidx.compose.foundation.layout.Box(
+            Box(
                 Modifier
                     .size(58.dp)
                     .background(
@@ -120,56 +119,60 @@ internal fun PlayerControls(
                 contentAlignment =
                     Alignment.Center
             ) {
-                Icon(
-                    imageVector =
-                        if (isPlaying) {
-                            Lucide.Pause
-                        } else {
-                            Lucide.Play
-                        },
-                    contentDescription =
-                        if (isPlaying) {
-                            "Pause"
-                        } else {
-                            "Play"
-                        },
-                    tint = foreground,
-                    modifier =
-                        Modifier.size(35.dp)
-                )
+                if (isPlaying) {
+                    XmoPauseIcon(
+                        color =
+                            foreground,
+                        modifier =
+                            Modifier.size(
+                                36.dp
+                            )
+                    )
+                } else {
+                    XmoPlayIcon(
+                        color =
+                            foreground,
+                        modifier =
+                            Modifier.size(
+                                37.dp
+                            )
+                    )
+                }
             }
         }
 
-        androidx.compose.foundation.layout.Spacer(
-            Modifier.size(12.dp)
+        Spacer(
+            Modifier.size(4.dp)
         )
 
         BarePlayerButton(
             size = 47.dp,
-            enabled = hasNext,
-            onClick = next
+            enabled =
+                hasNext,
+            onClick =
+                next
         ) {
-            Icon(
-                imageVector =
-                    Lucide.SkipForward,
-                contentDescription =
-                    "Next",
-                tint =
+            XmoNextIcon(
+                color =
                     foreground.copy(
                         alpha =
-                            if (hasNext) {
+                            if (
+                                hasNext
+                            ) {
                                 1f
                             } else {
                                 .30f
                             }
                     ),
                 modifier =
-                    Modifier.size(29.dp)
+                    Modifier.size(
+                        31.dp
+                    )
             )
         }
 
-        androidx.compose.foundation.layout.Spacer(
-            Modifier.size(5.dp)
+        Spacer(
+            Modifier.size(12.dp)
         )
 
         BarePlayerButton(
@@ -208,7 +211,9 @@ internal fun PlayerControls(
                         accent
                     },
                 modifier =
-                    Modifier.size(23.dp)
+                    Modifier.size(
+                        23.dp
+                    )
             )
         }
     }
