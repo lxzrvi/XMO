@@ -19,25 +19,20 @@ internal fun PlayerBackground(
     val base =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFFF1F3F6)
-
+                Color(0xFFF4F6F9)
+    
             XmoTheme.Dark ->
-                Color(0xFF151518)
-
+                Color(0xFF202126)
+    
             XmoTheme.Amoled ->
-                Color.Black
+                Color(0xFF09090A)
         }
 
     val artworkStrength =
         when (theme) {
-            XmoTheme.Light ->
-                .19f
-
-            XmoTheme.Dark ->
-                .22f
-
-            XmoTheme.Amoled ->
-                .18f
+            XmoTheme.Light -> .24f
+            XmoTheme.Dark -> .26f
+            XmoTheme.Amoled -> .22f
         }
 
     val secondaryStrength =
