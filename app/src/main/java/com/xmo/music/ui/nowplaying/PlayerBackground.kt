@@ -16,70 +16,73 @@ internal fun PlayerBackground(
     deep: Color,
     theme: XmoTheme
 ) {
+    /*
+     * The neutral base itself is deliberately lighter than the
+     * previous implementation. Artwork contributes tint, not a
+     * dark solid backdrop.
+     */
     val base =
         when (theme) {
             XmoTheme.Light ->
                 Color(0xFFF4F6F9)
-    
+
             XmoTheme.Dark ->
-                Color(0xFF202126)
-    
+                Color(0xFF24262B)
+
             XmoTheme.Amoled ->
-                Color(0xFF09090A)
+                Color(0xFF090A0C)
         }
 
-    val artworkStrength =
+    val primary =
         when (theme) {
-            XmoTheme.Light -> .24f
-            XmoTheme.Dark -> .26f
-            XmoTheme.Amoled -> .22f
+            XmoTheme.Light ->
+                .30f
+
+            XmoTheme.Dark ->
+                .30f
+
+            XmoTheme.Amoled ->
+                .25f
         }
 
-    val secondaryStrength =
-        artworkStrength * .72f
+    val secondary =
+        primary * .55f
+
+    /*
+     * Mix the raw deep color back towards dominant. This stops a
+     * very dark Palette-derived "deep" field from muddying the
+     * screen.
+     */
+    val softDeep =
+        mixColor(
+            from = deep,
+            to = dominant,
+            fraction = .58f
+        )
 
     Canvas(
         Modifier
             .fillMaxSize()
             .background(base)
     ) {
-        /*
-         * Wide, low-opacity color fields. No solid dominant fill.
-         */
         drawRect(
             Brush.radialGradient(
                 colors =
                     listOf(
                         dominant.copy(
+                            alpha = primary
+                        ),
+                        dominant.copy(
                             alpha =
-                                artworkStrength
+                                primary *
+                                    .10f
                         ),
                         Color.Transparent
                     ),
                 center =
                     Offset(
                         size.width * .12f,
-                        size.height * .13f
-                    ),
-                radius =
-                    size.width * 1.18f
-            )
-        )
-
-        drawRect(
-            Brush.radialGradient(
-                colors =
-                    listOf(
-                        deep.copy(
-                            alpha =
-                                secondaryStrength
-                        ),
-                        Color.Transparent
-                    ),
-                center =
-                    Offset(
-                        size.width * .88f,
-                        size.height * .28f
+                        size.height * .12f
                     ),
                 radius =
                     size.width * 1.22f
@@ -90,20 +93,19 @@ internal fun PlayerBackground(
             Brush.radialGradient(
                 colors =
                     listOf(
-                        dominant.copy(
+                        softDeep.copy(
                             alpha =
-                                artworkStrength *
-                                    .72f
+                                secondary
                         ),
                         Color.Transparent
                     ),
                 center =
                     Offset(
-                        size.width * .17f,
-                        size.height * .63f
+                        size.width * .90f,
+                        size.height * .25f
                     ),
                 radius =
-                    size.width * 1.25f
+                    size.width * 1.30f
             )
         )
 
@@ -111,58 +113,79 @@ internal fun PlayerBackground(
             Brush.radialGradient(
                 colors =
                     listOf(
-                        deep.copy(
+                        dominant.copy(
                             alpha =
-                                secondaryStrength *
-                                    .75f
+                                primary *
+                                    .72f
                         ),
                         Color.Transparent
                     ),
                 center =
                     Offset(
-                        size.width * .86f,
-                        size.height * .83f
+                        size.width * .10f,
+                        size.height * .58f
                     ),
                 radius =
-                    size.width * 1.28f
+                    size.width * 1.34f
+            )
+        )
+
+        drawRect(
+            Brush.radialGradient(
+                colors =
+                    listOf(
+                        softDeep.copy(
+                            alpha =
+                                secondary *
+                                    .64f
+                        ),
+                        Color.Transparent
+                    ),
+                center =
+                    Offset(
+                        size.width * .88f,
+                        size.height * .78f
+                    ),
+                radius =
+                    size.width * 1.38f
             )
         )
 
         /*
-         * Tiny neutral integration layer keeps all four fields
-         * visually joined rather than looking like circles.
+         * Gentle light veil rather than a dark veil.
          */
-        drawRect(
-            Brush.verticalGradient(
-                colors =
-                    when (theme) {
-                        XmoTheme.Light ->
+        when (theme) {
+            XmoTheme.Light -> {
+                drawRect(
+                    Brush.verticalGradient(
+                        colors =
                             listOf(
                                 Color.White.copy(
-                                    alpha = .025f
+                                    alpha = .05f
                                 ),
                                 Color.White.copy(
-                                    alpha = .10f
+                                    alpha = .13f
                                 )
                             )
+                    )
+                )
+            }
 
-                        XmoTheme.Dark ->
-                            listOf(
-                                Color.Transparent,
-                                Color.Black.copy(
-                                    alpha = .08f
-                                )
-                            )
+            XmoTheme.Dark -> {
+                drawRect(
+                    Color.White.copy(
+                        alpha = .018f
+                    )
+                )
+            }
 
-                        XmoTheme.Amoled ->
-                            listOf(
-                                Color.Transparent,
-                                Color.Black.copy(
-                                    alpha = .20f
-                                )
-                            )
-                    }
-            )
-        )
+            XmoTheme.Amoled -> {
+                /*
+                 * AMOLED remains black-based, but artwork fields
+                 * stay visible rather than being covered by an
+                 * additional dark gradient.
+                 */
+            }
+        }
     }
 }
