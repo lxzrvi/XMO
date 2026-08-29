@@ -25,10 +25,11 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -67,6 +68,7 @@ fun NowPlaying(
     previous: () -> Unit,
     previousItem: () -> Unit,
     next: () -> Unit,
+    playQueueIndex: (Int) -> Unit,
     seekTo: (Long) -> Unit,
     toggleLike: () -> Unit,
     toggleShuffle: () -> Unit,
@@ -92,12 +94,6 @@ fun NowPlaying(
 
     val accent =
         LocalXmoAccent.current
-
-    /*
-     * =========================================================
-     * CURRENT QUEUE WINDOW
-     * =========================================================
-     */
 
     val currentIndex =
         state.currentIndex
@@ -146,8 +142,8 @@ fun NowPlaying(
             if (artist.isBlank()) {
                 0
             } else {
-                songs.count { song ->
-                    song.artist
+                songs.count {
+                    it.artist
                         .trim()
                         .equals(
                             artist,
@@ -156,12 +152,6 @@ fun NowPlaying(
                 }
             }
         }
-
-    /*
-     * =========================================================
-     * CAROUSEL + COLORS
-     * =========================================================
-     */
 
     val carousel =
         remember {
@@ -186,7 +176,9 @@ fun NowPlaying(
             currentSongId =
                 state.currentSongId,
             coverX =
-                carousel.x
+                carousel.x,
+            transactionActive =
+                carousel.transactionActive
         )
 
     val displayColor =
@@ -207,16 +199,11 @@ fun NowPlaying(
 
     val themeColors =
         playerThemeColors(
-            theme = theme,
+            theme =
+                theme,
             displayColor =
                 displayColor
         )
-
-    /*
-     * =========================================================
-     * REAL PLAYBACK POSITION
-     * =========================================================
-     */
 
     LaunchedEffect(
         state.currentSongId,
@@ -236,12 +223,6 @@ fun NowPlaying(
             )
         }
     }
-
-    /*
-     * =========================================================
-     * LYRICS
-     * =========================================================
-     */
 
     var fileLyrics by remember(
         state.currentSongId,
@@ -291,12 +272,6 @@ fun NowPlaying(
             }
         }
 
-    /*
-     * =========================================================
-     * UI STATE
-     * =========================================================
-     */
-
     var overlay by remember {
         mutableStateOf<PlayerOverlay?>(
             null
@@ -319,10 +294,6 @@ fun NowPlaying(
         )
     }
 
-    /*
-     * Original timer duration is locally retained only when the
-     * timer is actually set through this player instance.
-     */
     var sleepTotalMs by remember {
         mutableStateOf<Long?>(
             null
@@ -340,12 +311,6 @@ fun NowPlaying(
         }
     }
 
-    /*
-     * =========================================================
-     * OPEN / CLOSE
-     * =========================================================
-     */
-
     val entrance =
         remember {
             Animatable(1f)
@@ -357,8 +322,7 @@ fun NowPlaying(
         }
 
     var screenHeight by remember {
-        androidx.compose.runtime
-            .mutableFloatStateOf(1f)
+        mutableFloatStateOf(1f)
     }
 
     var dismissing by remember {
@@ -424,24 +388,9 @@ fun NowPlaying(
         }
     }
 
-    /*
-     * =========================================================
-     * ROOT
-     * =========================================================
-     */
-
     Box(
         Modifier
             .fillMaxSize()
-
-            /*
-             * Makes the full-screen Now Playing itself a pointer
-             * hit target. Underlying Home/NavBar must not receive
-             * touches while this overlay is composed.
-             *
-             * Events aren't consumed here because child controls
-             * still need their own gestures.
-             */
             .pointerInput(Unit) {
                 awaitPointerEventScope {
                     while (true) {
@@ -449,21 +398,18 @@ fun NowPlaying(
                     }
                 }
             }
-
             .onSizeChanged {
                 screenHeight =
                     it.height
                         .toFloat()
                         .coerceAtLeast(1f)
             }
-
             .graphicsLayer {
                 translationY =
                     playerY.value +
                         entrance.value *
                         screenHeight
             }
-
             .clip(
                 RoundedCornerShape(
                     topStart =
@@ -501,40 +447,31 @@ fun NowPlaying(
             theme = theme
         )
 
-        /*
-         * =====================================================
-         * MAIN PLAYER
-         * =====================================================
-         */
-
         Column(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
         ) {
             PlayerHeader(
-                source = source,
+                source =
+                    source,
                 sourceIsCategory =
                     sourceIsCategory,
                 foreground =
                     themeColors.overlayText,
-                playerY = playerY,
+                playerY =
+                    playerY,
                 screenHeight =
                     screenHeight,
-
                 close = {
                     closePlayer()
                 },
-
                 dismissAfterDrag = {
-                    if (
-                        !dismissing
-                    ) {
+                    if (!dismissing) {
                         dismissing = true
                         dismiss()
                     }
                 },
-
                 share = {
                     currentSong?.let {
                         shareSong(
@@ -543,16 +480,12 @@ fun NowPlaying(
                         )
                     }
                 },
-
                 options = {
                     overlay =
                         PlayerOverlay.Options
                 }
             )
 
-            /*
-             * Artwork lower placement.
-             */
             Spacer(
                 Modifier.height(93.dp)
             )
@@ -577,40 +510,35 @@ fun NowPlaying(
                     carousel,
                 showLyrics =
                     artworkLyrics,
-                lyrics = lyrics,
+                lyrics =
+                    lyrics,
                 position =
                     state.position,
-                colors = colors,
-                accent = accent,
-                theme = theme,
+                colors =
+                    colors,
+                accent =
+                    accent,
+                theme =
+                    theme,
                 previousSong =
                     previousItem,
-                nextSong = next,
-
+                nextSong =
+                    next,
                 toggleLyrics = {
                     artworkLyrics =
                         !artworkLyrics
                 },
-
                 pickLyrics = {
                     lyricPicker.launch(
                         arrayOf("*/*")
                     )
                 },
-
                 fullscreenLyrics = {
-                    /*
-                     * Keep cover lyrics alive beneath fullscreen.
-                     * Closing naturally returns to it.
-                     */
                     artworkLyrics = true
                     fullLyrics = true
                 }
             )
 
-            /*
-             * Artwork -> player panel.
-             */
             Spacer(
                 Modifier.height(95.dp)
             )
@@ -628,11 +556,14 @@ fun NowPlaying(
                     .background(
                         themeColors.panel
                     )
+                    /*
+                     * Panel content starts slightly higher.
+                     */
                     .padding(
                         start = 12.dp,
-                        top = 15.dp,
+                        top = 10.dp,
                         end = 12.dp,
-                        bottom = 4.dp
+                        bottom = 2.dp
                     )
             ) {
                 PlayerInfo(
@@ -652,7 +583,8 @@ fun NowPlaying(
                         colors,
                     accent =
                         accent,
-
+                    softButton =
+                        themeColors.softButton,
                     toggleLike = {
                         toggleLike()
 
@@ -665,39 +597,30 @@ fun NowPlaying(
                                 }
                             )
                     },
-
                     openCategories = {
                         overlay =
                             PlayerOverlay.Options
                     },
-
                     openSleep = {
                         overlay =
                             PlayerOverlay.Sleep
                     },
-
                     openQueue = {
                         overlay =
                             PlayerOverlay.Queue
                     },
-
                     openDetails = {
                         overlay =
                             PlayerOverlay.Details
                     },
-
                     openArtist = {
                         overlay =
                             PlayerOverlay.Artist
                     }
                 )
 
-                /*
-                 * Progress begins shortly after title/artist,
-                 * instead of being forced to the panel bottom.
-                 */
                 Spacer(
-                    Modifier.height(5.dp)
+                    Modifier.height(3.dp)
                 )
 
                 PlayerBody(
@@ -741,12 +664,6 @@ fun NowPlaying(
             }
         }
 
-        /*
-         * =====================================================
-         * OVERLAYS
-         * =====================================================
-         */
-
         when (overlay) {
             PlayerOverlay.Queue -> {
                 QueueSheet(
@@ -755,6 +672,8 @@ fun NowPlaying(
                         state.currentSongId,
                     colors =
                         colors,
+                    playIndex =
+                        playQueueIndex,
                     dismiss = {
                         overlay = null
                     }
@@ -771,24 +690,12 @@ fun NowPlaying(
                         colors,
                     liked =
                         liked,
-
                     close = {
                         overlay = null
                     },
-
                     toggleLike = {
                         toggleLike()
-
-                        pop =
-                            PopMessage(
-                                if (liked) {
-                                    "Removed from Liked Songs"
-                                } else {
-                                    "Added to Liked Songs"
-                                }
-                            )
                     },
-
                     share = {
                         currentSong?.let {
                             shareSong(
@@ -799,7 +706,6 @@ fun NowPlaying(
 
                         overlay = null
                     },
-
                     setCategory = {
                             category,
                             add ->
@@ -808,31 +714,13 @@ fun NowPlaying(
                             category.id,
                             add
                         )
-
-                        pop =
-                            PopMessage(
-                                if (add) {
-                                    "Added to ${category.name}"
-                                } else {
-                                    "Removed from ${category.name}"
-                                }
-                            )
                     },
+                    createCategory = {
+                            name ->
 
-                    createCategory = { name ->
-                        val created =
-                            createCategory(name)
-
-                        if (
-                            created != null
-                        ) {
-                            pop =
-                                PopMessage(
-                                    "Created ${created.name}"
-                                )
-                        }
-
-                        created != null
+                        createCategory(
+                            name
+                        ) != null
                     }
                 )
             }
@@ -844,11 +732,9 @@ fun NowPlaying(
                     active =
                         state.sleepTimerRemainingMs >
                             0L,
-
                     dismiss = {
                         overlay = null
                     },
-
                     setTimer = {
                             duration,
                             label ->
@@ -867,11 +753,8 @@ fun NowPlaying(
                                 "Sleep timer set for $label"
                             )
                     },
-
                     cancel = {
-                        sleepTotalMs =
-                            null
-
+                        sleepTotalMs = null
                         cancelSleepTimer()
 
                         overlay = null
@@ -916,39 +799,29 @@ fun NowPlaying(
                 Unit
         }
 
-        /*
-         * =====================================================
-         * FULLSCREEN LYRICS
-         * =====================================================
-         */
-
         AnimatedVisibility(
             visible =
                 fullLyrics,
-
             enter =
                 fadeIn(
-                    animationSpec =
-                        tween(280)
+                    tween(300)
                 ) +
                     slideInVertically(
                         animationSpec =
-                            tween(340),
+                            tween(360),
                         initialOffsetY = {
-                            it / 8
+                            it / 10
                         }
                     ),
-
             exit =
                 fadeOut(
-                    animationSpec =
-                        tween(230)
+                    tween(260)
                 ) +
                     slideOutVertically(
                         animationSpec =
-                            tween(310),
+                            tween(330),
                         targetOffsetY = {
-                            it / 8
+                            it / 10
                         }
                     )
         ) {
@@ -971,6 +844,8 @@ fun NowPlaying(
                     deep,
                 theme =
                     theme,
+                accent =
+                    accent,
                 isPlaying =
                     state.isPlaying,
                 canPrevious =
@@ -985,19 +860,12 @@ fun NowPlaying(
                     next,
                 seekTo =
                     seekTo,
-
                 close = {
                     fullLyrics = false
                     artworkLyrics = true
                 }
             )
         }
-
-        /*
-         * =====================================================
-         * POP
-         * =====================================================
-         */
 
         pop?.let {
             XmoPop(
