@@ -84,4 +84,8 @@ dependencies {
     implementation(
         "dev.chrisbanes.haze:haze-blur-materials:2.0.0-alpha05"
     )
+
+    // Lucide — app-wide XMO icon system
+    implementation("com.composables:icons-lucide:1.1.0"
+    )
 }
