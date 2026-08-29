@@ -5,12 +5,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.RoundRect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.drawscope.Fill
-import androidx.compose.ui.unit.dp
 
 @Composable
 internal fun XmoPlayIcon(
@@ -18,7 +15,7 @@ internal fun XmoPlayIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -26,48 +23,51 @@ internal fun XmoPlayIcon(
         val h =
             size.height
 
+        /*
+         * Same visual vertical bounds as Pause: ~22%..78%.
+         */
         val path =
             Path().apply {
                 moveTo(
-                    w * .31f,
-                    h * .19f
+                    w * .32f,
+                    h * .22f
                 )
 
                 cubicTo(
-                    w * .31f,
-                    h * .13f,
+                    w * .32f,
+                    h * .17f,
                     w * .38f,
-                    h * .10f,
-                    w * .44f,
-                    h * .14f
+                    h * .15f,
+                    w * .43f,
+                    h * .18f
                 )
 
                 lineTo(
-                    w * .80f,
-                    h * .42f
+                    w * .77f,
+                    h * .43f
                 )
 
                 cubicTo(
-                    w * .87f,
-                    h * .47f,
-                    w * .87f,
-                    h * .55f,
-                    w * .80f,
-                    h * .60f
+                    w * .84f,
+                    h * .48f,
+                    w * .84f,
+                    h * .52f,
+                    w * .77f,
+                    h * .57f
                 )
 
                 lineTo(
-                    w * .44f,
-                    h * .87f
+                    w * .43f,
+                    h * .82f
                 )
 
                 cubicTo(
                     w * .38f,
-                    h * .92f,
-                    w * .31f,
-                    h * .88f,
-                    w * .31f,
-                    h * .81f
+                    h * .85f,
+                    w * .32f,
+                    h * .82f,
+                    w * .32f,
+                    h * .78f
                 )
 
                 close()
@@ -75,8 +75,7 @@ internal fun XmoPlayIcon(
 
         drawPath(
             path = path,
-            color = color,
-            style = Fill
+            color = color
         )
     }
 }
@@ -87,27 +86,25 @@ internal fun XmoPauseIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val barWidth =
-            size.width * .21f
+            size.width * .20f
 
         val barHeight =
-            size.height * .62f
+            size.height * .56f
 
         val top =
-            size.height *
-                .19f
+            size.height * .22f
 
         val radius =
-            barWidth *
-                .42f
+            barWidth * .43f
 
         drawRoundRect(
             color = color,
             topLeft =
                 Offset(
-                    size.width * .25f,
+                    size.width * .27f,
                     top
                 ),
             size =
@@ -126,7 +123,7 @@ internal fun XmoPauseIcon(
             color = color,
             topLeft =
                 Offset(
-                    size.width * .54f,
+                    size.width * .53f,
                     top
                 ),
             size =
@@ -149,7 +146,7 @@ internal fun XmoPreviousIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -157,7 +154,7 @@ internal fun XmoPreviousIcon(
         val h =
             size.height
 
-        val barWidth =
+        val bar =
             w * .12f
 
         drawRoundRect(
@@ -165,71 +162,70 @@ internal fun XmoPreviousIcon(
             topLeft =
                 Offset(
                     w * .20f,
-                    h * .22f
+                    h * .24f
                 ),
             size =
                 Size(
-                    barWidth,
-                    h * .56f
+                    bar,
+                    h * .52f
                 ),
             cornerRadius =
                 CornerRadius(
-                    barWidth / 2f,
-                    barWidth / 2f
+                    bar / 2f,
+                    bar / 2f
                 )
         )
 
-        val first =
+        val path =
             Path().apply {
                 moveTo(
-                    w * .67f,
-                    h * .23f
+                    w * .70f,
+                    h * .24f
                 )
 
                 cubicTo(
-                    w * .72f,
-                    h * .19f,
-                    w * .77f,
-                    h * .23f,
-                    w * .77f,
+                    w * .74f,
+                    h * .21f,
+                    w * .78f,
+                    h * .24f,
+                    w * .78f,
                     h * .30f
                 )
 
                 lineTo(
-                    w * .77f,
+                    w * .78f,
                     h * .70f
                 )
 
                 cubicTo(
-                    w * .77f,
-                    h * .77f,
-                    w * .72f,
-                    h * .81f,
-                    w * .67f,
-                    h * .77f
+                    w * .78f,
+                    h * .76f,
+                    w * .74f,
+                    h * .79f,
+                    w * .70f,
+                    h * .76f
                 )
 
                 lineTo(
-                    w * .36f,
-                    h * .56f
+                    w * .37f,
+                    h * .55f
                 )
 
                 cubicTo(
-                    w * .28f,
+                    w * .30f,
                     h * .51f,
-                    w * .28f,
-                    h * .47f,
-                    w * .36f,
-                    h * .42f
+                    w * .30f,
+                    h * .49f,
+                    w * .37f,
+                    h * .45f
                 )
 
                 close()
             }
 
         drawPath(
-            path = first,
-            color = color,
-            style = Fill
+            path = path,
+            color = color
         )
     }
 }
@@ -240,7 +236,7 @@ internal fun XmoNextIcon(
     modifier: Modifier = Modifier
 ) {
     Canvas(
-        modifier = modifier
+        modifier
     ) {
         val w =
             size.width
@@ -248,7 +244,7 @@ internal fun XmoNextIcon(
         val h =
             size.height
 
-        val barWidth =
+        val bar =
             w * .12f
 
         drawRoundRect(
@@ -256,62 +252,62 @@ internal fun XmoNextIcon(
             topLeft =
                 Offset(
                     w * .68f,
-                    h * .22f
+                    h * .24f
                 ),
             size =
                 Size(
-                    barWidth,
-                    h * .56f
+                    bar,
+                    h * .52f
                 ),
             cornerRadius =
                 CornerRadius(
-                    barWidth / 2f,
-                    barWidth / 2f
+                    bar / 2f,
+                    bar / 2f
                 )
         )
 
         val path =
             Path().apply {
                 moveTo(
-                    w * .33f,
-                    h * .23f
+                    w * .30f,
+                    h * .24f
                 )
 
                 cubicTo(
-                    w * .28f,
-                    h * .19f,
-                    w * .23f,
-                    h * .23f,
-                    w * .23f,
+                    w * .26f,
+                    h * .21f,
+                    w * .22f,
+                    h * .24f,
+                    w * .22f,
                     h * .30f
                 )
 
                 lineTo(
-                    w * .23f,
+                    w * .22f,
                     h * .70f
                 )
 
                 cubicTo(
-                    w * .23f,
-                    h * .77f,
-                    w * .28f,
-                    h * .81f,
-                    w * .33f,
-                    h * .77f
+                    w * .22f,
+                    h * .76f,
+                    w * .26f,
+                    h * .79f,
+                    w * .30f,
+                    h * .76f
                 )
 
                 lineTo(
-                    w * .64f,
-                    h * .56f
+                    w * .63f,
+                    h * .55f
                 )
 
                 cubicTo(
-                    w * .72f,
+                    w * .70f,
                     h * .51f,
-                    w * .72f,
-                    h * .47f,
-                    w * .64f,
-                    h * .42f
+                    w * .70f,
+                    h * .49f,
+                    w * .63f,
+                    h * .45f
                 )
 
                 close()
@@ -319,8 +315,7 @@ internal fun XmoNextIcon(
 
         drawPath(
             path = path,
-            color = color,
-            style = Fill
+            color = color
         )
     }
 }
