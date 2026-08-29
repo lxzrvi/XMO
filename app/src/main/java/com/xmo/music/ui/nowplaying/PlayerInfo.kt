@@ -22,6 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.composables.icons.lucide.Clock3
+import com.composables.icons.lucide.Info
 import com.composables.icons.lucide.ListMusic
 import com.composables.icons.lucide.Lucide
 import com.xmo.music.ui.HomeColors
@@ -46,16 +47,22 @@ internal fun PlayerInfo(
     openArtist: () -> Unit
 ) {
     Box(
-        Modifier
-            .fillMaxWidth()
-            .height(104.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(
+                    104.dp
+                )
     ) {
         Row(
-            Modifier
-                .align(
-                    Alignment.TopStart
-                )
-                .padding(start = 4.dp),
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.TopStart
+                    )
+                    .padding(
+                        start = 4.dp
+                    ),
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
@@ -67,9 +74,12 @@ internal fun PlayerInfo(
                     toggleLike
             ) {
                 FilledHeart(
-                    filled = liked,
+                    filled =
+                        liked,
                     color =
-                        if (liked) {
+                        if (
+                            liked
+                        ) {
                             accent
                         } else {
                             colors.icon
@@ -78,7 +88,10 @@ internal fun PlayerInfo(
             }
 
             Spacer(
-                Modifier.width(7.dp)
+                modifier =
+                    Modifier.width(
+                        7.dp
+                    )
             )
 
             PremiumCircle(
@@ -92,7 +105,9 @@ internal fun PlayerInfo(
                     filled =
                         inCategory,
                     color =
-                        if (inCategory) {
+                        if (
+                            inCategory
+                        ) {
                             accent
                         } else {
                             colors.icon
@@ -109,15 +124,19 @@ internal fun PlayerInfo(
                     .align(
                         Alignment.TopEnd
                     )
-                    .padding(end = 4.dp)
+                    .padding(
+                        end = 4.dp
+                    )
         ) {
             SleepRingButton(
                 remainingMs =
                     sleepRemainingMs,
                 totalMs =
                     sleepTotalMs,
-                colors = colors,
-                accent = accent,
+                colors =
+                    colors,
+                accent =
+                    accent,
                 onClick =
                     openSleep
             )
@@ -136,7 +155,7 @@ internal fun PlayerInfo(
                         colors.icon,
                     modifier =
                         Modifier.size(
-                            18.dp
+                            19.dp
                         )
                 )
             }
@@ -146,27 +165,32 @@ internal fun PlayerInfo(
                 onClick =
                     openDetails
             ) {
-                Text(
-                    text = "?",
-                    color =
+                Icon(
+                    imageVector =
+                        Lucide.Info,
+                    contentDescription =
+                        "Song details",
+                    tint =
                         colors.icon,
-                    fontFamily =
-                        XmoFont.bold,
-                    fontSize = 18.sp
+                    modifier =
+                        Modifier.size(
+                            19.dp
+                        )
                 )
             }
         }
 
         Column(
-            Modifier
-                .align(
-                    Alignment.BottomStart
-                )
-                .fillMaxWidth()
-                .padding(
-                    start = 4.dp,
-                    end = 8.dp
-                )
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.BottomStart
+                    )
+                    .fillMaxWidth()
+                    .padding(
+                        start = 4.dp,
+                        end = 8.dp
+                    )
         ) {
             Text(
                 text =
@@ -177,7 +201,8 @@ internal fun PlayerInfo(
                     colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 23.sp,
+                fontSize =
+                    23.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis
@@ -192,7 +217,8 @@ internal fun PlayerInfo(
                     colors.sub,
                 fontFamily =
                     XmoFont.medium,
-                fontSize = 14.sp,
+                fontSize =
+                    14.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis,
@@ -216,7 +242,8 @@ private fun SleepRingButton(
     onClick: () -> Unit
 ) {
     val active =
-        remainingMs > 0L
+        remainingMs >
+            0L
 
     val progress =
         if (
@@ -225,8 +252,10 @@ private fun SleepRingButton(
             totalMs > 0L
         ) {
             (
-                remainingMs.toFloat() /
-                    totalMs.toFloat()
+                remainingMs
+                    .toFloat() /
+                    totalMs
+                        .toFloat()
                 )
                 .coerceIn(
                     0f,
@@ -237,13 +266,17 @@ private fun SleepRingButton(
         }
 
     Box(
-        Modifier.size(40.dp),
+        modifier =
+            Modifier.size(
+                40.dp
+            ),
         contentAlignment =
             Alignment.Center
     ) {
         CapsuleButton(
             size = 40.dp,
-            onClick = onClick
+            onClick =
+                onClick
         ) {
             Icon(
                 imageVector =
@@ -251,30 +284,48 @@ private fun SleepRingButton(
                 contentDescription =
                     "Sleep timer",
                 tint =
-                    if (active) {
+                    if (
+                        active
+                    ) {
                         accent
                     } else {
                         colors.icon
                     },
                 modifier =
-                    Modifier.size(18.dp)
+                    Modifier.size(
+                        18.dp
+                    )
             )
         }
 
-        if (progress != null) {
+        /*
+         * No made-up percentage. Ring only exists when the
+         * original timer duration is actually known.
+         */
+        if (
+            progress != null
+        ) {
             Canvas(
-                Modifier.size(32.dp)
+                modifier =
+                    Modifier.size(
+                        32.dp
+                    )
             ) {
                 drawArc(
-                    color = accent,
-                    startAngle = -90f,
+                    color =
+                        accent,
+                    startAngle =
+                        -90f,
                     sweepAngle =
-                        360f * progress,
-                    useCenter = false,
+                        360f *
+                            progress,
+                    useCenter =
+                        false,
                     style =
                         Stroke(
                             width =
-                                1.5.dp.toPx(),
+                                1.5.dp
+                                    .toPx(),
                             cap =
                                 StrokeCap.Round
                         )
