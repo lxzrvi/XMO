@@ -17,7 +17,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import com.xmo.music.XmoTheme
 import com.xmo.music.ui.Artwork
-import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -25,32 +24,40 @@ import kotlin.math.max
 internal class PlayerColorState(
     initial: Color
 ) {
-    var current by mutableStateOf(initial)
-        internal set
-
-    var previous by mutableStateOf(initial)
-        internal set
-
-    var next by mutableStateOf(initial)
+    /*
+     * Latest real Palette result belonging to Media3 current.
+     *
+     * This is NOT automatically the visually committed color.
+     */
+    var current by
+        mutableStateOf(initial)
         internal set
 
     /*
-     * Last fully accepted visual song color.
+     * Visual adjacent Palette window.
+     *
+     * These remain frozen while a carousel transaction is active.
      */
-    var committed by mutableStateOf(initial)
+    var previous by
+        mutableStateOf(initial)
+        internal set
+
+    var next by
+        mutableStateOf(initial)
         internal set
 
     /*
-     * Actual resting color drawn by the player.
+     * Last visually completed song color.
      */
-    var rendered by mutableStateOf(initial)
+    var committed by
+        mutableStateOf(initial)
         internal set
 
     /*
-     * Used to make the header foreground less eager to flip
-     * around the luminance boundary.
+     * Actual resting color drawn by Now Playing.
      */
-    var useDarkOverlayText by mutableStateOf(false)
+    var rendered by
+        mutableStateOf(initial)
         internal set
 }
 
@@ -65,224 +72,295 @@ internal fun rememberPlayerColors(
     coverX: Animatable<Float, *>,
     transactionActive: Boolean
 ): PlayerColorState {
-    val initial = Color(0xFF6D7078)
+    val initial =
+        Color(0xFF6D7078)
 
-    val state = remember {
-        PlayerColorState(initial)
-    }
+    val state =
+        remember {
+            PlayerColorState(
+                initial = initial
+            )
+        }
 
     /*
-     * Small in-memory color cache local to Now Playing.
+     * Compose-side Palette cache.
      *
-     * Artwork also has its own cache, but this prevents repeated
-     * Compose-side extraction while queue windows are moving.
+     * Artwork already has caching too, but retaining the lifted
+     * result here prevents repeat processing as the queue window
+     * changes.
      */
-    val paletteCache = remember {
-        mutableStateMapOf<String, Color>()
-    }
+    val paletteCache =
+        remember {
+            mutableStateMapOf<String, Color>()
+        }
 
-    suspend fun extract(uri: Uri?): Color {
+    suspend fun extract(
+        uri: Uri?
+    ): Color {
         if (uri == null) {
             return state.committed
         }
 
-        val key = uri.toString()
+        val key =
+            uri.toString()
 
-        paletteCache[key]?.let {
-            return it
-        }
+        paletteCache[key]
+            ?.let {
+                return it
+            }
 
         val raw =
             Artwork.cached(uri)
                 ?: Artwork.color(
-                    context = context,
-                    uri = uri
+                    context,
+                    uri
                 )
 
-        val lifted = liftArtworkColor(raw)
+        val lifted =
+            liftArtworkColor(raw)
 
-        paletteCache[key] = lifted
+        paletteCache[key] =
+            lifted
 
         return lifted
     }
 
     /*
-     * ---------------------------------------------------------
-     * CURRENT
-     * ---------------------------------------------------------
+     * =========================================================
+     * CURRENT MEDIA3 COLOR
+     * =========================================================
      *
-     * This represents Media3 truth, NOT necessarily what is
-     * already visually committed.
+     * The Palette result is allowed to become current as soon as
+     * the real song changes, but rendered/committed are not.
      */
     LaunchedEffect(
         currentSongId,
         currentArtwork,
         fallbackArtwork
     ) {
-        val requestedSongId = currentSongId
+        val requestedSongId =
+            currentSongId
+
         val requestedArtwork =
-            currentArtwork ?: fallbackArtwork
+            currentArtwork
+                ?: fallbackArtwork
 
         val extracted =
             if (requestedArtwork != null) {
-                extract(requestedArtwork)
+                extract(
+                    requestedArtwork
+                )
             } else {
                 state.committed
             }
 
         /*
-         * LaunchedEffect cancellation normally protects us, but
-         * keeping the request identity explicit makes the visual
-         * contract clear.
+         * Prevent a stale extraction from replacing the newest
+         * Media3 song color.
          */
-        if (requestedSongId == currentSongId) {
-            state.current = extracted
+        if (
+            requestedSongId ==
+            currentSongId
+        ) {
+            state.current =
+                extracted
         }
     }
 
     /*
-     * ---------------------------------------------------------
-     * PREVIOUS
-     * ---------------------------------------------------------
+     * =========================================================
+     * PREVIOUS PALETTE
+     * =========================================================
      *
-     * Never fallback to state.current here. current may already
-     * belong to the newly reported Media3 item.
+     * Do not let a newly recomposed queue window replace the old
+     * visual Palette window while the cover is still travelling.
      */
-    LaunchedEffect(previousArtwork) {
+    LaunchedEffect(
+        previousArtwork,
+        transactionActive
+    ) {
+        if (
+            transactionActive
+        ) {
+            return@LaunchedEffect
+        }
+
         state.previous =
-            if (previousArtwork != null) {
-                extract(previousArtwork)
-            } else {
-                state.committed
-            }
+            previousArtwork
+                ?.let {
+                    extract(it)
+                }
+                ?: state.committed
     }
 
     /*
-     * ---------------------------------------------------------
-     * NEXT
-     * ---------------------------------------------------------
+     * =========================================================
+     * NEXT PALETTE
+     * =========================================================
      */
-    LaunchedEffect(nextArtwork) {
+    LaunchedEffect(
+        nextArtwork,
+        transactionActive
+    ) {
+        if (
+            transactionActive
+        ) {
+            return@LaunchedEffect
+        }
+
         state.next =
-            if (nextArtwork != null) {
-                extract(nextArtwork)
-            } else {
-                state.committed
-            }
+            nextArtwork
+                ?.let {
+                    extract(it)
+                }
+                ?: state.committed
     }
 
     /*
-     * ---------------------------------------------------------
-     * RESTING COMMIT
-     * ---------------------------------------------------------
+     * =========================================================
+     * RESTING COLOR COMMIT
+     * =========================================================
      *
-     * Do not immediately accept a new current color simply
-     * because Media3 changed currentSongId.
+     * No arbitrary delay/timer.
      *
-     * Wait until:
-     * 1. carousel transaction is finished
-     * 2. artwork displacement is back at zero
-     * 3. state remains stable for a short visual boundary
-     *
-     * The small delay is NOT a fake song-transition timer. It
-     * only debounces Compose/Media3 state publication ordering.
+     * New current color is accepted only when the real visual
+     * transaction is no longer active and the carousel is at
+     * rest.
      */
     LaunchedEffect(
         currentSongId,
         transactionActive,
         state.current
     ) {
-        if (transactionActive) {
-            return@LaunchedEffect
-        }
-
-        if (abs(coverX.value) >= 1f) {
-            return@LaunchedEffect
-        }
-
-        val expectedSongId = currentSongId
-        val expectedColor = state.current
-
-        delay(32)
-
         if (
-            expectedSongId != currentSongId ||
             transactionActive ||
             abs(coverX.value) >= 1f ||
-            expectedColor != state.current ||
-            expectedColor == state.committed
+            state.current == state.committed
         ) {
             return@LaunchedEffect
         }
 
-        val from = state.rendered
-        val to = expectedColor
+        val expectedSongId =
+            currentSongId
+
+        val from =
+            state.rendered
+
+        val to =
+            state.current
 
         animate(
             initialValue = 0f,
             targetValue = 1f,
-            animationSpec = tween(
-                durationMillis = 500
-            )
+            animationSpec =
+                tween<Float>(
+                    durationMillis = 460
+                )
         ) { value, _ ->
-            val rawFraction = value ?: 0f
+
+            val fraction =
+                value ?: 0f
 
             state.rendered =
                 mixColor(
                     from = from,
                     to = to,
-                    fraction = smoothFraction(rawFraction)
+                    fraction =
+                        smoothFraction(
+                            fraction
+                        )
                 )
         }
 
         /*
-         * Only commit if the visual target is still valid.
+         * Do not commit an old animation if another song or
+         * visual transaction took ownership in the meantime.
          */
         if (
-            expectedSongId == currentSongId &&
             !transactionActive &&
-            abs(coverX.value) < 1f &&
-            expectedColor == state.current
+            currentSongId ==
+            expectedSongId &&
+            state.current == to
         ) {
-            state.committed = to
-            state.rendered = to
+            state.committed =
+                to
+
+            state.rendered =
+                to
         }
     }
 
     return state
 }
 
+/*
+ * =============================================================
+ * CURRENT DISPLAY COLOR
+ * =============================================================
+ */
+
 internal fun playerDisplayColor(
     colors: PlayerColorState,
     coverX: Float,
     coverWidth: Float
 ): Color {
-    val width = coverWidth.coerceAtLeast(1f)
+    val width =
+        coverWidth
+            .coerceAtLeast(1f)
 
     val fraction =
-        (coverX / width)
-            .coerceIn(-1f, 1f)
+        (
+            coverX /
+                width
+            )
+            .coerceIn(
+                -1f,
+                1f
+            )
 
     /*
-     * Resting UI is always the controlled rendered color.
+     * At rest, only use the controlled rendered color.
      */
-    if (abs(fraction) < .001f) {
+    if (
+        abs(fraction) <
+        .001f
+    ) {
         return colors.rendered
     }
 
+    /*
+     * x < 0 = Next
+     * x > 0 = Previous
+     *
+     * Adjacent Palette colors remain frozen for the whole visual
+     * transaction.
+     */
     val destination =
-        if (fraction < 0f) {
+        if (
+            fraction < 0f
+        ) {
             colors.next
         } else {
             colors.previous
         }
 
     return mixColor(
-        from = colors.committed,
-        to = destination,
-        fraction = smoothFraction(abs(fraction))
+        from =
+            colors.committed,
+        to =
+            destination,
+        fraction =
+            smoothFraction(
+                abs(fraction)
+            )
     )
 }
+
+/*
+ * =============================================================
+ * THEME COLORS
+ * =============================================================
+ */
 
 internal data class PlayerThemeColors(
     val overlayText: Color,
@@ -298,7 +376,10 @@ internal fun playerThemeColors(
     displayColor: Color
 ): PlayerThemeColors {
     val overlayText =
-        if (displayColor.luminance() > .67f) {
+        if (
+            displayColor.luminance() >
+            .67f
+        ) {
             Color(0xFF151519)
         } else {
             Color.White
@@ -317,63 +398,87 @@ internal fun playerThemeColors(
     val softButton =
         when (theme) {
             XmoTheme.Light ->
-                Color.Black.copy(alpha = .065f)
+                Color.Black.copy(
+                    alpha = .065f
+                )
 
             XmoTheme.Dark ->
-                Color.White.copy(alpha = .105f)
+                Color.White.copy(
+                    alpha = .105f
+                )
 
             XmoTheme.Amoled ->
-                Color.White.copy(alpha = .12f)
+                Color.White.copy(
+                    alpha = .12f
+                )
         }
 
     /*
-     * More translucent than before so artwork color remains
-     * visible through the lower player surface.
-     *
-     * Do not make AMOLED completely opaque black here; the
-     * artwork-derived field should still be perceptible.
+     * Translucent lower panel so artwork color remains visible.
      */
     val panel =
         when (theme) {
             XmoTheme.Light ->
-                Color.White.copy(alpha = .52f)
+                Color.White.copy(
+                    alpha = .52f
+                )
 
             XmoTheme.Dark ->
-                Color(0xFF202126).copy(alpha = .52f)
+                Color(0xFF202126)
+                    .copy(
+                        alpha = .52f
+                    )
 
             XmoTheme.Amoled ->
-                Color(0xFF08090B).copy(alpha = .62f)
+                Color(0xFF08090B)
+                    .copy(
+                        alpha = .62f
+                    )
         }
 
     val border =
         when (theme) {
             XmoTheme.Light ->
-                Color.White.copy(alpha = .42f)
+                Color.White.copy(
+                    alpha = .42f
+                )
 
             XmoTheme.Dark ->
-                Color.White.copy(alpha = .13f)
+                Color.White.copy(
+                    alpha = .13f
+                )
 
             XmoTheme.Amoled ->
-                Color.White.copy(alpha = .15f)
+                Color.White.copy(
+                    alpha = .15f
+                )
         }
 
     return PlayerThemeColors(
-        overlayText = overlayText,
-        controls = controls,
-        playBackground = softButton,
-        panel = panel,
-        border = border,
-        softButton = softButton
+        overlayText =
+            overlayText,
+        controls =
+            controls,
+        playBackground =
+            softButton,
+        panel =
+            panel,
+        border =
+            border,
+        softButton =
+            softButton
     )
 }
+
+/*
+ * =============================================================
+ * ARTWORK COLOR LIFT
+ * =============================================================
+ */
 
 internal fun liftArtworkColor(
     color: Color
 ): Color {
-    /*
-     * Preserve hue but stop dark Palette dominant colors from
-     * producing a nearly-black Now Playing background.
-     */
     val strongest =
         max(
             color.red,
@@ -383,62 +488,124 @@ internal fun liftArtworkColor(
             )
         )
 
-    if (strongest <= .001f) {
-        return Color(0xFF777A84)
+    if (
+        strongest <= .001f
+    ) {
+        return Color(
+            0xFF777A84
+        )
     }
 
     /*
-     * Lift genuinely dark artwork more strongly.
+     * Dark dominant colors are raised enough to remain clearly
+     * visible in the Now Playing background.
      */
     val targetPeak =
         when {
-            strongest < .18f -> .48f
-            strongest < .30f -> .44f
-            strongest < .40f -> .42f
-            else -> strongest
+            strongest < .18f ->
+                .48f
+
+            strongest < .30f ->
+                .44f
+
+            strongest < .40f ->
+                .42f
+
+            else ->
+                strongest
         }
 
     val multiplier =
-        if (strongest < targetPeak) {
-            targetPeak / strongest
+        if (
+            strongest <
+            targetPeak
+        ) {
+            targetPeak /
+                strongest
         } else {
             1f
         }
 
     var red =
-        (color.red * multiplier)
-            .coerceIn(0f, 1f)
+        (
+            color.red *
+                multiplier
+            )
+            .coerceIn(
+                0f,
+                1f
+            )
 
     var green =
-        (color.green * multiplier)
-            .coerceIn(0f, 1f)
+        (
+            color.green *
+                multiplier
+            )
+            .coerceIn(
+                0f,
+                1f
+            )
 
     var blue =
-        (color.blue * multiplier)
-            .coerceIn(0f, 1f)
+        (
+            color.blue *
+                multiplier
+            )
+            .coerceIn(
+                0f,
+                1f
+            )
 
     /*
-     * Slight white lift keeps very saturated Palette values
-     * premium/bright rather than muddy without washing the hue.
+     * Small white lift keeps very dark/saturated Palette results
+     * clean without washing out their hue.
      */
     val whiteLift =
-        if (strongest < .42f) {
+        if (
+            strongest < .42f
+        ) {
             .07f
         } else {
             .025f
         }
 
-    red += (1f - red) * whiteLift
-    green += (1f - green) * whiteLift
-    blue += (1f - blue) * whiteLift
+    red +=
+        (1f - red) *
+            whiteLift
+
+    green +=
+        (1f - green) *
+            whiteLift
+
+    blue +=
+        (1f - blue) *
+            whiteLift
 
     return Color(
-        red = red.coerceIn(0f, 1f),
-        green = green.coerceIn(0f, 1f),
-        blue = blue.coerceIn(0f, 1f),
+        red =
+            red.coerceIn(
+                0f,
+                1f
+            ),
+        green =
+            green.coerceIn(
+                0f,
+                1f
+            ),
+        blue =
+            blue.coerceIn(
+                0f,
+                1f
+            ),
         alpha = 1f
     )
 }
+
+/*
+ * =============================================================
+ * COLOR INTERPOLATION
+ * =============================================================
+ */
 
 internal fun mixColor(
     from: Color,
@@ -446,20 +613,35 @@ internal fun mixColor(
     fraction: Float
 ): Color {
     val value =
-        fraction.coerceIn(0f, 1f)
+        fraction.coerceIn(
+            0f,
+            1f
+        )
 
     return Color(
         red =
             from.red +
-                (to.red - from.red) * value,
+                (
+                    to.red -
+                        from.red
+                    ) *
+                value,
 
         green =
             from.green +
-                (to.green - from.green) * value,
+                (
+                    to.green -
+                        from.green
+                    ) *
+                value,
 
         blue =
             from.blue +
-                (to.blue - from.blue) * value,
+                (
+                    to.blue -
+                        from.blue
+                    ) *
+                value,
 
         alpha = 1f
     )
@@ -469,11 +651,16 @@ private fun smoothFraction(
     fraction: Float
 ): Float {
     val value =
-        fraction.coerceIn(0f, 1f)
+        fraction.coerceIn(
+            0f,
+            1f
+        )
 
-    /*
-     * Smoothstep:
-     * no abrupt velocity change at either end.
-     */
-    return value * value * (3f - 2f * value)
+    return value *
+        value *
+        (
+            3f -
+                2f *
+                value
+            )
 }
