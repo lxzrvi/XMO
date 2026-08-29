@@ -1296,6 +1296,22 @@ fun NowPlaying(
             }
         }
 
+        if (
+            overlay ==
+            PlayerOverlay.Artist
+        ) {
+            ArtistInfoBox(
+                artist =
+                    state.artist,
+                trackCount =
+                    artistTrackCount,
+                colors =
+                    colors,
+                close = {
+                    overlay = null
+                }
+            )
+        }
         /*
          * =====================================================
          * QUEUE
