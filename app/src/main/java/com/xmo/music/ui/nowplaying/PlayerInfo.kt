@@ -1,19 +1,24 @@
 package com.xmo.music.ui.nowplaying
 
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -21,7 +26,6 @@ import com.composables.icons.lucide.Clock3
 import com.composables.icons.lucide.ListMusic
 import com.composables.icons.lucide.Lucide
 import com.xmo.music.ui.HomeColors
-import androidx.compose.foundation.layout.fillMaxSize
 import com.xmo.music.ui.XmoFont
 
 @Composable
@@ -47,14 +51,19 @@ internal fun PlayerInfo(
             .height(100.dp)
     ) {
         /*
-         * Controls keep their existing upper-right position.
+         * Actions stay at their original upper-right position.
+         *
+         * Like and Category are independent circles.
+         * Timer / Queue / Details remain one capsule.
          */
         Row(
             Modifier
                 .align(
                     Alignment.TopEnd
                 )
-                .padding(end = 4.dp),
+                .padding(
+                    end = 4.dp
+                ),
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
@@ -62,7 +71,8 @@ internal fun PlayerInfo(
                 size = 40.dp,
                 background =
                     colors.button,
-                onClick = toggleLike
+                onClick =
+                    toggleLike
             ) {
                 FilledHeart(
                     filled = liked,
@@ -75,7 +85,7 @@ internal fun PlayerInfo(
                 )
             }
 
-            androidx.compose.foundation.layout.Spacer(
+            Spacer(
                 Modifier.width(5.dp)
             )
 
@@ -98,7 +108,7 @@ internal fun PlayerInfo(
                 )
             }
 
-            androidx.compose.foundation.layout.Spacer(
+            Spacer(
                 Modifier.width(5.dp)
             )
 
@@ -107,14 +117,17 @@ internal fun PlayerInfo(
                     colors.button
             ) {
                 SleepRingButton(
-                remainingMs =
-                    sleepRemainingMs,
-                totalMs =
-                    sleepTotalMs,
-                colors = colors,
-                accent = accent,
-                onClick = openSleep
-            )
+                    remainingMs =
+                        sleepRemainingMs,
+                    totalMs =
+                        sleepTotalMs,
+                    colors =
+                        colors,
+                    accent =
+                        accent,
+                    onClick =
+                        openSleep
+                )
 
                 CapsuleButton(
                     size = 40.dp,
@@ -126,7 +139,8 @@ internal fun PlayerInfo(
                             Lucide.ListMusic,
                         contentDescription =
                             "Queue",
-                        tint = colors.icon,
+                        tint =
+                            colors.icon,
                         modifier =
                             Modifier.size(
                                 18.dp
@@ -145,15 +159,16 @@ internal fun PlayerInfo(
                             colors.icon,
                         fontFamily =
                             XmoFont.bold,
-                        fontSize = 18.sp
+                        fontSize =
+                            18.sp
                     )
                 }
             }
         }
 
         /*
-         * Text remains exactly in its lower independent region.
-         * Artist has no press-scale animation now.
+         * Title + Artist live independently beneath the action
+         * controls. Moving this text does not move the actions.
          */
         Column(
             Modifier
@@ -171,24 +186,32 @@ internal fun PlayerInfo(
                     title.ifBlank {
                         "Unknown song"
                     },
-                color = colors.text,
+                color =
+                    colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 23.sp,
+                fontSize =
+                    23.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis
             )
 
+            /*
+             * No PressButton:
+             * artist tap intentionally has NO scale-down effect.
+             */
             Text(
                 text =
                     artist.ifBlank {
                         "Unknown artist"
                     },
-                color = colors.sub,
+                color =
+                    colors.sub,
                 fontFamily =
                     XmoFont.medium,
-                fontSize = 14.sp,
+                fontSize =
+                    14.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis,
@@ -202,6 +225,7 @@ internal fun PlayerInfo(
         }
     }
 }
+
 @Composable
 private fun SleepRingButton(
     remainingMs: Long,
@@ -213,6 +237,14 @@ private fun SleepRingButton(
     val active =
         remainingMs > 0L
 
+    /*
+     * Null means we genuinely don't know the timer's original
+     * duration, e.g. player screen re-opened after another
+     * component had already started the timer.
+     *
+     * In that case icon remains active but no fake percentage is
+     * drawn.
+     */
     val progress =
         if (
             active &&
@@ -238,7 +270,8 @@ private fun SleepRingButton(
     ) {
         CapsuleButton(
             size = 40.dp,
-            onClick = onClick
+            onClick =
+                onClick
         ) {
             Icon(
                 imageVector =
@@ -252,32 +285,34 @@ private fun SleepRingButton(
                         colors.icon
                     },
                 modifier =
-                    Modifier.size(18.dp)
+                    Modifier.size(
+                        18.dp
+                    )
             )
         }
 
-        if (
-            progress != null
-        ) {
-            androidx.compose.foundation.Canvas(
-                Modifier.fillMaxSize()
+        if (progress != null) {
+            Canvas(
+                Modifier
+                    .fillMaxSize()
+                    .padding(1.dp)
             ) {
                 drawArc(
                     color = accent,
-                    startAngle = -90f,
+                    startAngle =
+                        -90f,
                     sweepAngle =
                         360f *
                             progress,
-                    useCenter = false,
+                    useCenter =
+                        false,
                     style =
-                        androidx.compose.ui.graphics.drawscope
-                            .Stroke(
-                                width =
-                                    1.8.dp.toPx(),
-                                cap =
-                                    androidx.compose.ui.graphics
-                                        .StrokeCap.Round
-                            )
+                        Stroke(
+                            width =
+                                1.8.dp.toPx(),
+                            cap =
+                                StrokeCap.Round
+                        )
                 )
             }
         }
