@@ -1,13 +1,7 @@
 package com.xmo.music.ui.nowplaying
 
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.spring
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,6 +10,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,30 +36,43 @@ internal fun ArtworkLyrics(
     showArtwork: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val surface =
+    val targetSurface =
         when (theme) {
             XmoTheme.Light ->
-                Color.White.copy(
-                    alpha = .91f
-                )
-
-            XmoTheme.Dark ->
-                Color(0xFF19191C)
-                    .copy(
-                        alpha = .91f
-                    )
-
-            XmoTheme.Amoled ->
-                Color(0xFF080808)
+                Color(0xFFF8F9FB)
                     .copy(
                         alpha = .94f
                     )
+
+            XmoTheme.Dark ->
+                Color(0xFF292B30)
+                    .copy(
+                        alpha = .94f
+                    )
+
+            XmoTheme.Amoled ->
+                Color(0xFF101114)
+                    .copy(
+                        alpha = .96f
+                    )
         }
+
+    val surface by
+        animateColorAsState(
+            targetValue =
+                targetSurface,
+            animationSpec =
+                tween(360),
+            label =
+                "lyricsSurface"
+        )
 
     Box(
         modifier
             .clip(
-                RoundedCornerShape(24.dp)
+                RoundedCornerShape(
+                    24.dp
+                )
             )
             .background(surface)
     ) {
@@ -90,7 +98,8 @@ internal fun ArtworkLyrics(
         ) {
             CapsuleButton(
                 size = 38.dp,
-                onClick = pickLyrics
+                onClick =
+                    pickLyrics
             ) {
                 Icon(
                     imageVector =
@@ -121,13 +130,14 @@ internal fun ArtworkLyrics(
 
             CapsuleButton(
                 size = 38.dp,
-                onClick = showArtwork
+                onClick =
+                    showArtwork
             ) {
                 Icon(
                     imageVector =
                         Lucide.X,
                     contentDescription =
-                        "Return to artwork",
+                        "Show artwork",
                     tint = colors.text,
                     modifier =
                         Modifier.size(18.dp)
