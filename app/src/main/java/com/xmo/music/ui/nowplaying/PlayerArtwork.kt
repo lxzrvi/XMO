@@ -1,9 +1,15 @@
 package com.xmo.music.ui.nowplaying
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -19,12 +25,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,20 +42,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import com.xmo.music.XmoTheme
 import com.xmo.music.data.SongLyrics
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
-import com.xmo.music.XmoTheme
 import kotlinx.coroutines.launch
 import kotlin.math.abs
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
 
 @Composable
 internal fun PlayerArtwork(
@@ -81,9 +80,8 @@ internal fun PlayerArtwork(
     }
 
     /*
-     * Artwork URIs are frozen while Media3 is changing items.
-     * This prevents the queue recomposition from replacing the
-     * visual transaction before the controller confirms it.
+     * Snapshots remain stable until Media3 confirms the actual
+     * song ID change.
      */
     var snapshotCurrent by remember {
         mutableStateOf(current)
@@ -102,9 +100,9 @@ internal fun PlayerArtwork(
     }
 
     /*
-     * -1 = previous transaction
-     *  0 = idle
-     *  1 = next transaction
+     * -1 previous
+     *  0 idle
+     *  1 next
      */
     var pending by remember {
         mutableIntStateOf(0)
@@ -123,8 +121,11 @@ internal fun PlayerArtwork(
             currentId != transactionSongId
         ) {
             /*
-             * Real Media3 state changed. Reset displacement first,
-             * then adopt the new queue artwork.
+             * Media3 confirmation arrived.
+             *
+             * Reset displacement before changing the snapshots so
+             * the newly-current artwork never appears translated
+             * by the old transaction.
              */
             x.snapTo(0f)
 
@@ -155,6 +156,12 @@ internal fun PlayerArtwork(
             setWidth(width)
         }
 
+        /*
+         * Gesture surface always occupies the artwork viewport.
+         *
+         * Lyrics get their own vertical scroll when visible, so
+         * carousel gestures are disabled on that side.
+         */
         Box(
             Modifier
                 .fillMaxSize()
@@ -164,11 +171,6 @@ internal fun PlayerArtwork(
                     canNext,
                     showLyrics
                 ) {
-                    /*
-                     * Lyrics own vertical/manual scrolling while the
-                     * artwork is reversed. Carousel is intentionally
-                     * disabled in that state.
-                     */
                     if (showLyrics) {
                         return@pointerInput
                     }
@@ -178,18 +180,24 @@ internal fun PlayerArtwork(
                             rawX = 0f
                         },
 
-                        onDrag = { change, amount ->
+                        onDrag = {
+                                change,
+                                amount ->
+
                             if (pending != 0) {
                                 return@detectDragGestures
                             }
 
+                            /*
+                             * Vertical artwork dragging has no
+                             * player-close behavior anymore.
+                             */
                             rawX += amount.x
 
-                            /*
-                             * Horizontal-only artwork transaction.
-                             * No vertical player dismissal exists here.
-                             */
-                            if (abs(rawX) > 7f) {
+                            if (
+                                abs(rawX) >
+                                7f
+                            ) {
                                 change.consume()
 
                                 scope.launch {
@@ -240,8 +248,10 @@ internal fun PlayerArtwork(
                                         pending = 1
 
                                         x.animateTo(
-                                            -width,
-                                            tween(220)
+                                            targetValue =
+                                                -width,
+                                            animationSpec =
+                                                tween(220)
                                         )
 
                                         nextSong()
@@ -257,8 +267,10 @@ internal fun PlayerArtwork(
                                         pending = -1
 
                                         x.animateTo(
-                                            width,
-                                            tween(220)
+                                            targetValue =
+                                                width,
+                                            animationSpec =
+                                                tween(220)
                                         )
 
                                         previousSong()
@@ -266,13 +278,15 @@ internal fun PlayerArtwork(
 
                                     else -> {
                                         x.animateTo(
-                                            0f,
-                                            spring(
-                                                dampingRatio =
-                                                    .84f,
-                                                stiffness =
-                                                    430f
-                                            )
+                                            targetValue =
+                                                0f,
+                                            animationSpec =
+                                                spring(
+                                                    dampingRatio =
+                                                        .84f,
+                                                    stiffness =
+                                                        430f
+                                                )
                                         )
                                     }
                                 }
@@ -285,8 +299,10 @@ internal fun PlayerArtwork(
                             scope.launch {
                                 if (pending == 0) {
                                     x.animateTo(
-                                        0f,
-                                        tween(180)
+                                        targetValue =
+                                            0f,
+                                        animationSpec =
+                                            tween(180)
                                     )
                                 }
 
@@ -297,85 +313,104 @@ internal fun PlayerArtwork(
                 }
         ) {
             AnimatedContent(
-    targetState = showLyrics,
-    transitionSpec = {
-        (
-            fadeIn(
-                animationSpec =
-                    tween(260)
-            ) +
-                scaleIn(
-                    initialScale = .965f,
-                    animationSpec =
-                        tween(300)
-                )
-            )
-            .togetherWith(
-                fadeOut(
-                    animationSpec =
-                        tween(210)
-                ) +
-                    scaleOut(
-                        targetScale = 1.025f,
-                        animationSpec =
-                            tween(240)
-                    )
-            )
-    },
-    label = "artworkLyrics"
-) { lyricsVisible ->
+                targetState =
+                    showLyrics,
+                modifier =
+                    Modifier.fillMaxSize(),
+                transitionSpec = {
+                    (
+                        fadeIn(
+                            animationSpec =
+                                tween(260)
+                        ) +
+                            scaleIn(
+                                initialScale =
+                                    .965f,
+                                animationSpec =
+                                    tween(300)
+                            )
+                        )
+                        .togetherWith(
+                            fadeOut(
+                                animationSpec =
+                                    tween(210)
+                            ) +
+                                scaleOut(
+                                    targetScale =
+                                        1.025f,
+                                    animationSpec =
+                                        tween(240)
+                                )
+                        )
+                },
+                label =
+                    "artworkLyrics"
+            ) { lyricsVisible ->
 
-    if (lyricsVisible) {
-        ArtworkLyrics(
-            lyrics = lyrics,
-            position = position,
-            colors = colors,
-            accent = accent,
-            theme = theme,
-            pickLyrics = pickLyrics,
-            fullscreenLyrics =
-                fullscreenLyrics,
-            showArtwork =
-                toggleLyrics,
-            modifier =
-                Modifier
-                    .padding(
-                        horizontal = 17.dp
+                if (lyricsVisible) {
+                    Box(
+                        Modifier.fillMaxSize(),
+                        contentAlignment =
+                            Alignment.Center
+                    ) {
+                        ArtworkLyrics(
+                            lyrics = lyrics,
+                            position =
+                                position,
+                            colors =
+                                colors,
+                            accent = accent,
+                            theme = theme,
+                            pickLyrics =
+                                pickLyrics,
+                            fullscreenLyrics =
+                                fullscreenLyrics,
+                            showArtwork =
+                                toggleLyrics,
+                            modifier =
+                                Modifier
+                                    .padding(
+                                        horizontal =
+                                            17.dp
+                                    )
+                                    .fillMaxWidth()
+                                    .aspectRatio(1f)
+                        )
+                    }
+                } else {
+                    ArtworkCarousel(
+                        current =
+                            snapshotCurrent,
+                        previous =
+                            snapshotPrevious,
+                        next =
+                            snapshotNext,
+                        x = x.value,
+                        width = width,
+                        toggleLyrics =
+                            toggleLyrics
                     )
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .align(
-                        Alignment.Center
-                    )
-        )
-    } else {
-        Box(
-            Modifier.fillMaxSize()
-        ) {
-            snapshotPrevious?.let { uri ->
-                Cover(
-                    uri = uri,
-                    modifier =
-                        Modifier
-                            .padding(
-                                horizontal = 17.dp
-                            )
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .align(
-                                Alignment.Center
-                            )
-                            .graphicsLayer {
-                                translationX =
-                                    x.value -
-                                        width
-                            }
-                )
+                }
             }
+        }
+    }
+}
 
+@Composable
+private fun ArtworkCarousel(
+    current: Uri?,
+    previous: Uri?,
+    next: Uri?,
+    x: Float,
+    width: Float,
+    toggleLyrics: () -> Unit
+) {
+    Box(
+        Modifier.fillMaxSize()
+    ) {
+        previous?.let { uri ->
             Cover(
-                uri =
-                    snapshotCurrent,
+                uri = uri,
                 modifier =
                     Modifier
                         .padding(
@@ -388,92 +423,58 @@ internal fun PlayerArtwork(
                         )
                         .graphicsLayer {
                             translationX =
-                                x.value
+                                x - width
                         }
-                        .clickable(
-                            interactionSource =
-                                remember {
-                                    MutableInteractionSource()
-                                },
-                            indication = null,
-                            onClick =
-                                toggleLyrics
-                        )
             )
-
-            snapshotNext?.let { uri ->
-                Cover(
-                    uri = uri,
-                    modifier =
-                        Modifier
-                            .padding(
-                                horizontal = 17.dp
-                            )
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .align(
-                                Alignment.Center
-                            )
-                            .graphicsLayer {
-                                translationX =
-                                    x.value +
-                                        width
-                            }
-                )
-            }
         }
-    }
-}
 
-                Cover(
-                    uri = snapshotCurrent,
-                    modifier =
-                        Modifier
-                            .padding(
-                                horizontal = 17.dp
-                            )
-                            .fillMaxWidth()
-                            .aspectRatio(1f)
-                            .align(
-                                Alignment.Center
-                            )
-                            .graphicsLayer {
-                                translationX =
-                                    x.value
-                            }
-                            .clickable(
-                                interactionSource =
-                                    remember {
-                                        MutableInteractionSource()
-                                    },
-                                indication = null,
-                                onClick =
-                                    toggleLyrics
-                            )
-                )
-
-                snapshotNext?.let { uri ->
-                    Cover(
-                        uri = uri,
-                        modifier =
-                            Modifier
-                                .padding(
-                                    horizontal =
-                                        17.dp
-                                )
-                                .fillMaxWidth()
-                                .aspectRatio(1f)
-                                .align(
-                                    Alignment.Center
-                                )
-                                .graphicsLayer {
-                                    translationX =
-                                        x.value +
-                                            width
-                                }
-                    )
-                }
+        val interaction =
+            remember {
+                MutableInteractionSource()
             }
+
+        Cover(
+            uri = current,
+            modifier =
+                Modifier
+                    .padding(
+                        horizontal = 17.dp
+                    )
+                    .fillMaxWidth()
+                    .aspectRatio(1f)
+                    .align(
+                        Alignment.Center
+                    )
+                    .graphicsLayer {
+                        translationX = x
+                    }
+                    .clickable(
+                        interactionSource =
+                            interaction,
+                        indication = null,
+                        onClick =
+                            toggleLyrics
+                    )
+        )
+
+        next?.let { uri ->
+            Cover(
+                uri = uri,
+                modifier =
+                    Modifier
+                        .padding(
+                            horizontal = 17.dp
+                        )
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
+                        .align(
+                            Alignment.Center
+                        )
+                        .graphicsLayer {
+                            translationX =
+                                x + width
+                        }
+            )
         }
     }
 }
