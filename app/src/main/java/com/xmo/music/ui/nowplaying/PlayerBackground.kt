@@ -16,31 +16,26 @@ internal fun PlayerBackground(
     theme: XmoTheme
 ) {
     /*
-     * dominant is already transaction-controlled by
-     * PlayerColors.kt.
-     *
-     * Do not animate/change Palette state independently here.
-     * Every field is calculated from the SAME rendered dominant
-     * color so next/previous cannot produce separate flashes.
+     * All fields are calculated from the transaction-controlled
+     * display color. PlayerBackground never owns a separate song
+     * transition, which avoids Palette/background races.
      */
-
     val brightDominant =
         brightenBackgroundColor(
-            dominant,
-            when (theme) {
-                XmoTheme.Light -> .16f
-                XmoTheme.Dark -> .09f
-                XmoTheme.Amoled -> .05f
-            }
+            color = dominant,
+            amount =
+                when (theme) {
+                    XmoTheme.Light ->
+                        .16f
+
+                    XmoTheme.Dark ->
+                        .09f
+
+                    XmoTheme.Amoled ->
+                        .05f
+                }
         )
 
-    /*
-     * Keep deep related to the exact same dominant family.
-     *
-     * We intentionally pull deep strongly toward dominant.
-     * This prevents a Palette "deep" value from suddenly looking
-     * like a second unrelated background during transitions.
-     */
     val relatedDeep =
         mixColor(
             from = deep,
@@ -49,31 +44,39 @@ internal fun PlayerBackground(
         )
 
     /*
-     * Unlike the old implementation, artwork itself contributes
-     * to the actual base color rather than sitting as a weak
-     * transparent glow above a neutral screen.
+     * Artwork hue participates in the base itself instead of
+     * being only a faint field over an unrelated neutral screen.
      */
     val base =
         when (theme) {
             XmoTheme.Light ->
                 mixColor(
-                    from = Color(0xFFF8F9FB),
-                    to = brightDominant,
-                    fraction = .23f
+                    from =
+                        Color(0xFFF8F9FB),
+                    to =
+                        brightDominant,
+                    fraction =
+                        .23f
                 )
 
             XmoTheme.Dark ->
                 mixColor(
-                    from = Color(0xFF17181C),
-                    to = brightDominant,
-                    fraction = .32f
+                    from =
+                        Color(0xFF17181C),
+                    to =
+                        brightDominant,
+                    fraction =
+                        .32f
                 )
 
             XmoTheme.Amoled ->
                 mixColor(
-                    from = Color(0xFF030405),
-                    to = brightDominant,
-                    fraction = .21f
+                    from =
+                        Color(0xFF030405),
+                    to =
+                        brightDominant,
+                    fraction =
+                        .21f
                 )
         }
 
@@ -82,22 +85,28 @@ internal fun PlayerBackground(
             XmoTheme.Light ->
                 mixColor(
                     from = base,
-                    to = brightDominant,
-                    fraction = .48f
+                    to =
+                        brightDominant,
+                    fraction =
+                        .48f
                 )
 
             XmoTheme.Dark ->
                 mixColor(
                     from = base,
-                    to = brightDominant,
-                    fraction = .50f
+                    to =
+                        brightDominant,
+                    fraction =
+                        .50f
                 )
 
             XmoTheme.Amoled ->
                 mixColor(
                     from = base,
-                    to = brightDominant,
-                    fraction = .44f
+                    to =
+                        brightDominant,
+                    fraction =
+                        .44f
                 )
         }
 
@@ -106,22 +115,28 @@ internal fun PlayerBackground(
             XmoTheme.Light ->
                 mixColor(
                     from = base,
-                    to = brightDominant,
-                    fraction = .26f
+                    to =
+                        brightDominant,
+                    fraction =
+                        .26f
                 )
 
             XmoTheme.Dark ->
                 mixColor(
                     from = base,
-                    to = relatedDeep,
-                    fraction = .35f
+                    to =
+                        relatedDeep,
+                    fraction =
+                        .35f
                 )
 
             XmoTheme.Amoled ->
                 mixColor(
                     from = base,
-                    to = relatedDeep,
-                    fraction = .24f
+                    to =
+                        relatedDeep,
+                    fraction =
+                        .24f
                 )
         }
 
@@ -129,18 +144,12 @@ internal fun PlayerBackground(
         modifier =
             Modifier.fillMaxSize()
     ) {
-        /*
-         * Actual artwork-derived base.
-         */
         drawRect(
             color = base
         )
 
         /*
-         * Large top field.
-         *
-         * This makes the area behind header + artwork strongly
-         * identify with the current cover.
+         * Main artwork-derived field behind header/artwork.
          */
         drawRect(
             brush =
@@ -157,18 +166,19 @@ internal fun PlayerBackground(
                         ),
                     center =
                         Offset(
-                            x = size.width * .20f,
-                            y = size.height * .05f
+                            x =
+                                size.width *
+                                    .20f,
+                            y =
+                                size.height *
+                                    .05f
                         ),
                     radius =
-                        size.width * 1.35f
+                        size.width *
+                            1.35f
                 )
         )
 
-        /*
-         * Opposite soft color field adds depth without creating
-         * an unrelated Palette color.
-         */
         drawRect(
             brush =
                 Brush.radialGradient(
@@ -177,27 +187,35 @@ internal fun PlayerBackground(
                             relatedDeep.copy(
                                 alpha =
                                     when (theme) {
-                                        XmoTheme.Light -> .24f
-                                        XmoTheme.Dark -> .34f
-                                        XmoTheme.Amoled -> .27f
+                                        XmoTheme.Light ->
+                                            .24f
+
+                                        XmoTheme.Dark ->
+                                            .34f
+
+                                        XmoTheme.Amoled ->
+                                            .27f
                                     }
                             ),
                             Color.Transparent
                         ),
                     center =
                         Offset(
-                            x = size.width * .98f,
-                            y = size.height * .28f
+                            x =
+                                size.width *
+                                    .98f,
+                            y =
+                                size.height *
+                                    .28f
                         ),
                     radius =
-                        size.width * 1.18f
+                        size.width *
+                            1.18f
                 )
         )
 
         /*
-         * Artwork color underneath the lower controls/panel.
-         * This is important because the panel itself is now
-         * translucent.
+         * Color underneath translucent player panel.
          */
         drawRect(
             brush =
@@ -207,27 +225,33 @@ internal fun PlayerBackground(
                             brightDominant.copy(
                                 alpha =
                                     when (theme) {
-                                        XmoTheme.Light -> .30f
-                                        XmoTheme.Dark -> .35f
-                                        XmoTheme.Amoled -> .28f
+                                        XmoTheme.Light ->
+                                            .30f
+
+                                        XmoTheme.Dark ->
+                                            .35f
+
+                                        XmoTheme.Amoled ->
+                                            .28f
                                     }
                             ),
                             Color.Transparent
                         ),
                     center =
                         Offset(
-                            x = size.width * .08f,
-                            y = size.height * .68f
+                            x =
+                                size.width *
+                                    .08f,
+                            y =
+                                size.height *
+                                    .68f
                         ),
                     radius =
-                        size.width * 1.46f
+                        size.width *
+                            1.46f
                 )
         )
 
-        /*
-         * Bottom field prevents a hard neutral/black-looking
-         * lower screen.
-         */
         drawRect(
             brush =
                 Brush.radialGradient(
@@ -236,29 +260,33 @@ internal fun PlayerBackground(
                             lowerColor.copy(
                                 alpha =
                                     when (theme) {
-                                        XmoTheme.Light -> .50f
-                                        XmoTheme.Dark -> .52f
-                                        XmoTheme.Amoled -> .44f
+                                        XmoTheme.Light ->
+                                            .50f
+
+                                        XmoTheme.Dark ->
+                                            .52f
+
+                                        XmoTheme.Amoled ->
+                                            .44f
                                     }
                             ),
                             Color.Transparent
                         ),
                     center =
                         Offset(
-                            x = size.width * .82f,
-                            y = size.height * .94f
+                            x =
+                                size.width *
+                                    .82f,
+                            y =
+                                size.height *
+                                    .94f
                         ),
                     radius =
-                        size.width * 1.30f
+                        size.width *
+                            1.30f
                 )
         )
 
-        /*
-         * Theme finishing layer.
-         *
-         * Keep this extremely light. A strong black/white veil
-         * would destroy the artwork-derived color.
-         */
         when (theme) {
             XmoTheme.Light -> {
                 drawRect(
@@ -267,13 +295,16 @@ internal fun PlayerBackground(
                             colors =
                                 listOf(
                                     Color.White.copy(
-                                        alpha = .08f
+                                        alpha =
+                                            .08f
                                     ),
                                     Color.White.copy(
-                                        alpha = .025f
+                                        alpha =
+                                            .025f
                                     ),
                                     Color.White.copy(
-                                        alpha = .07f
+                                        alpha =
+                                            .07f
                                     )
                                 )
                         )
@@ -287,11 +318,13 @@ internal fun PlayerBackground(
                             colors =
                                 listOf(
                                     Color.White.copy(
-                                        alpha = .018f
+                                        alpha =
+                                            .018f
                                     ),
                                     Color.Transparent,
                                     Color.Black.copy(
-                                        alpha = .045f
+                                        alpha =
+                                            .045f
                                     )
                                 )
                         )
@@ -299,11 +332,6 @@ internal fun PlayerBackground(
             }
 
             XmoTheme.Amoled -> {
-                /*
-                 * AMOLED keeps true black influence around the
-                 * artwork fields while still allowing their hue
-                 * to remain visible.
-                 */
                 drawRect(
                     brush =
                         Brush.verticalGradient(
@@ -311,10 +339,12 @@ internal fun PlayerBackground(
                                 listOf(
                                     Color.Transparent,
                                     Color.Black.copy(
-                                        alpha = .05f
+                                        alpha =
+                                            .05f
                                     ),
                                     Color.Black.copy(
-                                        alpha = .11f
+                                        alpha =
+                                            .11f
                                     )
                                 )
                         )
@@ -337,16 +367,25 @@ private fun brightenBackgroundColor(
     return Color(
         red =
             color.red +
-                (1f - color.red) * value,
-
+                (
+                    1f -
+                        color.red
+                    ) *
+                value,
         green =
             color.green +
-                (1f - color.green) * value,
-
+                (
+                    1f -
+                        color.green
+                    ) *
+                value,
         blue =
             color.blue +
-                (1f - color.blue) * value,
-
+                (
+                    1f -
+                        color.blue
+                    ) *
+                value,
         alpha = 1f
     )
 }
