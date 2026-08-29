@@ -3,7 +3,6 @@ package com.xmo.music.ui.nowplaying
 import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,33 +57,43 @@ import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.XmoFont
 import kotlinx.coroutines.delay
 
-/*
- * =============================================================
- * COVER-SIZED LYRICS
- * =============================================================
- */
-
 @Composable
 internal fun ArtworkLyrics(
     lyrics: SongLyrics?,
     position: Long,
     colors: HomeColors,
     accent: Color,
+    theme: XmoTheme,
     pickLyrics: () -> Unit,
     fullscreenLyrics: () -> Unit,
     showArtwork: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val surface =
+        when (theme) {
+            XmoTheme.Light ->
+                Color.White.copy(
+                    alpha = .82f
+                )
+
+            XmoTheme.Dark ->
+                Color(0xFF171719)
+                    .copy(
+                        alpha = .82f
+                    )
+
+            XmoTheme.Amoled ->
+                Color.Black.copy(
+                    alpha = .88f
+                )
+        }
+
     Box(
         modifier
             .clip(
                 RoundedCornerShape(24.dp)
             )
-            .background(
-                Color.Black.copy(
-                    alpha = .18f
-                )
-            )
+            .background(surface)
     ) {
         FollowLyrics(
             lyrics = lyrics,
@@ -96,20 +105,13 @@ internal fun ArtworkLyrics(
                 Modifier
                     .fillMaxSize()
                     .padding(
-                        top = 45.dp,
-                        bottom = 30.dp
+                        horizontal = 14.dp
                     )
         )
 
-        /*
-         * Local LRC + fullscreen controls remain inside the
-         * artwork footprint.
-         */
         XmoCapsule(
             background =
-                colors.text.copy(
-                    alpha = .10f
-                ),
+                colors.button,
             modifier =
                 Modifier
                     .align(
@@ -119,14 +121,16 @@ internal fun ArtworkLyrics(
         ) {
             CapsuleButton(
                 size = 38.dp,
-                onClick = pickLyrics
+                onClick =
+                    pickLyrics
             ) {
                 Icon(
                     imageVector =
                         Lucide.Plus,
                     contentDescription =
                         "Choose local lyrics",
-                    tint = colors.text,
+                    tint =
+                        colors.text,
                     modifier =
                         Modifier.size(18.dp)
                 )
@@ -142,51 +146,32 @@ internal fun ArtworkLyrics(
                         Lucide.Expand,
                     contentDescription =
                         "Fullscreen lyrics",
-                    tint = colors.text,
+                    tint =
+                        colors.text,
+                    modifier =
+                        Modifier.size(18.dp)
+                )
+            }
+
+            CapsuleButton(
+                size = 38.dp,
+                onClick =
+                    showArtwork
+            ) {
+                Icon(
+                    imageVector =
+                        Lucide.X,
+                    contentDescription =
+                        "Show artwork",
+                    tint =
+                        colors.text,
                     modifier =
                         Modifier.size(18.dp)
                 )
             }
         }
-
-        /*
-         * Explicitly returns to artwork. Scrolling/touching the
-         * lyrics themselves does not close this surface.
-         */
-        Text(
-            text = "ARTWORK",
-            color =
-                colors.text.copy(
-                    alpha = .48f
-                ),
-            fontFamily =
-                XmoFont.medium,
-            fontSize = 9.sp,
-            letterSpacing = .7.sp,
-            modifier =
-                Modifier
-                    .align(
-                        Alignment.BottomCenter
-                    )
-                    .clip(
-                        RoundedCornerShape(10.dp)
-                    )
-                    .clickable(
-                        onClick = showArtwork
-                    )
-                    .padding(
-                        horizontal = 10.dp,
-                        vertical = 5.dp
-                    )
-        )
     }
 }
-
-/*
- * =============================================================
- * FOLLOWING LYRICS
- * =============================================================
- */
 
 @Composable
 internal fun FollowLyrics(
@@ -202,7 +187,7 @@ internal fun FollowLyrics(
         lyrics.lines.isEmpty()
     ) {
         Box(
-            modifier = modifier,
+            modifier,
             contentAlignment =
                 Alignment.Center
         ) {
@@ -210,7 +195,8 @@ internal fun FollowLyrics(
                 text =
                     "No local lyrics found.\n" +
                         "Tap + to choose an LRC file.",
-                color = colors.sub,
+                color =
+                    colors.sub,
                 fontFamily =
                     XmoFont.normal,
                 fontSize =
@@ -226,7 +212,11 @@ internal fun FollowLyrics(
                         23.sp
                     },
                 textAlign =
-                    TextAlign.Center
+                    TextAlign.Center,
+                modifier =
+                    Modifier.padding(
+                        horizontal = 18.dp
+                    )
             )
         }
 
@@ -235,18 +225,13 @@ internal fun FollowLyrics(
 
     val active =
         currentLyricIndex(
-            lyrics = lyrics,
-            position = position
+            lyrics,
+            position
         )
 
-    val listState =
+    val state =
         rememberLazyListState()
 
-    /*
-     * User scrolling temporarily owns positioning. After three
-     * seconds without manual scrolling, synced lyrics return to
-     * following actual playback position.
-     */
     var browsing by remember {
         mutableStateOf(false)
     }
@@ -256,10 +241,10 @@ internal fun FollowLyrics(
     }
 
     LaunchedEffect(
-        listState.isScrollInProgress
+        state.isScrollInProgress
     ) {
         if (
-            listState.isScrollInProgress
+            state.isScrollInProgress
         ) {
             browsing = true
             generation++
@@ -271,63 +256,78 @@ internal fun FollowLyrics(
 
             if (
                 generation == token &&
-                !listState.isScrollInProgress
+                !state.isScrollInProgress
             ) {
                 browsing = false
             }
         }
     }
 
+    /*
+     * First make sure active item exists in the visible layout,
+     * then calculate its REAL pixel center against the current
+     * viewport. No density/screen-specific magic offset.
+     */
     LaunchedEffect(
         active,
-        browsing
+        browsing,
+        fullscreen
     ) {
         if (
-            lyrics.synced &&
-            active >= 0 &&
-            !browsing
+            !lyrics.synced ||
+            active < 0 ||
+            browsing
         ) {
-            centerLyric(
-                state = listState,
-                index = active,
-                fullscreen = fullscreen
-            )
+            return@LaunchedEffect
         }
+
+        centerActualLyric(
+            state = state,
+            index = active
+        )
     }
 
     LazyColumn(
-        state = listState,
+        state = state,
         modifier = modifier,
         contentPadding =
             PaddingValues(
                 top =
                     if (fullscreen) {
-                        245.dp
+                        220.dp
                     } else {
-                        110.dp
+                        145.dp
                     },
                 bottom =
                     if (fullscreen) {
-                        285.dp
+                        220.dp
                     } else {
-                        110.dp
-                    }
+                        145.dp
+                    },
+                start = 4.dp,
+                end = 4.dp
             ),
         verticalArrangement =
             Arrangement.spacedBy(
                 if (fullscreen) {
-                    21.dp
+                    20.dp
                 } else {
                     13.dp
                 }
             )
     ) {
         itemsIndexed(
-            items = lyrics.lines,
-            key = { index, line ->
+            items =
+                lyrics.lines,
+            key = {
+                    index,
+                    line ->
+
                 "$index:${line.timeMs}:${line.text}"
             }
-        ) { index, line ->
+        ) {
+                index,
+                line ->
 
             val selected =
                 lyrics.synced &&
@@ -339,21 +339,21 @@ internal fun FollowLyrics(
                         when {
                             fullscreen &&
                                 selected ->
-                                1.08f
+                                1.07f
 
                             selected ->
-                                1.055f
+                                1.045f
 
                             else ->
                                 1f
                         },
                     animationSpec =
                         spring(
-                            dampingRatio = .76f,
-                            stiffness = 420f
+                            dampingRatio = .78f,
+                            stiffness = 400f
                         ),
                     label =
-                        "lyricScale$index"
+                        "lyric$index"
                 )
 
             Text(
@@ -365,9 +365,9 @@ internal fun FollowLyrics(
                         colors.text.copy(
                             alpha =
                                 if (fullscreen) {
-                                    .46f
+                                    .48f
                                 } else {
-                                    .52f
+                                    .55f
                                 }
                         )
                     },
@@ -387,7 +387,7 @@ internal fun FollowLyrics(
                             20.sp
 
                         selected ->
-                            21.sp
+                            20.sp
 
                         else ->
                             16.sp
@@ -402,16 +402,27 @@ internal fun FollowLyrics(
                             29.sp
 
                         selected ->
-                            28.sp
+                            27.sp
 
                         else ->
                             24.sp
                     },
                 textAlign =
                     TextAlign.Center,
+                softWrap = true,
+                overflow =
+                    TextOverflow.Visible,
                 modifier =
                     Modifier
                         .fillMaxWidth()
+                        .padding(
+                            horizontal =
+                                if (fullscreen) {
+                                    18.dp
+                                } else {
+                                    8.dp
+                                }
+                        )
                         .graphicsLayer {
                             scaleX = scale
                             scaleY = scale
@@ -422,27 +433,47 @@ internal fun FollowLyrics(
     }
 }
 
-private suspend fun centerLyric(
+private suspend fun centerActualLyric(
     state: LazyListState,
-    index: Int,
-    fullscreen: Boolean
+    index: Int
 ) {
-    state.animateScrollToItem(
-        index = index,
-        scrollOffset =
-            if (fullscreen) {
-                -410
-            } else {
-                -110
-            }
-    )
-}
+    /*
+     * Bring item into layout first. This isn't the final
+     * position.
+     */
+    state.scrollToItem(index)
 
-/*
- * =============================================================
- * FULLSCREEN LYRICS
- * =============================================================
- */
+    /*
+     * Wait until LazyColumn reports the new visible layout.
+     */
+    kotlinx.coroutines.delay(16L)
+
+    val layout =
+        state.layoutInfo
+
+    val item =
+        layout.visibleItemsInfo
+            .firstOrNull {
+                it.index == index
+            }
+            ?: return
+
+    val viewportCenter =
+        (
+            layout.viewportStartOffset +
+                layout.viewportEndOffset
+            ) / 2f
+
+    val itemCenter =
+        item.offset +
+            item.size / 2f
+
+    val delta =
+        itemCenter -
+            viewportCenter
+
+    state.animateScrollBy(delta)
+}
 
 @Composable
 internal fun FullLyrics(
@@ -476,12 +507,9 @@ internal fun FullLyrics(
 
     val lyricColors =
         HomeColors(
-            bg =
-                Color.Transparent,
-            surface =
-                Color.Transparent,
-            text =
-                foreground,
+            bg = Color.Transparent,
+            surface = Color.Transparent,
+            text = foreground,
             sub =
                 foreground.copy(
                     alpha = .60f
@@ -515,12 +543,6 @@ internal fun FullLyrics(
                 .statusBarsPadding()
                 .navigationBarsPadding()
         ) {
-            /*
-             * =================================================
-             * HEADER
-             * =================================================
-             */
-
             Row(
                 Modifier
                     .fillMaxWidth()
@@ -542,11 +564,6 @@ internal fun FullLyrics(
                                 RoundedCornerShape(
                                     9.dp
                                 )
-                            )
-                            .background(
-                                foreground.copy(
-                                    alpha = .08f
-                                )
                             ),
                     contentScale =
                         ContentScale.Crop
@@ -560,10 +577,7 @@ internal fun FullLyrics(
                         )
                 ) {
                     Text(
-                        text =
-                            title.ifBlank {
-                                "Unknown song"
-                            },
+                        text = title,
                         color = foreground,
                         fontFamily =
                             XmoFont.bold,
@@ -574,10 +588,7 @@ internal fun FullLyrics(
                     )
 
                     Text(
-                        text =
-                            artist.ifBlank {
-                                "Unknown artist"
-                            },
+                        text = artist,
                         color =
                             foreground.copy(
                                 alpha = .60f
@@ -591,11 +602,6 @@ internal fun FullLyrics(
                     )
                 }
 
-                /*
-                 * Requested order:
-                 *
-                 * Play -> Previous -> Next -> Close
-                 */
                 XmoCapsule(
                     background =
                         foreground.copy(
@@ -603,7 +609,6 @@ internal fun FullLyrics(
                         )
                 ) {
                     CapsuleButton(
-                        size = 39.dp,
                         onClick =
                             togglePlay
                     ) {
@@ -615,11 +620,7 @@ internal fun FullLyrics(
                                     Lucide.Play
                                 },
                             contentDescription =
-                                if (isPlaying) {
-                                    "Pause"
-                                } else {
-                                    "Play"
-                                },
+                                "Play pause",
                             tint = foreground,
                             modifier =
                                 Modifier.size(18.dp)
@@ -627,7 +628,6 @@ internal fun FullLyrics(
                     }
 
                     CapsuleButton(
-                        size = 39.dp,
                         enabled =
                             canPrevious,
                         onClick =
@@ -638,50 +638,29 @@ internal fun FullLyrics(
                                 Lucide.SkipBack,
                             contentDescription =
                                 "Previous",
-                            tint =
-                                foreground.copy(
-                                    alpha =
-                                        if (
-                                            canPrevious
-                                        ) {
-                                            1f
-                                        } else {
-                                            .30f
-                                        }
-                                ),
+                            tint = foreground,
                             modifier =
                                 Modifier.size(17.dp)
                         )
                     }
 
                     CapsuleButton(
-                        size = 39.dp,
                         enabled =
                             canNext,
-                        onClick =
-                            next
+                        onClick = next
                     ) {
                         Icon(
                             imageVector =
                                 Lucide.SkipForward,
                             contentDescription =
                                 "Next",
-                            tint =
-                                foreground.copy(
-                                    alpha =
-                                        if (canNext) {
-                                            1f
-                                        } else {
-                                            .30f
-                                        }
-                                ),
+                            tint = foreground,
                             modifier =
                                 Modifier.size(17.dp)
                         )
                     }
 
                     CapsuleButton(
-                        size = 39.dp,
                         onClick = close
                     ) {
                         Icon(
@@ -697,19 +676,11 @@ internal fun FullLyrics(
                 }
             }
 
-            /*
-             * =================================================
-             * REAL DRAGGABLE PROGRESS
-             * =================================================
-             */
-
             Column(
                 Modifier
                     .fillMaxWidth()
                     .padding(
-                        start = 17.dp,
-                        end = 17.dp,
-                        top = 2.dp
+                        horizontal = 17.dp
                     )
             ) {
                 RoundedSeekBar(
@@ -729,8 +700,7 @@ internal fun FullLyrics(
                         Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text =
-                            playerTime(position),
+                        playerTime(position),
                         color =
                             foreground.copy(
                                 alpha = .60f
@@ -741,8 +711,7 @@ internal fun FullLyrics(
                     )
 
                     Text(
-                        text =
-                            playerTime(duration),
+                        playerTime(duration),
                         color =
                             foreground.copy(
                                 alpha = .60f
@@ -758,10 +727,6 @@ internal fun FullLyrics(
                 Modifier.height(4.dp)
             )
 
-            /*
-             * No fixed screen-height calculation. Weight gives
-             * lyrics exactly the remaining safe viewport.
-             */
             FollowLyrics(
                 lyrics = lyrics,
                 position = position,
@@ -772,6 +737,9 @@ internal fun FullLyrics(
                     Modifier
                         .fillMaxWidth()
                         .weight(1f)
+                        .padding(
+                            horizontal = 8.dp
+                        )
             )
         }
     }
