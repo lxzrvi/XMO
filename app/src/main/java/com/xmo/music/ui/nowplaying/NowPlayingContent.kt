@@ -8,8 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -45,39 +43,52 @@ internal fun NowPlayingContent(
     queue: List<Song>,
     categories: List<UserCategory>,
     liked: Boolean,
+
     currentIndex: Int,
     currentSong: Song?,
     previousSong: Song?,
     nextSong: Song?,
     fallbackArtwork: Uri?,
+
     artistTrackCount: Int,
     inCategory: Boolean,
+
     lyrics: SongLyrics?,
+
     colors: HomeColors,
     accent: Color,
+
     displayColor: Color,
     deep: Color,
     themeColors: PlayerThemeColors,
+
     carousel: PlayerCarouselState,
+
     overlay: PlayerOverlay?,
     artworkLyrics: Boolean,
     fullLyrics: Boolean,
+
     pop: PopMessage?,
     sleepTotalMs: Long?,
+
     entrance: Animatable<Float, *>,
     playerY: Animatable<Float, *>,
     screenHeight: Float,
-    dismissing: Boolean,
+
     updateScreenHeight: (Float) -> Unit,
+
     closePlayer: suspend () -> Unit,
     dismissAfterDrag: () -> Unit,
+
     setOverlay: (PlayerOverlay?) -> Unit,
     setArtworkLyrics: (Boolean) -> Unit,
     setFullLyrics: (Boolean) -> Unit,
     setPop: (PopMessage?) -> Unit,
     setSleepTotalMs: (Long?) -> Unit,
+
     pickLyrics: () -> Unit,
     shareCurrentSong: () -> Unit,
+
     togglePlay: () -> Unit,
     previous: () -> Unit,
     previousItem: () -> Unit,
@@ -89,23 +100,25 @@ internal fun NowPlayingContent(
     cycleRepeat: () -> Unit,
     setSleepTimer: (Long) -> Unit,
     cancelSleepTimer: () -> Unit,
+
     setSongInCategory: (
         categoryId: String,
         added: Boolean
     ) -> Unit,
+
     createCategory: (String) -> UserCategory?
 ) {
     Box(
         modifier =
             Modifier
                 .fillMaxSize()
-                /*
-                 * Full player consumes its complete touch surface.
-                 * Home/NavBar underneath cannot receive touches.
-                 */
                 .pointerInput(
                     Unit
                 ) {
+                    /*
+                     * Now Playing is a real full-screen overlay.
+                     * Unhandled touches never reach Home/NavBar.
+                     */
                     awaitPointerEventScope {
                         while (true) {
                             awaitPointerEvent()
@@ -165,6 +178,12 @@ internal fun NowPlayingContent(
                 theme
         )
 
+        /*
+         * =====================================================
+         * MAIN FIXED PLAYER
+         * =====================================================
+         */
+
         Column(
             modifier =
                 Modifier
@@ -196,6 +215,9 @@ internal fun NowPlayingContent(
                 }
             )
 
+            /*
+             * Artwork remains lower than the header.
+             */
             Spacer(
                 modifier =
                     Modifier.height(
@@ -248,6 +270,11 @@ internal fun NowPlayingContent(
                 pickLyrics =
                     pickLyrics,
                 fullscreenLyrics = {
+                    /*
+                     * Keep the small lyrics presentation selected
+                     * under fullscreen so closing can morph back
+                     * to it directly.
+                     */
                     setArtworkLyrics(
                         true
                     )
@@ -258,6 +285,9 @@ internal fun NowPlayingContent(
                 }
             )
 
+            /*
+             * Requested artwork -> panel breathing space.
+             */
             Spacer(
                 modifier =
                     Modifier.height(
@@ -266,8 +296,8 @@ internal fun NowPlayingContent(
             )
 
             /*
-             * Theme-aware translucent panel.
-             * PlayerBackground remains visible through it.
+             * Translucent lower panel. Artwork splashes remain
+             * visible underneath instead of becoming a solid box.
              */
             Column(
                 modifier =
@@ -288,10 +318,14 @@ internal fun NowPlayingContent(
                             themeColors.panel
                         )
                         .padding(
-                            start = 12.dp,
-                            top = 10.dp,
-                            end = 12.dp,
-                            bottom = 2.dp
+                            start =
+                                12.dp,
+                            top =
+                                10.dp,
+                            end =
+                                12.dp,
+                            bottom =
+                                2.dp
                         )
             ) {
                 PlayerInfo(
@@ -407,7 +441,7 @@ internal fun NowPlayingContent(
 
         /*
          * =====================================================
-         * MODAL PLAYER OVERLAYS
+         * PLAYER OVERLAYS
          * =====================================================
          */
 
@@ -572,8 +606,9 @@ internal fun NowPlayingContent(
          * FULLSCREEN LYRICS
          * =====================================================
          *
-         * artworkLyrics remains true underneath this layer.
-         * Closing therefore returns to the small lyrics card.
+         * This is a soft scale/fade from the existing small-card
+         * state. No large bottom slide that makes the two lyrics
+         * surfaces feel unrelated.
          */
 
         AnimatedVisibility(
@@ -584,26 +619,16 @@ internal fun NowPlayingContent(
                     animationSpec =
                         tween(
                             durationMillis =
-                                360
+                                310
                         )
                 ) +
-                    slideInVertically(
-                        animationSpec =
-                            tween(
-                                durationMillis =
-                                    420
-                            ),
-                        initialOffsetY = {
-                            it / 18
-                        }
-                    ) +
                     scaleIn(
                         initialScale =
-                            .965f,
+                            .94f,
                         animationSpec =
                             tween(
                                 durationMillis =
-                                    420
+                                    390
                             )
                     ),
             exit =
@@ -611,22 +636,12 @@ internal fun NowPlayingContent(
                     animationSpec =
                         tween(
                             durationMillis =
-                                260
+                                250
                         )
                 ) +
-                    slideOutVertically(
-                        animationSpec =
-                            tween(
-                                durationMillis =
-                                    360
-                            ),
-                        targetOffsetY = {
-                            it / 20
-                        }
-                    ) +
                     scaleOut(
                         targetScale =
-                            .975f,
+                            .95f,
                         animationSpec =
                             tween(
                                 durationMillis =
@@ -683,6 +698,12 @@ internal fun NowPlayingContent(
             )
         }
 
+        /*
+         * =====================================================
+         * TRANSIENT XMO POP
+         * =====================================================
+         */
+
         pop?.let {
             XmoPop(
                 message =
@@ -696,7 +717,8 @@ internal fun NowPlayingContent(
                         )
                         .statusBarsPadding()
                         .padding(
-                            top = 72.dp
+                            top =
+                                72.dp
                         )
             )
         }
