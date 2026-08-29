@@ -106,6 +106,18 @@ fun NowPlaying(
             currentIndex + 1
         )
 
+    val fallbackArtwork =
+        state.artworkUri
+            ?.let(
+                Uri::parse
+            )
+
+    /*
+     * =========================================================
+     * REAL CURRENT SONG METADATA
+     * =========================================================
+     */
+
     val inCategory =
         currentSong?.let { song ->
             categories.any {
@@ -144,43 +156,86 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * CAROUSEL + ARTWORK COLORS
+     * FROZEN ARTWORK CAROUSEL
      * =========================================================
      */
 
     val carousel =
         remember {
-            PlayerCarouselState()
+            PlayerCarouselState(
+                initialId =
+                    state.currentSongId,
+                initialIndex =
+                    currentIndex,
+                initialCurrent =
+                    currentSong?.artwork
+                        ?: fallbackArtwork,
+                initialPrevious =
+                    previousSong?.artwork,
+                initialNext =
+                    nextSong?.artwork
+            )
         }
 
-    val fallbackArtwork =
-        state.artworkUri
-            ?.let(
-                Uri::parse
-            )
+    /*
+     * This only initializes an empty first frame or refreshes
+     * metadata while the same visual song remains current.
+     *
+     * It cannot adopt a different song during an active visual
+     * transaction.
+     */
+    LaunchedEffect(
+        state.currentSongId,
+        currentIndex,
+        currentSong?.artwork,
+        previousSong?.artwork,
+        nextSong?.artwork,
+        fallbackArtwork
+    ) {
+        carousel.initializeIfEmpty(
+            id =
+                state.currentSongId,
+            index =
+                currentIndex,
+            current =
+                currentSong?.artwork
+                    ?: fallbackArtwork,
+            previous =
+                previousSong?.artwork,
+            next =
+                nextSong?.artwork
+        )
+
+        carousel.updateIdleWindow(
+            id =
+                state.currentSongId,
+            index =
+                currentIndex,
+            current =
+                currentSong?.artwork
+                    ?: fallbackArtwork,
+            previous =
+                previousSong?.artwork,
+            next =
+                nextSong?.artwork
+        )
+    }
+
+    /*
+     * =========================================================
+     * ONE ARTWORK COLOR PIPELINE
+     * =========================================================
+     *
+     * PlayerColors reads the exact same frozen visual window as
+     * PlayerArtwork.
+     */
 
     val artworkColors =
         rememberPlayerColors(
             context =
                 context,
-            currentArtwork =
-                currentSong
-                    ?.artwork,
-            fallbackArtwork =
-                fallbackArtwork,
-            previousArtwork =
-                previousSong
-                    ?.artwork,
-            nextArtwork =
-                nextSong
-                    ?.artwork,
-            currentSongId =
-                state.currentSongId,
-            coverX =
-                carousel.x,
-            transactionActive =
+            carousel =
                 carousel
-                    .transactionActive
         )
 
     val displayColor =
@@ -307,10 +362,10 @@ fun NowPlaying(
         }
 
     /*
-     * Intentionally independent from currentSongId.
+     * Not keyed to currentSongId.
      *
-     * If small lyrics are open while changing song, small lyrics
-     * remain open for the confirmed next/previous song.
+     * If the artwork-sized lyrics card is open, next/previous
+     * keeps that same presentation mode open.
      */
     var artworkLyrics by
         remember {
@@ -354,7 +409,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * PLAYER OPEN / CLOSE
+     * OPEN / DISMISS PLAYER
      * =========================================================
      */
 
@@ -402,21 +457,6 @@ fun NowPlaying(
         onOpened()
     }
 
-    LaunchedEffect(
-        pop?.key
-    ) {
-        if (
-            pop != null
-        ) {
-            delay(
-                1_900L
-            )
-
-            pop =
-                null
-        }
-    }
-
     suspend fun closePlayer() {
         if (
             dismissing
@@ -442,7 +482,28 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * BACK PRIORITY
+     * POP MESSAGE LIFETIME
+     * =========================================================
+     */
+
+    LaunchedEffect(
+        pop?.key
+    ) {
+        if (
+            pop != null
+        ) {
+            delay(
+                1_900L
+            )
+
+            pop =
+                null
+        }
+    }
+
+    /*
+     * =========================================================
+     * ANDROID BACK
      * =========================================================
      */
 
@@ -476,7 +537,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * SCREEN RENDERING
+     * RENDER
      * =========================================================
      */
 
@@ -495,6 +556,7 @@ fun NowPlaying(
             categories,
         liked =
             liked,
+
         currentIndex =
             currentIndex,
         currentSong =
@@ -505,46 +567,54 @@ fun NowPlaying(
             nextSong,
         fallbackArtwork =
             fallbackArtwork,
+
         artistTrackCount =
             artistTrackCount,
         inCategory =
             inCategory,
+
         lyrics =
             lyrics,
+
         colors =
             colors,
         accent =
             accent,
+
         displayColor =
             displayColor,
         deep =
             deep,
         themeColors =
             themeColors,
+
         carousel =
             carousel,
+
         overlay =
             overlay,
         artworkLyrics =
             artworkLyrics,
         fullLyrics =
             fullLyrics,
+
         pop =
             pop,
         sleepTotalMs =
             sleepTotalMs,
+
         entrance =
             entrance,
         playerY =
             playerY,
         screenHeight =
             screenHeight,
-        dismissing =
-            dismissing,
 
         updateScreenHeight = {
             screenHeight =
-                it
+                it.coerceAtLeast(
+                    1f
+                )
         },
 
         closePlayer = {
@@ -598,8 +668,10 @@ fun NowPlaying(
         shareCurrentSong = {
             currentSong?.let {
                 shareSong(
-                    context,
-                    it
+                    context =
+                        context,
+                    song =
+                        it
                 )
             }
         },
