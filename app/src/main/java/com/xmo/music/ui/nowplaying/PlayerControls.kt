@@ -1,23 +1,19 @@
 package com.xmo.music.ui.nowplaying
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Repeat1
-import com.composables.icons.lucide.Repeat2
-import com.composables.icons.lucide.Shuffle
 
 @Composable
 internal fun PlayerControls(
@@ -36,24 +32,20 @@ internal fun PlayerControls(
     cycleRepeat: () -> Unit
 ) {
     Row(
-        Modifier.fillMaxWidth(),
+        modifier =
+            Modifier.fillMaxWidth(),
         verticalAlignment =
             Alignment.CenterVertically,
         horizontalArrangement =
-            androidx.compose.foundation.layout
-                .Arrangement.Center
+            Arrangement.Center
     ) {
         BarePlayerButton(
             size = 45.dp,
             onClick =
                 toggleShuffle
         ) {
-            Icon(
-                imageVector =
-                    Lucide.Shuffle,
-                contentDescription =
-                    "Shuffle",
-                tint =
+            XmoShuffleIcon(
+                color =
                     if (
                         shuffleEnabled
                     ) {
@@ -63,13 +55,16 @@ internal fun PlayerControls(
                     },
                 modifier =
                     Modifier.size(
-                        23.dp
+                        24.dp
                     )
             )
         }
 
         Spacer(
-            Modifier.size(12.dp)
+            modifier =
+                Modifier.size(
+                    12.dp
+                )
         )
 
         BarePlayerButton(
@@ -88,7 +83,7 @@ internal fun PlayerControls(
                             ) {
                                 1f
                             } else {
-                                .30f
+                                .28f
                             }
                     ),
                 modifier =
@@ -99,7 +94,10 @@ internal fun PlayerControls(
         }
 
         Spacer(
-            Modifier.size(4.dp)
+            modifier =
+                Modifier.size(
+                    4.dp
+                )
         )
 
         BarePlayerButton(
@@ -108,18 +106,23 @@ internal fun PlayerControls(
                 togglePlay
         ) {
             Box(
-                Modifier
-                    .size(58.dp)
-                    .background(
-                        color =
-                            playBackground,
-                        shape =
-                            CircleShape
-                    ),
+                modifier =
+                    Modifier
+                        .size(
+                            58.dp
+                        )
+                        .background(
+                            color =
+                                playBackground,
+                            shape =
+                                CircleShape
+                        ),
                 contentAlignment =
                     Alignment.Center
             ) {
-                if (isPlaying) {
+                if (
+                    isPlaying
+                ) {
                     XmoPauseIcon(
                         color =
                             foreground,
@@ -142,7 +145,10 @@ internal fun PlayerControls(
         }
 
         Spacer(
-            Modifier.size(4.dp)
+            modifier =
+                Modifier.size(
+                    4.dp
+                )
         )
 
         BarePlayerButton(
@@ -161,7 +167,7 @@ internal fun PlayerControls(
                             ) {
                                 1f
                             } else {
-                                .30f
+                                .28f
                             }
                     ),
                 modifier =
@@ -172,7 +178,10 @@ internal fun PlayerControls(
         }
 
         Spacer(
-            Modifier.size(12.dp)
+            modifier =
+                Modifier.size(
+                    12.dp
+                )
         )
 
         BarePlayerButton(
@@ -180,28 +189,11 @@ internal fun PlayerControls(
             onClick =
                 cycleRepeat
         ) {
-            Icon(
-                imageVector =
-                    if (
-                        repeatMode ==
-                        Player.REPEAT_MODE_ONE
-                    ) {
-                        Lucide.Repeat1
-                    } else {
-                        Lucide.Repeat2
-                    },
-                contentDescription =
-                    when (repeatMode) {
-                        Player.REPEAT_MODE_ONE ->
-                            "Repeat one"
-
-                        Player.REPEAT_MODE_ALL ->
-                            "Repeat all"
-
-                        else ->
-                            "Repeat off"
-                    },
-                tint =
+            XmoRepeatIcon(
+                repeatOne =
+                    repeatMode ==
+                        Player.REPEAT_MODE_ONE,
+                color =
                     if (
                         repeatMode ==
                         Player.REPEAT_MODE_OFF
@@ -212,7 +204,7 @@ internal fun PlayerControls(
                     },
                 modifier =
                     Modifier.size(
-                        23.dp
+                        25.dp
                     )
             )
         }
