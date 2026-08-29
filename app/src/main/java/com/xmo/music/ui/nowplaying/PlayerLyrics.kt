@@ -36,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -453,11 +454,11 @@ internal fun FullLyrics(
     close: () -> Unit
 ) {
     val foreground =
-        if (
-            androidx.compose.ui.graphics
-                .luminance(dominant) >
-            .58f
-        ) {
+        if (dominant.luminance() > .58f) {
+            Color(0xFF111214)
+        } else {
+            Color.White
+        } {
             Color(0xFF111214)
         } else {
             Color.White
