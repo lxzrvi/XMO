@@ -1,7 +1,10 @@
 package com.xmo.music.ui.nowplaying
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -10,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,12 +22,16 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -31,6 +39,7 @@ import com.xmo.music.data.Song
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun QueueSheet(
@@ -39,16 +48,40 @@ internal fun QueueSheet(
     colors: HomeColors,
     dismiss: () -> Unit
 ) {
+    val scope =
+        rememberCoroutineScope()
+
+    val sheetY =
+        remember {
+            Animatable(0f)
+        }
+
+    val configuration =
+        LocalConfiguration.current
+
+    val sheetHeightDp =
+        configuration.screenHeightDp *
+            .72f
+
     Box(
         Modifier
             .fillMaxSize()
             .background(
-                androidx.compose.ui.graphics.Color.Black
-                    .copy(alpha = .28f)
+                Color.Black.copy(
+                    alpha = .18f
+                )
             )
-            .clickable(
-                onClick = dismiss
-            ),
+            /*
+             * No clickable/ripple backdrop.
+             * This is intentionally a passive touch blocker.
+             */
+            .pointerInput(Unit) {
+                awaitPointerEventScope {
+                    while (true) {
+                        awaitPointerEvent()
+                    }
+                }
+            },
         contentAlignment =
             Alignment.BottomCenter
     ) {
@@ -56,10 +89,12 @@ internal fun QueueSheet(
             Modifier
                 .fillMaxWidth()
                 .height(
-                    LocalConfiguration.current
-                        .screenHeightDp.dp *
-                        .72f
+                    sheetHeightDp.dp
                 )
+                .graphicsLayer {
+                    translationY =
+                        sheetY.value
+                }
                 .clip(
                     RoundedCornerShape(
                         topStart = 30.dp,
@@ -69,25 +104,109 @@ internal fun QueueSheet(
                 .background(
                     colors.surface
                 )
-                .clickable {}
-                .padding(top = 12.dp)
         ) {
+            /*
+             * Dedicated swipe handle.
+             *
+             * Queue list itself remains free for normal scrolling.
+             */
             Box(
                 Modifier
-                    .align(
-                        Alignment.CenterHorizontally
-                    )
-                    .width(42.dp)
-                    .height(4.dp)
-                    .clip(
-                        RoundedCornerShape(2.dp)
-                    )
-                    .background(
-                        colors.sub.copy(
-                            alpha = .28f
+                    .fillMaxWidth()
+                    .height(36.dp)
+                    .pointerInput(Unit) {
+                        detectDragGestures(
+                            onDrag = {
+                                    change,
+                                    amount ->
+
+                                if (
+                                    amount.y > 0f ||
+                                    sheetY.value >
+                                    0f
+                                ) {
+                                    change.consume()
+
+                                    scope.launch {
+                                        sheetY.snapTo(
+                                            (
+                                                sheetY.value +
+                                                    amount.y
+                                                )
+                                                .coerceAtLeast(
+                                                    0f
+                                                )
+                                        )
+                                    }
+                                }
+                            },
+
+                            onDragEnd = {
+                                scope.launch {
+                                    if (
+                                        sheetY.value >
+                                        90f
+                                    ) {
+                                        sheetY.animateTo(
+                                            targetValue =
+                                                1_000f,
+                                            animationSpec =
+                                                tween(250)
+                                        )
+
+                                        dismiss()
+                                    } else {
+                                        sheetY.animateTo(
+                                            targetValue =
+                                                0f,
+                                            animationSpec =
+                                                spring(
+                                                    dampingRatio =
+                                                        .82f,
+                                                    stiffness =
+                                                        430f
+                                                )
+                                        )
+                                    }
+                                }
+                            },
+
+                            onDragCancel = {
+                                scope.launch {
+                                    sheetY.animateTo(
+                                        targetValue =
+                                            0f,
+                                        animationSpec =
+                                            spring(
+                                                dampingRatio =
+                                                    .84f,
+                                                stiffness =
+                                                    450f
+                                            )
+                                    )
+                                }
+                            }
                         )
-                    )
-            )
+                    },
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                Box(
+                    Modifier
+                        .width(52.dp)
+                        .height(5.dp)
+                        .clip(
+                            RoundedCornerShape(
+                                3.dp
+                            )
+                        )
+                        .background(
+                            colors.sub.copy(
+                                alpha = .30f
+                            )
+                        )
+                )
+            }
 
             Text(
                 text = "Queue",
@@ -98,7 +217,7 @@ internal fun QueueSheet(
                 modifier =
                     Modifier.padding(
                         start = 18.dp,
-                        top = 16.dp,
+                        top = 2.dp,
                         bottom = 11.dp
                     )
             )
@@ -119,7 +238,9 @@ internal fun QueueSheet(
             ) {
                 items(
                     items = queue,
-                    key = { it.id }
+                    key = { song ->
+                        song.id
+                    }
                 ) { song ->
                     QueueRow(
                         song = song,
@@ -148,7 +269,9 @@ private fun QueueRow(
             .fillMaxWidth()
             .height(58.dp)
             .clip(
-                RoundedCornerShape(14.dp)
+                RoundedCornerShape(
+                    14.dp
+                )
             )
             .background(
                 if (active) {
@@ -199,9 +322,7 @@ private fun QueueRow(
                 fontFamily =
                     XmoFont.bold,
                 fontSize = 12.sp,
-                maxLines = 1,
-                overflow =
-                    TextOverflow.Ellipsis
+                maxLines = 1
             )
 
             Text(
@@ -210,9 +331,7 @@ private fun QueueRow(
                 fontFamily =
                     XmoFont.normal,
                 fontSize = 10.sp,
-                maxLines = 1,
-                overflow =
-                    TextOverflow.Ellipsis
+                maxLines = 1
             )
         }
     }
