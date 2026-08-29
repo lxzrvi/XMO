@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -64,7 +63,7 @@ internal fun FullLyrics(
             XmoTheme.Amoled ->
                 if (
                     dominant.luminance() >
-                    .72f
+                    .70f
                 ) {
                     Color(0xFF17181B)
                 } else {
@@ -77,7 +76,9 @@ internal fun FullLyrics(
             targetValue =
                 foregroundTarget,
             animationSpec =
-                tween(380),
+                tween(
+                    durationMillis = 500
+                ),
             label =
                 "fullLyricsForeground"
         )
@@ -89,7 +90,7 @@ internal fun FullLyrics(
             text = foreground,
             sub =
                 foreground.copy(
-                    alpha = .56f
+                    alpha = .58f
                 ),
             button =
                 foreground.copy(
@@ -97,7 +98,7 @@ internal fun FullLyrics(
                 ),
             icon =
                 foreground.copy(
-                    alpha = .80f
+                    alpha = .82f
                 ),
             border =
                 foreground.copy(
@@ -106,182 +107,209 @@ internal fun FullLyrics(
         )
 
     Box(
-        Modifier.fillMaxSize()
+        modifier =
+            Modifier.fillMaxSize()
     ) {
         PlayerBackground(
-            dominant =
-                dominant,
+            dominant = dominant,
             deep = deep,
             theme = theme
         )
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
-                .navigationBarsPadding()
+        /*
+         * Safe-area box owns the entire lyrics viewport.
+         *
+         * The top metadata/seek UI is an overlay, so it does not
+         * push FollowLyrics downward. Current lyric therefore
+         * targets the real safe-screen centre.
+         */
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
         ) {
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .height(70.dp)
-                    .padding(
-                        start = 15.dp,
-                        end = 12.dp
-                    ),
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-                AsyncImage(
-                    model = artwork,
-                    contentDescription = null,
-                    modifier =
-                        Modifier
-                            .size(42.dp)
-                            .clip(
-                                RoundedCornerShape(
-                                    10.dp
-                                )
-                            ),
-                    contentScale =
-                        ContentScale.Crop
-                )
-
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .padding(
-                            start = 10.dp
-                        )
-                ) {
-                    Text(
-                        text =
-                            title.ifBlank {
-                                "Unknown song"
-                            },
-                        color =
-                            foreground,
-                        fontFamily =
-                            XmoFont.bold,
-                        fontSize = 14.sp,
-                        maxLines = 1,
-                        overflow =
-                            TextOverflow.Ellipsis
-                    )
-
-                    Text(
-                        text =
-                            artist.ifBlank {
-                                "Unknown artist"
-                            },
-                        color =
-                            foreground.copy(
-                                alpha = .58f
-                            ),
-                        fontFamily =
-                            XmoFont.medium,
-                        fontSize = 10.sp,
-                        maxLines = 1,
-                        overflow =
-                            TextOverflow.Ellipsis
-                    )
-                }
-
-                FullLyricsControls(
-                    isPlaying =
-                        isPlaying,
-                    canPrevious =
-                        canPrevious,
-                    canNext =
-                        canNext,
-                    foreground =
-                        foreground,
-                    background =
-                        foreground.copy(
-                            alpha = .09f
-                        ),
-                    togglePlay =
-                        togglePlay,
-                    previous =
-                        previous,
-                    next = next,
-                    close = close
-                )
-            }
-
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        horizontal = 17.dp
-                    )
-            ) {
-                RoundedSeekBar(
-                    position =
-                        position,
-                    duration =
-                        duration,
-                    active =
-                        accent,
-                    inactive =
-                        foreground.copy(
-                            alpha = .18f
-                        ),
-                    seekTo =
-                        seekTo
-                )
-
-                Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement =
-                        Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text =
-                            playerTime(
-                                position
-                            ),
-                        color =
-                            foreground.copy(
-                                alpha = .56f
-                            ),
-                        fontFamily =
-                            XmoFont.medium,
-                        fontSize = 10.sp
-                    )
-
-                    Text(
-                        text =
-                            playerTime(
-                                duration
-                            ),
-                        color =
-                            foreground.copy(
-                                alpha = .56f
-                            ),
-                        fontFamily =
-                            XmoFont.medium,
-                        fontSize = 10.sp
-                    )
-                }
-            }
-
-            Spacer(
-                Modifier.height(3.dp)
-            )
-
             FollowLyrics(
                 lyrics = lyrics,
                 position = position,
-                colors =
-                    lyricColors,
+                colors = lyricColors,
                 accent = accent,
                 fullscreen = true,
                 modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
+                    Modifier.fillMaxSize()
             )
+
+            Column(
+                modifier =
+                    Modifier
+                        .align(
+                            Alignment.TopCenter
+                        )
+                        .fillMaxWidth()
+            ) {
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(
+                                70.dp
+                            )
+                            .padding(
+                                start = 15.dp,
+                                end = 12.dp
+                            ),
+                    verticalAlignment =
+                        Alignment.CenterVertically
+                ) {
+                    AsyncImage(
+                        model = artwork,
+                        contentDescription =
+                            null,
+                        modifier =
+                            Modifier
+                                .size(
+                                    42.dp
+                                )
+                                .clip(
+                                    RoundedCornerShape(
+                                        11.dp
+                                    )
+                                ),
+                        contentScale =
+                            ContentScale.Crop
+                    )
+
+                    Column(
+                        modifier =
+                            Modifier
+                                .weight(
+                                    1f
+                                )
+                                .padding(
+                                    start = 10.dp
+                                )
+                    ) {
+                        Text(
+                            text =
+                                title.ifBlank {
+                                    "Unknown song"
+                                },
+                            color =
+                                foreground,
+                            fontFamily =
+                                XmoFont.bold,
+                            fontSize =
+                                14.sp,
+                            maxLines = 1,
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+
+                        Text(
+                            text =
+                                artist.ifBlank {
+                                    "Unknown artist"
+                                },
+                            color =
+                                foreground.copy(
+                                    alpha = .60f
+                                ),
+                            fontFamily =
+                                XmoFont.medium,
+                            fontSize =
+                                10.sp,
+                            maxLines = 1,
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+                    }
+
+                    FullLyricsControls(
+                        isPlaying =
+                            isPlaying,
+                        canPrevious =
+                            canPrevious,
+                        canNext =
+                            canNext,
+                        foreground =
+                            foreground,
+                        background =
+                            foreground.copy(
+                                alpha = .09f
+                            ),
+                        togglePlay =
+                            togglePlay,
+                        previous =
+                            previous,
+                        next =
+                            next,
+                        close =
+                            close
+                    )
+                }
+
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(
+                                horizontal = 17.dp
+                            )
+                ) {
+                    RoundedSeekBar(
+                        position =
+                            position,
+                        duration =
+                            duration,
+                        active =
+                            accent,
+                        inactive =
+                            foreground.copy(
+                                alpha = .18f
+                            ),
+                        seekTo =
+                            seekTo
+                    )
+
+                    Row(
+                        modifier =
+                            Modifier.fillMaxWidth(),
+                        horizontalArrangement =
+                            Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text =
+                                playerTime(
+                                    position
+                                ),
+                            color =
+                                foreground.copy(
+                                    alpha = .58f
+                                ),
+                            fontFamily =
+                                XmoFont.medium,
+                            fontSize =
+                                10.sp
+                        )
+
+                        Text(
+                            text =
+                                playerTime(
+                                    duration
+                                ),
+                            color =
+                                foreground.copy(
+                                    alpha = .58f
+                                ),
+                            fontFamily =
+                                XmoFont.medium,
+                            fontSize =
+                                10.sp
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -339,9 +367,7 @@ private fun FullLyricsControls(
                 color =
                     foreground.copy(
                         alpha =
-                            if (
-                                canPrevious
-                            ) {
+                            if (canPrevious) {
                                 1f
                             } else {
                                 .28f
@@ -383,12 +409,11 @@ private fun FullLyricsControls(
             onClick =
                 close
         ) {
-            /*
-             * Lightweight custom X so fullscreen transport stays
-             * independent of an extended icon pack.
-             */
             androidx.compose.foundation.Canvas(
-                Modifier.size(18.dp)
+                modifier =
+                    Modifier.size(
+                        18.dp
+                    )
             ) {
                 val stroke =
                     2.dp.toPx()
