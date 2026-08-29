@@ -1165,7 +1165,21 @@ fun App() {
                             next = {
                                 player.next()
                             },
-
+                            
+                            playQueueIndex = { index ->
+                                val currentQueue =
+                                    player.queue()
+                            
+                                if (
+                                    index in currentQueue.indices
+                                ) {
+                                    player.play(
+                                        currentQueue,
+                                        index
+                                    )
+                                }
+                            },
+                            
                             seekTo = {
                                 player.seekTo(it)
                             },
