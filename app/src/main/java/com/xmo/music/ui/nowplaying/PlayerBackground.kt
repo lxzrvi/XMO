@@ -16,147 +16,158 @@ internal fun PlayerBackground(
     deep: Color,
     theme: XmoTheme
 ) {
-    val bottom =
+    val base =
         when (theme) {
             XmoTheme.Light ->
-                Color.White.copy(alpha = .20f)
+                Color(0xFFF1F3F6)
 
             XmoTheme.Dark ->
-                Color.Black.copy(alpha = .28f)
+                Color(0xFF151518)
 
             XmoTheme.Amoled ->
-                Color.Black.copy(alpha = .45f)
+                Color.Black
         }
+
+    val artworkStrength =
+        when (theme) {
+            XmoTheme.Light ->
+                .19f
+
+            XmoTheme.Dark ->
+                .22f
+
+            XmoTheme.Amoled ->
+                .18f
+        }
+
+    val secondaryStrength =
+        artworkStrength * .72f
 
     Canvas(
         Modifier
             .fillMaxSize()
-            .background(dominant)
+            .background(base)
     ) {
+        /*
+         * Wide, low-opacity color fields. No solid dominant fill.
+         */
         drawRect(
             Brush.radialGradient(
-                colors = listOf(
-                    dominant,
-                    Color.Transparent
-                ),
-                center = Offset(
-                    size.width * .10f,
-                    size.height * .08f
-                ),
-                radius = size.width * 1.20f
+                colors =
+                    listOf(
+                        dominant.copy(
+                            alpha =
+                                artworkStrength
+                        ),
+                        Color.Transparent
+                    ),
+                center =
+                    Offset(
+                        size.width * .12f,
+                        size.height * .13f
+                    ),
+                radius =
+                    size.width * 1.18f
             )
         )
 
         drawRect(
             Brush.radialGradient(
-                colors = listOf(
-                    deep.copy(alpha = .50f),
-                    Color.Transparent
-                ),
-                center = Offset(
-                    size.width * .92f,
-                    size.height * .30f
-                ),
-                radius = size.width * 1.15f
+                colors =
+                    listOf(
+                        deep.copy(
+                            alpha =
+                                secondaryStrength
+                        ),
+                        Color.Transparent
+                    ),
+                center =
+                    Offset(
+                        size.width * .88f,
+                        size.height * .28f
+                    ),
+                radius =
+                    size.width * 1.22f
             )
         )
 
         drawRect(
             Brush.radialGradient(
-                colors = listOf(
-                    dominant.copy(alpha = .76f),
-                    Color.Transparent
-                ),
-                center = Offset(
-                    size.width * .06f,
-                    size.height * .62f
-                ),
-                radius = size.width * 1.22f
+                colors =
+                    listOf(
+                        dominant.copy(
+                            alpha =
+                                artworkStrength *
+                                    .72f
+                        ),
+                        Color.Transparent
+                    ),
+                center =
+                    Offset(
+                        size.width * .17f,
+                        size.height * .63f
+                    ),
+                radius =
+                    size.width * 1.25f
             )
         )
 
         drawRect(
             Brush.radialGradient(
-                colors = listOf(
-                    deep.copy(alpha = .54f),
-                    Color.Transparent
-                ),
-                center = Offset(
-                    size.width * .94f,
-                    size.height * .83f
-                ),
-                radius = size.width * 1.25f
+                colors =
+                    listOf(
+                        deep.copy(
+                            alpha =
+                                secondaryStrength *
+                                    .75f
+                        ),
+                        Color.Transparent
+                    ),
+                center =
+                    Offset(
+                        size.width * .86f,
+                        size.height * .83f
+                    ),
+                radius =
+                    size.width * 1.28f
             )
         )
 
+        /*
+         * Tiny neutral integration layer keeps all four fields
+         * visually joined rather than looking like circles.
+         */
         drawRect(
             Brush.verticalGradient(
-                colors = listOf(
-                    Color.Transparent,
-                    bottom
-                ),
-                startY = size.height * .55f,
-                endY = size.height
+                colors =
+                    when (theme) {
+                        XmoTheme.Light ->
+                            listOf(
+                                Color.White.copy(
+                                    alpha = .025f
+                                ),
+                                Color.White.copy(
+                                    alpha = .10f
+                                )
+                            )
+
+                        XmoTheme.Dark ->
+                            listOf(
+                                Color.Transparent,
+                                Color.Black.copy(
+                                    alpha = .08f
+                                )
+                            )
+
+                        XmoTheme.Amoled ->
+                            listOf(
+                                Color.Transparent,
+                                Color.Black.copy(
+                                    alpha = .20f
+                                )
+                            )
+                    }
             )
         )
     }
-}
-
-internal fun liftArtworkColor(
-    color: Color
-): Color {
-    val minimum = .22f
-
-    val maximum =
-        maxOf(
-            color.red,
-            color.green,
-            color.blue
-        )
-
-    if (maximum >= minimum) {
-        return color
-    }
-
-    if (maximum <= .001f) {
-        return Color(0xFF4A4D55)
-    }
-
-    val multiplier =
-        minimum / maximum
-
-    return Color(
-        red =
-            (color.red * multiplier)
-                .coerceIn(0f, 1f),
-        green =
-            (color.green * multiplier)
-                .coerceIn(0f, 1f),
-        blue =
-            (color.blue * multiplier)
-                .coerceIn(0f, 1f),
-        alpha = 1f
-    )
-}
-
-internal fun mixColor(
-    from: Color,
-    to: Color,
-    fraction: Float
-): Color {
-    val f =
-        fraction.coerceIn(0f, 1f)
-
-    return Color(
-        red =
-            from.red +
-                (to.red - from.red) * f,
-        green =
-            from.green +
-                (to.green - from.green) * f,
-        blue =
-            from.blue +
-                (to.blue - from.blue) * f,
-        alpha = 1f
-    )
 }
