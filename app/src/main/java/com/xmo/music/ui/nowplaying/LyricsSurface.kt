@@ -39,43 +39,49 @@ internal fun ArtworkLyrics(
     val targetSurface =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFFF8F9FB)
-                    .copy(
-                        alpha = .94f
-                    )
+                Color.White.copy(
+                    alpha = .80f
+                )
 
             XmoTheme.Dark ->
-                Color(0xFF292B30)
+                Color(0xFF202126)
                     .copy(
-                        alpha = .94f
+                        alpha = .76f
                     )
 
             XmoTheme.Amoled ->
-                Color(0xFF101114)
+                Color(0xFF08090B)
                     .copy(
-                        alpha = .96f
+                        alpha = .82f
                     )
         }
 
     val surface by
         animateColorAsState(
-            targetValue =
-                targetSurface,
+            targetValue = targetSurface,
             animationSpec =
-                tween(360),
+                tween(400),
             label =
                 "lyricsSurface"
         )
 
     Box(
-        modifier
-            .clip(
-                RoundedCornerShape(
-                    24.dp
+        modifier =
+            modifier
+                .clip(
+                    RoundedCornerShape(
+                        24.dp
+                    )
                 )
-            )
-            .background(surface)
+                .background(surface)
     ) {
+        /*
+         * List gets the complete card viewport.
+         *
+         * Controls float above it instead of changing the list
+         * height, therefore its mathematical center remains the
+         * artwork card center.
+         */
         FollowLyrics(
             lyrics = lyrics,
             position = position,
@@ -88,7 +94,9 @@ internal fun ArtworkLyrics(
 
         XmoCapsule(
             background =
-                colors.button,
+                colors.button.copy(
+                    alpha = .82f
+                ),
             modifier =
                 Modifier
                     .align(
@@ -98,8 +106,7 @@ internal fun ArtworkLyrics(
         ) {
             CapsuleButton(
                 size = 38.dp,
-                onClick =
-                    pickLyrics
+                onClick = pickLyrics
             ) {
                 Icon(
                     imageVector =
@@ -130,8 +137,7 @@ internal fun ArtworkLyrics(
 
             CapsuleButton(
                 size = 38.dp,
-                onClick =
-                    showArtwork
+                onClick = showArtwork
             ) {
                 Icon(
                     imageVector =
