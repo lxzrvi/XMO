@@ -1,8 +1,10 @@
 package com.xmo.music.ui.nowplaying
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectDragGestures
@@ -33,6 +35,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -62,124 +67,173 @@ internal fun QueueSheet(
 
     val sheetY =
         remember {
-            Animatable(0f)
+            Animatable(
+                0f
+            )
         }
 
-    var sheetHeightPx by remember {
-        mutableFloatStateOf(1f)
-    }
+    var sheetHeightPx by
+        remember {
+            mutableFloatStateOf(
+                1f
+            )
+        }
 
-    var menuIndex by remember {
-        mutableStateOf<Int?>(
-            null
-        )
-    }
+    var menuIndex by
+        remember {
+            mutableStateOf<Int?>(
+                null
+            )
+        }
 
     val sheetHeight =
-        LocalConfiguration.current
-            .screenHeightDp.dp *
+        LocalConfiguration
+            .current
+            .screenHeightDp
+            .dp *
             .72f
 
+    /*
+     * Back closes the long-hold menu first. Otherwise it closes
+     * QueueSheet. This handler is inside the queue overlay, so it
+     * takes priority while the sheet is present.
+     */
+    BackHandler {
+        if (
+            menuIndex != null
+        ) {
+            menuIndex =
+                null
+        } else {
+            dismiss()
+        }
+    }
+
     Box(
-        Modifier.fillMaxSize()
+        modifier =
+            Modifier.fillMaxSize()
     ) {
-        /*
-         * Backdrop closes the queue.
-         *
-         * No Material indication/press effect.
-         */
         Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Color.Black.copy(
-                        alpha = .10f
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        Color.Black.copy(
+                            alpha = .10f
+                        )
                     )
-                )
-                .simpleTap(
-                    dismiss
-                )
+                    .simpleTap(
+                        dismiss
+                    )
         )
 
         Column(
-            Modifier
-                .align(
-                    Alignment.BottomCenter
-                )
-                .fillMaxWidth()
-                .height(sheetHeight)
-                .onSizeChanged {
-                    sheetHeightPx =
-                        it.height
-                            .toFloat()
-                            .coerceAtLeast(
-                                1f
-                            )
-                }
-                .graphicsLayer {
-                    translationY =
-                        sheetY.value
-                }
-                .clip(
-                    RoundedCornerShape(
-                        topStart = 30.dp,
-                        topEnd = 30.dp
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.BottomCenter
                     )
-                )
-                .background(
-                    colors.surface
-                )
+                    .fillMaxWidth()
+                    .height(
+                        sheetHeight
+                    )
+                    .onSizeChanged {
+                        sheetHeightPx =
+                            it.height
+                                .toFloat()
+                                .coerceAtLeast(
+                                    1f
+                                )
+                    }
+                    .graphicsLayer {
+                        translationY =
+                            sheetY.value
+                    }
+                    .clip(
+                        RoundedCornerShape(
+                            topStart =
+                                30.dp,
+                            topEnd =
+                                30.dp
+                        )
+                    )
+                    .background(
+                        colors.surface
+                    )
         ) {
             Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(38.dp)
-                    .pointerInput(
-                        sheetHeightPx
-                    ) {
-                        detectDragGestures(
-                            onDrag = {
-                                    change,
-                                    amount ->
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(
+                            38.dp
+                        )
+                        .pointerInput(
+                            sheetHeightPx
+                        ) {
+                            detectDragGestures(
+                                onDrag = {
+                                        change,
+                                        amount ->
 
-                                if (
-                                    amount.y > 0f ||
-                                    sheetY.value >
-                                    0f
-                                ) {
-                                    change.consume()
-
-                                    scope.launch {
-                                        sheetY.snapTo(
-                                            (
-                                                sheetY.value +
-                                                    amount.y
-                                                )
-                                                .coerceIn(
-                                                    0f,
-                                                    sheetHeightPx
-                                                )
-                                        )
-                                    }
-                                }
-                            },
-
-                            onDragEnd = {
-                                scope.launch {
                                     if (
+                                        amount.y > 0f ||
                                         sheetY.value >
-                                        sheetHeightPx *
-                                            .13f
+                                        0f
                                     ) {
-                                        sheetY.animateTo(
-                                            targetValue =
-                                                sheetHeightPx,
-                                            animationSpec =
-                                                tween(280)
-                                        )
+                                        change.consume()
 
-                                        dismiss()
-                                    } else {
+                                        scope.launch {
+                                            sheetY.snapTo(
+                                                (
+                                                    sheetY.value +
+                                                        amount.y
+                                                    )
+                                                    .coerceIn(
+                                                        0f,
+                                                        sheetHeightPx
+                                                    )
+                                            )
+                                        }
+                                    }
+                                },
+
+                                onDragEnd = {
+                                    scope.launch {
+                                        if (
+                                            sheetY.value >
+                                            sheetHeightPx *
+                                                .13f
+                                        ) {
+                                            sheetY.animateTo(
+                                                targetValue =
+                                                    sheetHeightPx,
+                                                animationSpec =
+                                                    tween(
+                                                        durationMillis =
+                                                            280
+                                                    )
+                                            )
+
+                                            dismiss()
+                                        } else {
+                                            sheetY.animateTo(
+                                                targetValue =
+                                                    0f,
+                                                animationSpec =
+                                                    spring(
+                                                        dampingRatio =
+                                                            .84f,
+                                                        stiffness =
+                                                            420f
+                                                    )
+                                            )
+                                        }
+                                    }
+                                },
+
+                                onDragCancel = {
+                                    scope.launch {
                                         sheetY.animateTo(
                                             targetValue =
                                                 0f,
@@ -188,56 +242,47 @@ internal fun QueueSheet(
                                                     dampingRatio =
                                                         .84f,
                                                     stiffness =
-                                                        420f
+                                                        430f
                                                 )
                                         )
                                     }
                                 }
-                            },
-
-                            onDragCancel = {
-                                scope.launch {
-                                    sheetY.animateTo(
-                                        targetValue =
-                                            0f,
-                                        animationSpec =
-                                            spring(
-                                                dampingRatio =
-                                                    .84f,
-                                                stiffness =
-                                                    430f
-                                            )
-                                    )
-                                }
-                            }
-                        )
-                    },
+                            )
+                        },
                 contentAlignment =
                     Alignment.Center
             ) {
                 Box(
-                    Modifier
-                        .width(54.dp)
-                        .height(5.dp)
-                        .clip(
-                            RoundedCornerShape(
-                                3.dp
+                    modifier =
+                        Modifier
+                            .width(
+                                54.dp
                             )
-                        )
-                        .background(
-                            colors.sub.copy(
-                                alpha = .28f
+                            .height(
+                                5.dp
                             )
-                        )
+                            .clip(
+                                RoundedCornerShape(
+                                    3.dp
+                                )
+                            )
+                            .background(
+                                colors.sub.copy(
+                                    alpha = .28f
+                                )
+                            )
                 )
             }
 
             Text(
-                text = "Queue",
-                color = colors.text,
+                text =
+                    "Queue",
+                color =
+                    colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 19.sp,
+                fontSize =
+                    19.sp,
                 modifier =
                     Modifier.padding(
                         start = 18.dp,
@@ -261,7 +306,8 @@ internal fun QueueSheet(
                     )
             ) {
                 itemsIndexed(
-                    items = queue,
+                    items =
+                        queue,
                     key = {
                             _,
                             song ->
@@ -272,14 +318,25 @@ internal fun QueueSheet(
                         index,
                         song ->
 
+                    val active =
+                        song.id ==
+                            currentSongId
+
                     QueueRow(
-                        song = song,
+                        song =
+                            song,
                         active =
-                            song.id ==
-                                currentSongId,
-                        colors = colors,
+                            active,
+                        colors =
+                            colors,
                         onClick = {
-                            playIndex(index)
+                            /*
+                             * Real queue-index playback. Queue
+                             * deliberately remains open.
+                             */
+                            playIndex(
+                                index
+                            )
                         },
                         onLongClick = {
                             menuIndex =
@@ -291,17 +348,30 @@ internal fun QueueSheet(
         }
 
         menuIndex?.let { index ->
-            queue.getOrNull(index)
+            queue
+                .getOrNull(
+                    index
+                )
                 ?.let { song ->
                     QueueActionMenu(
-                        song = song,
-                        colors = colors,
+                        song =
+                            song,
+                        active =
+                            song.id ==
+                                currentSongId,
+                        colors =
+                            colors,
                         play = {
-                            playIndex(index)
-                            menuIndex = null
+                            playIndex(
+                                index
+                            )
+
+                            menuIndex =
+                                null
                         },
                         dismiss = {
-                            menuIndex = null
+                            menuIndex =
+                                null
                         }
                     )
                 }
@@ -326,33 +396,41 @@ private fun QueueRow(
         }
 
     Row(
-        Modifier
-            .fillMaxWidth()
-            .height(58.dp)
-            .clip(
-                RoundedCornerShape(
-                    14.dp
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(
+                    58.dp
                 )
-            )
-            .background(
-                if (active) {
-                    accent.copy(
-                        alpha = .10f
+                .clip(
+                    RoundedCornerShape(
+                        14.dp
                     )
-                } else {
-                    colors.button
-                }
-            )
-            .combinedClickable(
-                interactionSource =
-                    interaction,
-                indication = null,
-                onClick =
-                    onClick,
-                onLongClick =
-                    onLongClick
-            )
-            .padding(5.dp),
+                )
+                .background(
+                    if (
+                        active
+                    ) {
+                        accent.copy(
+                            alpha = .10f
+                        )
+                    } else {
+                        colors.button
+                    }
+                )
+                .combinedClickable(
+                    interactionSource =
+                        interaction,
+                    indication =
+                        null,
+                    onClick =
+                        onClick,
+                    onLongClick =
+                        onLongClick
+                )
+                .padding(
+                    5.dp
+                ),
         verticalAlignment =
             Alignment.CenterVertically
     ) {
@@ -363,7 +441,9 @@ private fun QueueRow(
                 null,
             modifier =
                 Modifier
-                    .size(48.dp)
+                    .size(
+                        48.dp
+                    )
                     .clip(
                         RoundedCornerShape(
                             10.dp
@@ -377,24 +457,31 @@ private fun QueueRow(
         )
 
         Column(
-            Modifier
-                .weight(1f)
-                .padding(
-                    horizontal = 10.dp
-                )
+            modifier =
+                Modifier
+                    .weight(
+                        1f
+                    )
+                    .padding(
+                        horizontal =
+                            10.dp
+                    )
         ) {
             Text(
                 text =
                     song.title,
                 color =
-                    if (active) {
+                    if (
+                        active
+                    ) {
                         accent
                     } else {
                         colors.text
                     },
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 12.sp,
+                fontSize =
+                    12.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis
@@ -407,102 +494,313 @@ private fun QueueRow(
                     colors.sub,
                 fontFamily =
                     XmoFont.normal,
-                fontSize = 10.sp,
+                fontSize =
+                    10.sp,
                 maxLines = 1,
                 overflow =
                     TextOverflow.Ellipsis
+            )
+        }
+
+        /*
+         * Dedicated current-song mark instead of an unrelated
+         * generic icon. Filled rounded bars fit the XMO transport
+         * family.
+         */
+        if (
+            active
+        ) {
+            QueuePlayingMark(
+                color =
+                    accent,
+                modifier =
+                    Modifier
+                        .padding(
+                            end = 10.dp
+                        )
+                        .size(
+                            19.dp
+                        )
             )
         }
     }
 }
 
 @Composable
+private fun QueuePlayingMark(
+    color: Color,
+    modifier: Modifier = Modifier
+) {
+    Canvas(
+        modifier =
+            modifier
+    ) {
+        val barWidth =
+            size.width *
+                .16f
+
+        val radius =
+            barWidth / 2f
+
+        drawRoundRect(
+            color = color,
+            topLeft =
+                Offset(
+                    x =
+                        size.width *
+                            .18f,
+                    y =
+                        size.height *
+                            .39f
+                ),
+            size =
+                Size(
+                    width =
+                        barWidth,
+                    height =
+                        size.height *
+                            .38f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    radius,
+                    radius
+                )
+        )
+
+        drawRoundRect(
+            color = color,
+            topLeft =
+                Offset(
+                    x =
+                        size.width *
+                            .42f,
+                    y =
+                        size.height *
+                            .22f
+                ),
+            size =
+                Size(
+                    width =
+                        barWidth,
+                    height =
+                        size.height *
+                            .55f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    radius,
+                    radius
+                )
+        )
+
+        drawRoundRect(
+            color = color,
+            topLeft =
+                Offset(
+                    x =
+                        size.width *
+                            .66f,
+                    y =
+                        size.height *
+                            .31f
+                ),
+            size =
+                Size(
+                    width =
+                        barWidth,
+                    height =
+                        size.height *
+                            .46f
+                ),
+            cornerRadius =
+                CornerRadius(
+                    radius,
+                    radius
+                )
+        )
+    }
+}
+
+@Composable
 private fun QueueActionMenu(
     song: Song,
+    active: Boolean,
     colors: HomeColors,
     play: () -> Unit,
     dismiss: () -> Unit
 ) {
     Box(
-        Modifier
-            .fillMaxSize()
-            .simpleTap(
-                dismiss
-            ),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(
+                    Color.Black.copy(
+                        alpha = .13f
+                    )
+                )
+                .simpleTap(
+                    dismiss
+                ),
         contentAlignment =
             Alignment.Center
     ) {
         Column(
-            Modifier
-                .padding(
-                    horizontal = 42.dp
-                )
-                .fillMaxWidth()
-                .clip(
-                    RoundedCornerShape(
-                        22.dp
+            modifier =
+                Modifier
+                    .padding(
+                        horizontal =
+                            42.dp
                     )
-                )
-                .background(
-                    colors.surface
-                )
-                .padding(14.dp)
+                    .fillMaxWidth()
+                    .clip(
+                        RoundedCornerShape(
+                            24.dp
+                        )
+                    )
+                    .background(
+                        colors.surface
+                    )
+                    .padding(
+                        15.dp
+                    )
         ) {
-            Text(
-                text = song.title,
-                color = colors.text,
-                fontFamily =
-                    XmoFont.bold,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow =
-                    TextOverflow.Ellipsis
-            )
+            Row(
+                modifier =
+                    Modifier.fillMaxWidth(),
+                verticalAlignment =
+                    Alignment.CenterVertically
+            ) {
+                AsyncImage(
+                    model =
+                        song.artwork,
+                    contentDescription =
+                        null,
+                    modifier =
+                        Modifier
+                            .size(
+                                46.dp
+                            )
+                            .clip(
+                                RoundedCornerShape(
+                                    12.dp
+                                )
+                            )
+                            .background(
+                                colors.button
+                            ),
+                    contentScale =
+                        ContentScale.Crop
+                )
 
-            Text(
-                text = song.artist,
-                color = colors.sub,
-                fontFamily =
-                    XmoFont.normal,
-                fontSize = 10.sp,
-                maxLines = 1
-            )
+                Column(
+                    modifier =
+                        Modifier
+                            .weight(
+                                1f
+                            )
+                            .padding(
+                                start = 11.dp
+                            )
+                ) {
+                    Text(
+                        text =
+                            song.title,
+                        color =
+                            colors.text,
+                        fontFamily =
+                            XmoFont.bold,
+                        fontSize =
+                            14.sp,
+                        maxLines = 1,
+                        overflow =
+                            TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        text =
+                            song.artist,
+                        color =
+                            colors.sub,
+                        fontFamily =
+                            XmoFont.normal,
+                        fontSize =
+                            10.sp,
+                        maxLines = 1,
+                        overflow =
+                            TextOverflow.Ellipsis
+                    )
+                }
+            }
 
             Spacer(
-                Modifier.height(10.dp)
+                modifier =
+                    Modifier.height(
+                        12.dp
+                    )
             )
 
             PressButton(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(44.dp),
-                onClick = play
+                        .height(
+                            46.dp
+                        ),
+                enabled =
+                    !active,
+                onClick =
+                    play
             ) {
                 Box(
-                    Modifier
-                        .fillMaxSize()
-                        .clip(
-                            RoundedCornerShape(
-                                13.dp
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .clip(
+                                RoundedCornerShape(
+                                    15.dp
+                                )
                             )
-                        )
-                        .background(
-                            colors.button
-                        ),
+                            .background(
+                                colors.button
+                            ),
                     contentAlignment =
                         Alignment.Center
                 ) {
                     Text(
-                        text = "Play",
+                        text =
+                            if (
+                                active
+                            ) {
+                                "Currently Playing"
+                            } else {
+                                "Play"
+                            },
                         color =
-                            colors.text,
+                            colors.text.copy(
+                                alpha =
+                                    if (
+                                        active
+                                    ) {
+                                        .48f
+                                    } else {
+                                        1f
+                                    }
+                            ),
                         fontFamily =
                             XmoFont.medium,
-                        fontSize = 12.sp
+                        fontSize =
+                            12.sp
                     )
                 }
             }
+
+            /*
+             * Play Next / Remove / Reorder are intentionally not
+             * exposed. QueueSheet currently receives only the real
+             * playIndex API, so displaying those actions would be
+             * a fake backend control.
+             */
         }
     }
 }
