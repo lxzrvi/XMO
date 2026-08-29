@@ -31,7 +31,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.clip
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -185,8 +185,8 @@ internal fun PlayerArtwork(
         }
 
         /*
-         * Natural next, transport-button next/previous, or other
-         * Media3-driven song change.
+         * Natural next, transport-button next/previous,
+         * or other Media3-driven song change.
          */
         if (
             !carousel.transactionActive
@@ -257,8 +257,9 @@ internal fun PlayerArtwork(
     }
 
     /*
-     * Live neighbours may recompose independently. Only adopt
-     * them while no frozen visual transaction owns the carousel.
+     * Live neighbours may recompose independently.
+     * Only adopt them while no frozen visual transaction
+     * owns the carousel.
      */
     LaunchedEffect(
         current,
@@ -292,8 +293,8 @@ internal fun PlayerArtwork(
             LocalDensity.current
 
         /*
-         * Artwork has 17dp horizontal inset on each side.
-         * This value is ONLY used by the artwork carousel.
+         * Artwork has 17dp on both horizontal sides.
+         * This is used only for artwork carousel width.
          */
         val horizontalInsetPx =
             with(density) {
@@ -327,6 +328,10 @@ internal fun PlayerArtwork(
                         canNext,
                         showLyrics
                     ) {
+                        /*
+                         * Disable artwork swipe while
+                         * lyrics are visible.
+                         */
                         if (showLyrics) {
                             return@pointerInput
                         }
@@ -369,6 +374,10 @@ internal fun PlayerArtwork(
                                             carousel.x.value +
                                                 amount.x
 
+                                        /*
+                                         * Resistance when there
+                                         * is no next song.
+                                         */
                                         if (
                                             target < 0f &&
                                             !canNext
@@ -379,6 +388,10 @@ internal fun PlayerArtwork(
                                                     .16f
                                         }
 
+                                        /*
+                                         * Resistance when there
+                                         * is no previous song.
+                                         */
                                         if (
                                             target > 0f &&
                                             !canPrevious
@@ -409,6 +422,10 @@ internal fun PlayerArtwork(
 
                                 scope.launch {
                                     when {
+
+                                        /*
+                                         * Swipe left -> next.
+                                         */
                                         carousel.x.value <
                                             -coverWidth *
                                             .15f &&
@@ -433,6 +450,9 @@ internal fun PlayerArtwork(
                                             nextSong()
                                         }
 
+                                        /*
+                                         * Swipe right -> previous.
+                                         */
                                         carousel.x.value >
                                             coverWidth *
                                             .15f &&
@@ -457,6 +477,9 @@ internal fun PlayerArtwork(
                                             previousSong()
                                         }
 
+                                        /*
+                                         * Swipe not strong enough.
+                                         */
                                         else -> {
                                             carousel.x.animateTo(
                                                 targetValue =
@@ -505,9 +528,12 @@ internal fun PlayerArtwork(
         ) {
 
             /*
+             * ====================================================
              * ARTWORK
+             * ====================================================
              *
-             * This remains square and cropped intentionally.
+             * Artwork remains square.
+             * ContentScale.Crop remains unchanged intentionally.
              */
             AnimatedVisibility(
                 visible =
@@ -529,7 +555,7 @@ internal fun PlayerArtwork(
                                 tween(
                                     durationMillis =
                                         340
-                                )
+                            )
                         ),
                 exit =
                     fadeOut(
@@ -546,7 +572,7 @@ internal fun PlayerArtwork(
                                 tween(
                                     durationMillis =
                                         260
-                                )
+                            )
                         )
             ) {
                 ArtworkCarousel(
@@ -566,14 +592,17 @@ internal fun PlayerArtwork(
             }
 
             /*
+             * ====================================================
              * LYRICS
+             * ====================================================
              *
              * IMPORTANT:
+             *
              * Do NOT use coverSizeModifier() here.
              *
-             * Lyrics get the entire 382dp host height so
-             * FollowLyrics can place the active lyric at
-             * the physical center.
+             * Lyrics receive the complete host area.
+             * This prevents the lyrics list from being forced
+             * into the square artwork dimensions.
              */
             AnimatedVisibility(
                 visible =
@@ -612,8 +641,8 @@ internal fun PlayerArtwork(
                                 tween(
                                     durationMillis =
                                         280
-                                )
                             )
+                        )
             ) {
                 Box(
                     modifier =
@@ -640,7 +669,9 @@ internal fun PlayerArtwork(
                             toggleLyrics,
 
                         /*
-                         * Full host area instead of
+                         * FIX:
+                         *
+                         * Full lyrics area instead of
                          * square artwork dimensions.
                          */
                         modifier =
@@ -652,6 +683,12 @@ internal fun PlayerArtwork(
     }
 }
 
+
+/*
+ * ============================================================
+ * ARTWORK CAROUSEL
+ * ============================================================
+ */
 @Composable
 private fun ArtworkCarousel(
     current: Uri?,
@@ -665,6 +702,10 @@ private fun ArtworkCarousel(
         modifier =
             Modifier.fillMaxSize()
     ) {
+
+        /*
+         * Previous artwork.
+         */
         previous?.let {
             Cover(
                 uri =
@@ -681,6 +722,9 @@ private fun ArtworkCarousel(
             )
         }
 
+        /*
+         * Current artwork.
+         */
         Cover(
             uri =
                 current,
@@ -705,6 +749,9 @@ private fun ArtworkCarousel(
                     )
         )
 
+        /*
+         * Next artwork.
+         */
         next?.let {
             Cover(
                 uri =
@@ -723,10 +770,16 @@ private fun ArtworkCarousel(
     }
 }
 
+
 /*
- * ONLY FOR ALBUM ART.
+ * ============================================================
+ * ARTWORK SIZE
+ * ============================================================
  *
- * Square + Crop is intentional.
+ * ONLY artwork uses this.
+ *
+ * 17dp left + 17dp right.
+ * Square aspect ratio.
  */
 private fun coverSizeModifier(): Modifier =
     Modifier
@@ -738,6 +791,12 @@ private fun coverSizeModifier(): Modifier =
             1f
         )
 
+
+/*
+ * ============================================================
+ * COVER
+ * ============================================================
+ */
 @Composable
 private fun Cover(
     uri: Uri?,
@@ -757,6 +816,7 @@ private fun Cover(
                     )
                 )
     ) {
+
         AsyncImage(
             model =
                 uri,
@@ -766,13 +826,18 @@ private fun Cover(
                 Modifier.fillMaxSize(),
 
             /*
-             * Album artwork is intentionally cropped
-             * to fill the square cover.
+             * Album artwork intentionally fills the
+             * square cover and may crop the image edges.
+             *
+             * This is NOT the lyrics crop issue.
              */
             contentScale =
                 ContentScale.Crop
         )
 
+        /*
+         * XMO fallback when no artwork exists.
+         */
         if (uri == null) {
             Box(
                 modifier =
