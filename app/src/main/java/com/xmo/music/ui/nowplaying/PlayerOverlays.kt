@@ -64,6 +64,7 @@ internal sealed interface PlayerOverlay {
     data object Queue : PlayerOverlay
     data object Sleep : PlayerOverlay
     data object Details : PlayerOverlay
+    data object Artist : PlayerOverlay
 }
 
 internal data class PopMessage(
@@ -784,7 +785,109 @@ internal fun SleepTimerBox(
  * REAL SONG DETAILS
  * =============================================================
  */
+@Composable
+internal fun ArtistInfoBox(
+    artist: String,
+    trackCount: Int,
+    colors: HomeColors,
+    close: () -> Unit
+) {
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(
+                Color.Black.copy(
+                    alpha = .48f
+                )
+            )
+            .clickable(
+                onClick = close
+            ),
+        contentAlignment =
+            Alignment.Center
+    ) {
+        Column(
+            Modifier
+                .padding(
+                    horizontal = 32.dp
+                )
+                .fillMaxWidth()
+                .clip(
+                    RoundedCornerShape(
+                        25.dp
+                    )
+                )
+                .background(
+                    colors.surface
+                )
+                .clickable {}
+                .padding(18.dp),
+            horizontalAlignment =
+                Alignment.CenterHorizontally
+        ) {
+            Text(
+                text =
+                    artist.ifBlank {
+                        "Unknown artist"
+                    },
+                color =
+                    colors.text,
+                fontFamily =
+                    XmoFont.bold,
+                fontSize =
+                    19.sp,
+                textAlign =
+                    TextAlign.Center
+            )
 
+            Spacer(
+                Modifier.height(7.dp)
+            )
+
+            Text(
+                text =
+                    when (trackCount) {
+                        1 ->
+                            "1 track on this device"
+
+                        else ->
+                            "$trackCount tracks on this device"
+                    },
+                color =
+                    colors.sub,
+                fontFamily =
+                    XmoFont.normal,
+                fontSize =
+                    11.sp
+            )
+
+            Spacer(
+                Modifier.height(15.dp)
+            )
+
+            PremiumCircle(
+                size = 39.dp,
+                background =
+                    colors.button,
+                onClick = close
+            ) {
+                Icon(
+                    imageVector =
+                        Lucide.X,
+                    contentDescription =
+                        "Close",
+                    tint =
+                        colors.text,
+                    modifier =
+                        Modifier.size(
+                            18.dp
+                        )
+                )
+            }
+        }
+    }
+}
+ 
 @Composable
 internal fun SongDetailsBox(
     song: Song?,
