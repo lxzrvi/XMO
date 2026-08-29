@@ -1,6 +1,8 @@
 package com.xmo.music.ui.nowplaying
 
 import android.net.Uri
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,9 +16,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,12 +29,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.Pause
-import com.composables.icons.lucide.Play
-import com.composables.icons.lucide.SkipBack
-import com.composables.icons.lucide.SkipForward
-import com.composables.icons.lucide.X
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.SongLyrics
 import com.xmo.music.ui.HomeColors
@@ -49,6 +45,7 @@ internal fun FullLyrics(
     dominant: Color,
     deep: Color,
     theme: XmoTheme,
+    accent: Color,
     isPlaying: Boolean,
     canPrevious: Boolean,
     canNext: Boolean,
@@ -58,15 +55,32 @@ internal fun FullLyrics(
     seekTo: (Long) -> Unit,
     close: () -> Unit
 ) {
-    val foreground =
-        if (
-            dominant.luminance() >
-            .58f
-        ) {
-            Color(0xFF111214)
-        } else {
-            Color.White
+    val foregroundTarget =
+        when (theme) {
+            XmoTheme.Light ->
+                Color(0xFF151519)
+
+            XmoTheme.Dark,
+            XmoTheme.Amoled ->
+                if (
+                    dominant.luminance() >
+                    .72f
+                ) {
+                    Color(0xFF17181B)
+                } else {
+                    Color.White
+                }
         }
+
+    val foreground by
+        animateColorAsState(
+            targetValue =
+                foregroundTarget,
+            animationSpec =
+                tween(380),
+            label =
+                "fullLyricsForeground"
+        )
 
     val lyricColors =
         HomeColors(
@@ -75,19 +89,19 @@ internal fun FullLyrics(
             text = foreground,
             sub =
                 foreground.copy(
-                    alpha = .60f
+                    alpha = .56f
                 ),
             button =
                 foreground.copy(
-                    alpha = .10f
+                    alpha = .09f
                 ),
             icon =
                 foreground.copy(
-                    alpha = .78f
+                    alpha = .80f
                 ),
             border =
                 foreground.copy(
-                    alpha = .16f
+                    alpha = .14f
                 )
         )
 
@@ -95,7 +109,8 @@ internal fun FullLyrics(
         Modifier.fillMaxSize()
     ) {
         PlayerBackground(
-            dominant = dominant,
+            dominant =
+                dominant,
             deep = deep,
             theme = theme
         )
@@ -125,7 +140,7 @@ internal fun FullLyrics(
                             .size(42.dp)
                             .clip(
                                 RoundedCornerShape(
-                                    9.dp
+                                    10.dp
                                 )
                             ),
                     contentScale =
@@ -140,8 +155,12 @@ internal fun FullLyrics(
                         )
                 ) {
                     Text(
-                        text = title,
-                        color = foreground,
+                        text =
+                            title.ifBlank {
+                                "Unknown song"
+                            },
+                        color =
+                            foreground,
                         fontFamily =
                             XmoFont.bold,
                         fontSize = 14.sp,
@@ -151,13 +170,16 @@ internal fun FullLyrics(
                     )
 
                     Text(
-                        text = artist,
+                        text =
+                            artist.ifBlank {
+                                "Unknown artist"
+                            },
                         color =
                             foreground.copy(
-                                alpha = .60f
+                                alpha = .58f
                             ),
                         fontFamily =
-                            XmoFont.normal,
+                            XmoFont.medium,
                         fontSize = 10.sp,
                         maxLines = 1,
                         overflow =
@@ -165,78 +187,26 @@ internal fun FullLyrics(
                     )
                 }
 
-                XmoCapsule(
+                FullLyricsControls(
+                    isPlaying =
+                        isPlaying,
+                    canPrevious =
+                        canPrevious,
+                    canNext =
+                        canNext,
+                    foreground =
+                        foreground,
                     background =
                         foreground.copy(
-                            alpha = .10f
-                        )
-                ) {
-                    CapsuleButton(
-                        onClick =
-                            togglePlay
-                    ) {
-                        Icon(
-                            imageVector =
-                                if (isPlaying) {
-                                    Lucide.Pause
-                                } else {
-                                    Lucide.Play
-                                },
-                            contentDescription =
-                                "Play pause",
-                            tint = foreground,
-                            modifier =
-                                Modifier.size(18.dp)
-                        )
-                    }
-
-                    CapsuleButton(
-                        enabled =
-                            canPrevious,
-                        onClick =
-                            previous
-                    ) {
-                        Icon(
-                            imageVector =
-                                Lucide.SkipBack,
-                            contentDescription =
-                                "Previous",
-                            tint = foreground,
-                            modifier =
-                                Modifier.size(17.dp)
-                        )
-                    }
-
-                    CapsuleButton(
-                        enabled =
-                            canNext,
-                        onClick = next
-                    ) {
-                        Icon(
-                            imageVector =
-                                Lucide.SkipForward,
-                            contentDescription =
-                                "Next",
-                            tint = foreground,
-                            modifier =
-                                Modifier.size(17.dp)
-                        )
-                    }
-
-                    CapsuleButton(
-                        onClick = close
-                    ) {
-                        Icon(
-                            imageVector =
-                                Lucide.X,
-                            contentDescription =
-                                "Close",
-                            tint = foreground,
-                            modifier =
-                                Modifier.size(18.dp)
-                        )
-                    }
-                }
+                            alpha = .09f
+                        ),
+                    togglePlay =
+                        togglePlay,
+                    previous =
+                        previous,
+                    next = next,
+                    close = close
+                )
             }
 
             Column(
@@ -247,14 +217,18 @@ internal fun FullLyrics(
                     )
             ) {
                 RoundedSeekBar(
-                    position = position,
-                    duration = duration,
-                    active = foreground,
+                    position =
+                        position,
+                    duration =
+                        duration,
+                    active =
+                        accent,
                     inactive =
                         foreground.copy(
-                            alpha = .22f
+                            alpha = .18f
                         ),
-                    seekTo = seekTo
+                    seekTo =
+                        seekTo
                 )
 
                 Row(
@@ -264,10 +238,12 @@ internal fun FullLyrics(
                 ) {
                     Text(
                         text =
-                            playerTime(position),
+                            playerTime(
+                                position
+                            ),
                         color =
                             foreground.copy(
-                                alpha = .60f
+                                alpha = .56f
                             ),
                         fontFamily =
                             XmoFont.medium,
@@ -276,10 +252,12 @@ internal fun FullLyrics(
 
                     Text(
                         text =
-                            playerTime(duration),
+                            playerTime(
+                                duration
+                            ),
                         color =
                             foreground.copy(
-                                alpha = .60f
+                                alpha = .56f
                             ),
                         fontFamily =
                             XmoFont.medium,
@@ -289,20 +267,172 @@ internal fun FullLyrics(
             }
 
             Spacer(
-                Modifier.height(4.dp)
+                Modifier.height(3.dp)
             )
 
             FollowLyrics(
                 lyrics = lyrics,
                 position = position,
-                colors = lyricColors,
-                accent = foreground,
+                colors =
+                    lyricColors,
+                accent = accent,
                 fullscreen = true,
                 modifier =
                     Modifier
                         .fillMaxWidth()
                         .weight(1f)
             )
+        }
+    }
+}
+
+@Composable
+private fun FullLyricsControls(
+    isPlaying: Boolean,
+    canPrevious: Boolean,
+    canNext: Boolean,
+    foreground: Color,
+    background: Color,
+    togglePlay: () -> Unit,
+    previous: () -> Unit,
+    next: () -> Unit,
+    close: () -> Unit
+) {
+    XmoCapsule(
+        background =
+            background
+    ) {
+        CapsuleButton(
+            size = 39.dp,
+            onClick =
+                togglePlay
+        ) {
+            if (isPlaying) {
+                XmoPauseIcon(
+                    color =
+                        foreground,
+                    modifier =
+                        Modifier.size(
+                            20.dp
+                        )
+                )
+            } else {
+                XmoPlayIcon(
+                    color =
+                        foreground,
+                    modifier =
+                        Modifier.size(
+                            20.dp
+                        )
+                )
+            }
+        }
+
+        CapsuleButton(
+            size = 39.dp,
+            enabled =
+                canPrevious,
+            onClick =
+                previous
+        ) {
+            XmoPreviousIcon(
+                color =
+                    foreground.copy(
+                        alpha =
+                            if (
+                                canPrevious
+                            ) {
+                                1f
+                            } else {
+                                .28f
+                            }
+                    ),
+                modifier =
+                    Modifier.size(
+                        20.dp
+                    )
+            )
+        }
+
+        CapsuleButton(
+            size = 39.dp,
+            enabled =
+                canNext,
+            onClick =
+                next
+        ) {
+            XmoNextIcon(
+                color =
+                    foreground.copy(
+                        alpha =
+                            if (canNext) {
+                                1f
+                            } else {
+                                .28f
+                            }
+                    ),
+                modifier =
+                    Modifier.size(
+                        20.dp
+                    )
+            )
+        }
+
+        CapsuleButton(
+            size = 39.dp,
+            onClick =
+                close
+        ) {
+            /*
+             * Lightweight custom X so fullscreen transport stays
+             * independent of an extended icon pack.
+             */
+            androidx.compose.foundation.Canvas(
+                Modifier.size(18.dp)
+            ) {
+                val stroke =
+                    2.dp.toPx()
+
+                drawLine(
+                    color =
+                        foreground,
+                    start =
+                        androidx.compose.ui.geometry.Offset(
+                            size.width * .25f,
+                            size.height * .25f
+                        ),
+                    end =
+                        androidx.compose.ui.geometry.Offset(
+                            size.width * .75f,
+                            size.height * .75f
+                        ),
+                    strokeWidth =
+                        stroke,
+                    cap =
+                        androidx.compose.ui.graphics
+                            .StrokeCap.Round
+                )
+
+                drawLine(
+                    color =
+                        foreground,
+                    start =
+                        androidx.compose.ui.geometry.Offset(
+                            size.width * .75f,
+                            size.height * .25f
+                        ),
+                    end =
+                        androidx.compose.ui.geometry.Offset(
+                            size.width * .25f,
+                            size.height * .75f
+                        ),
+                    strokeWidth =
+                        stroke,
+                    cap =
+                        androidx.compose.ui.graphics
+                            .StrokeCap.Round
+                )
+            }
         }
     }
 }
