@@ -129,8 +129,9 @@ internal fun FollowLyrics(
             modifier.fillMaxSize()
     ) {
         /*
-         * Half the real viewport on both ends lets even the first
-         * and last lyric reach the physical viewport centre.
+         * Keep enough space above and below the lyrics
+         * so the first and last line can also physically
+         * reach the exact center of the screen.
          */
         val centrePadding =
             maxHeight / 2
@@ -168,6 +169,10 @@ internal fun FollowLyrics(
 
                 val targetColor =
                     if (selected) {
+                        /*
+                         * Active lyric remains your accent color.
+                         * Nothing changed here.
+                         */
                         accent
                     } else {
                         colors.text.copy(
@@ -213,12 +218,6 @@ internal fun FollowLyrics(
                     contentAlignment =
                         Alignment.Center
                 ) {
-                    /*
-                     * No graphicsLayer scaling. Font metrics own
-                     * their real layout size, so multiline lyrics
-                     * cannot get visually clipped by an unscaled
-                     * LazyColumn item.
-                     */
                     Text(
                         text = line.text,
                         color = lineColor,
@@ -270,6 +269,12 @@ internal fun FollowLyrics(
             }
         }
 
+        /*
+         * Automatically move the currently playing lyric
+         * to the physical center of the screen.
+         *
+         * User scrolling temporarily disables this.
+         */
         LaunchedEffect(
             active,
             userBrowsing,
@@ -285,6 +290,10 @@ internal fun FollowLyrics(
                 return@LaunchedEffect
             }
 
+            /*
+             * Wait until LazyColumn has measured the
+             * current item before calculating its center.
+             */
             withFrameNanos { }
 
             centerLyricExactly(
@@ -295,6 +304,20 @@ internal fun FollowLyrics(
     }
 }
 
+
+/*
+ * Centers one lyric item against the ACTUAL LazyColumn
+ * viewport center.
+ *
+ * This works for:
+ * - normal player
+ * - fullscreen
+ * - first lyric
+ * - middle lyrics
+ * - last lyric
+ * - multiline lyrics
+ * - changing lyric sizes
+ */
 private suspend fun centerLyricExactly(
     state: LazyListState,
     index: Int
@@ -303,6 +326,10 @@ private suspend fun centerLyricExactly(
         return
     }
 
+    /*
+     * First try to find the lyric in the currently
+     * measured items.
+     */
     var target =
         state.layoutInfo
             .visibleItemsInfo
@@ -310,6 +337,11 @@ private suspend fun centerLyricExactly(
                 it.index == index
             }
 
+    /*
+     * If it isn't currently visible, jump close to it.
+     * This does NOT define the final position.
+     * We calculate the exact center after measurement.
+     */
     if (target == null) {
         state.scrollToItem(
             index = index
@@ -326,24 +358,52 @@ private suspend fun centerLyricExactly(
                 ?: return
     }
 
+    /*
+     * Re-read layout AFTER measurement.
+     */
     val layout =
         state.layoutInfo
 
-    val viewportCenter =
-        (
-            layout.viewportStartOffset +
-                layout.viewportEndOffset
-            ) / 2f
+    /*
+     * LazyColumn's actual viewport.
+     *
+     * viewportStartOffset and viewportEndOffset are
+     * used instead of assuming that maxHeight / 2
+     * is enough.
+     */
+    val viewportStart =
+        layout.viewportStartOffset.toFloat()
 
+    val viewportEnd =
+        layout.viewportEndOffset.toFloat()
+
+    val viewportCenter =
+        (viewportStart + viewportEnd) / 2f
+
+    /*
+     * Center of the complete lyric item.
+     *
+     * This includes:
+     * - Text height
+     * - selected vertical padding
+     * - normal vertical padding
+     */
     val itemCenter =
         target.offset +
             target.size / 2f
 
+    /*
+     * Positive delta means the lyric is below
+     * the center and needs to move upward.
+     *
+     * Negative delta means it is above the center
+     * and needs to move downward.
+     */
     val delta =
         itemCenter -
             viewportCenter
 
-    if (abs(delta) > .5f) {
+    if (abs(delta) > 0.5f) {
         state.animateScrollBy(
             value = delta,
             animationSpec =
@@ -354,10 +414,14 @@ private suspend fun centerLyricExactly(
     }
 
     /*
-     * Correct any remaining rounding or multiline remeasurement.
+     * Wait for the animation/layout to settle.
      */
     withFrameNanos { }
 
+    /*
+     * Recalculate because multiline text or font
+     * measurement can change the item size.
+     */
     val corrected =
         state.layoutInfo
             .visibleItemsInfo
@@ -383,9 +447,16 @@ private suspend fun centerLyricExactly(
         correctedItemCenter -
             correctedViewportCenter
 
+    /*
+     * Small final correction for:
+     * - rounding
+     * - multiline lyrics
+     * - font remeasurement
+     * - padding changes
+     */
     if (abs(correction) > 1f) {
         state.scrollBy(
-            correction
+            value = correction
         )
     }
 }
