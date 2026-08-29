@@ -1,13 +1,15 @@
 package com.xmo.music.ui.nowplaying
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.foundation.layout.size
 import androidx.compose.ui.unit.dp
 import kotlin.math.cos
 import kotlin.math.sin
@@ -18,7 +20,10 @@ internal fun FilledHeart(
     color: Color
 ) {
     Canvas(
-        Modifier.size(19.dp)
+        modifier =
+            Modifier.size(
+                20.dp
+            )
     ) {
         val w =
             size.width
@@ -26,71 +31,77 @@ internal fun FilledHeart(
         val h =
             size.height
 
+        /*
+         * Softer heart with broader curved lobes and a less
+         * needle-like bottom point.
+         */
         val path =
             Path().apply {
                 moveTo(
                     w * .50f,
-                    h * .88f
+                    h * .87f
                 )
 
                 cubicTo(
-                    w * .43f,
-                    h * .80f,
-                    w * .10f,
-                    h * .59f,
-                    w * .10f,
-                    h * .32f
+                    w * .44f,
+                    h * .81f,
+                    w * .13f,
+                    h * .63f,
+                    w * .13f,
+                    h * .36f
                 )
 
                 cubicTo(
-                    w * .10f,
-                    h * .14f,
-                    w * .23f,
-                    h * .07f,
-                    w * .35f,
-                    h * .07f
+                    w * .13f,
+                    h * .20f,
+                    w * .25f,
+                    h * .11f,
+                    w * .37f,
+                    h * .11f
                 )
 
                 cubicTo(
-                    w * .43f,
-                    h * .07f,
-                    w * .48f,
-                    h * .12f,
+                    w * .44f,
+                    h * .11f,
+                    w * .49f,
+                    h * .16f,
                     w * .50f,
-                    h * .18f
+                    h * .23f
                 )
 
                 cubicTo(
-                    w * .53f,
-                    h * .12f,
-                    w * .58f,
-                    h * .07f,
-                    w * .66f,
-                    h * .07f
-                )
-
-                cubicTo(
-                    w * .80f,
-                    h * .07f,
-                    w * .90f,
-                    h * .17f,
-                    w * .90f,
-                    h * .32f
-                )
-
-                cubicTo(
-                    w * .90f,
-                    h * .59f,
+                    w * .52f,
+                    h * .16f,
                     w * .57f,
-                    h * .80f,
+                    h * .11f,
+                    w * .64f,
+                    h * .11f
+                )
+
+                cubicTo(
+                    w * .77f,
+                    h * .11f,
+                    w * .87f,
+                    h * .20f,
+                    w * .87f,
+                    h * .36f
+                )
+
+                cubicTo(
+                    w * .87f,
+                    h * .63f,
+                    w * .56f,
+                    h * .81f,
                     w * .50f,
-                    h * .88f
+                    h * .87f
                 )
 
                 close()
             }
 
-        if (filled) {
+        if (
+            filled
+        ) {
             drawPath(
                 path = path,
                 color = color
@@ -102,7 +113,11 @@ internal fun FilledHeart(
                 style =
                     Stroke(
                         width =
-                            1.8.dp.toPx()
+                            1.9.dp.toPx(),
+                        cap =
+                            StrokeCap.Round,
+                        join =
+                            StrokeJoin.Round
                     )
             )
         }
@@ -115,25 +130,37 @@ internal fun FilledStar(
     color: Color
 ) {
     Canvas(
-        Modifier.size(18.dp)
+        modifier =
+            Modifier.size(
+                19.dp
+            )
     ) {
         val center =
             Offset(
-                size.width / 2f,
-                size.height / 2f
+                x =
+                    size.width / 2f,
+                y =
+                    size.height / 2f
             )
 
+        /*
+         * Slightly shallower inner radius makes the category star
+         * fuller and less sharp/pin-like.
+         */
         val outer =
             size.minDimension *
-                .47f
+                .45f
 
         val inner =
-            outer * .43f
+            outer *
+                .50f
 
         val path =
             Path()
 
-        repeat(10) { index ->
+        repeat(
+            10
+        ) { index ->
             val radius =
                 if (
                     index % 2 == 0
@@ -146,7 +173,8 @@ internal fun FilledStar(
             val angle =
                 (
                     -90.0 +
-                        index * 36.0
+                        index *
+                        36.0
                     ) *
                     Math.PI /
                     180.0
@@ -156,18 +184,26 @@ internal fun FilledStar(
                     x =
                         center.x +
                             (
-                                cos(angle) *
+                                cos(
+                                    angle
+                                ) *
                                     radius
-                                ).toFloat(),
+                                )
+                                .toFloat(),
                     y =
                         center.y +
                             (
-                                sin(angle) *
+                                sin(
+                                    angle
+                                ) *
                                     radius
-                                ).toFloat()
+                                )
+                                .toFloat()
                 )
 
-            if (index == 0) {
+            if (
+                index == 0
+            ) {
                 path.moveTo(
                     point.x,
                     point.y
@@ -182,7 +218,9 @@ internal fun FilledStar(
 
         path.close()
 
-        if (filled) {
+        if (
+            filled
+        ) {
             drawPath(
                 path = path,
                 color = color
@@ -194,7 +232,11 @@ internal fun FilledStar(
                 style =
                     Stroke(
                         width =
-                            1.7.dp.toPx()
+                            1.8.dp.toPx(),
+                        cap =
+                            StrokeCap.Round,
+                        join =
+                            StrokeJoin.Round
                     )
             )
         }
