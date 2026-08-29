@@ -11,6 +11,8 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -90,7 +92,9 @@ fun NowPlaying(
         rememberCoroutineScope()
 
     val colors =
-        homeColors(theme)
+        homeColors(
+            theme
+        )
 
     val accent =
         LocalXmoAccent.current
@@ -139,7 +143,9 @@ fun NowPlaying(
                     ?.trim()
                     .orEmpty()
 
-            if (artist.isBlank()) {
+            if (
+                artist.isBlank()
+            ) {
                 0
             } else {
                 songs.count {
@@ -147,7 +153,8 @@ fun NowPlaying(
                         .trim()
                         .equals(
                             artist,
-                            ignoreCase = true
+                            ignoreCase =
+                                true
                         )
                 }
             }
@@ -160,25 +167,32 @@ fun NowPlaying(
 
     val fallbackArtwork =
         state.artworkUri
-            ?.let(Uri::parse)
+            ?.let(
+                Uri::parse
+            )
 
     val artworkColors =
         rememberPlayerColors(
-            context = context,
+            context =
+                context,
             currentArtwork =
-                currentSong?.artwork,
+                currentSong
+                    ?.artwork,
             fallbackArtwork =
                 fallbackArtwork,
             previousArtwork =
-                previousSong?.artwork,
+                previousSong
+                    ?.artwork,
             nextArtwork =
-                nextSong?.artwork,
+                nextSong
+                    ?.artwork,
             currentSongId =
                 state.currentSongId,
             coverX =
                 carousel.x,
             transactionActive =
-                carousel.transactionActive
+                carousel
+                    .transactionActive
         )
 
     val displayColor =
@@ -199,8 +213,7 @@ fun NowPlaying(
 
     val themeColors =
         playerThemeColors(
-            theme =
-                theme,
+            theme = theme,
             displayColor =
                 displayColor
         )
@@ -209,7 +222,9 @@ fun NowPlaying(
         state.currentSongId,
         state.isPlaying
     ) {
-        while (isActive) {
+        while (
+            isActive
+        ) {
             refreshPosition()
 
             delay(
@@ -224,14 +239,15 @@ fun NowPlaying(
         }
     }
 
-    var fileLyrics by remember(
-        state.currentSongId,
-        lyricsUri
-    ) {
-        mutableStateOf<SongLyrics?>(
-            null
-        )
-    }
+    var fileLyrics by
+        remember(
+            state.currentSongId,
+            lyricsUri
+        ) {
+            mutableStateOf<SongLyrics?>(
+                null
+            )
+        }
 
     LaunchedEffect(
         state.currentSongId,
@@ -241,7 +257,9 @@ fun NowPlaying(
             lyricsUri?.let {
                 readLyrics(
                     context,
-                    Uri.parse(it)
+                    Uri.parse(
+                        it
+                    )
                 )
             }
     }
@@ -256,7 +274,9 @@ fun NowPlaying(
             ActivityResultContracts
                 .OpenDocument()
         ) { uri ->
-            if (uri != null) {
+            if (
+                uri != null
+            ) {
                 runCatching {
                     context
                         .contentResolver
@@ -272,33 +292,46 @@ fun NowPlaying(
             }
         }
 
-    var overlay by remember {
-        mutableStateOf<PlayerOverlay?>(
-            null
-        )
-    }
+    var overlay by
+        remember {
+            mutableStateOf<PlayerOverlay?>(
+                null
+            )
+        }
 
-    var artworkLyrics by remember(
-        state.currentSongId
-    ) {
-        mutableStateOf(false)
-    }
+    /*
+     * Deliberately NOT keyed to currentSongId.
+     *
+     * If artwork-size lyrics are open, changing the real song
+     * keeps the player in the same lyrics mode.
+     */
+    var artworkLyrics by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
 
-    var fullLyrics by remember {
-        mutableStateOf(false)
-    }
+    var fullLyrics by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
 
-    var pop by remember {
-        mutableStateOf<PopMessage?>(
-            null
-        )
-    }
+    var pop by
+        remember {
+            mutableStateOf<PopMessage?>(
+                null
+            )
+        }
 
-    var sleepTotalMs by remember {
-        mutableStateOf<Long?>(
-            null
-        )
-    }
+    var sleepTotalMs by
+        remember {
+            mutableStateOf<Long?>(
+                null
+            )
+        }
 
     LaunchedEffect(
         state.sleepTimerRemainingMs
@@ -307,33 +340,50 @@ fun NowPlaying(
             state.sleepTimerRemainingMs <=
             0L
         ) {
-            sleepTotalMs = null
+            sleepTotalMs =
+                null
         }
     }
 
     val entrance =
         remember {
-            Animatable(1f)
+            Animatable(
+                1f
+            )
         }
 
     val playerY =
         remember {
-            Animatable(0f)
+            Animatable(
+                0f
+            )
         }
 
-    var screenHeight by remember {
-        mutableFloatStateOf(1f)
-    }
+    var screenHeight by
+        remember {
+            mutableFloatStateOf(
+                1f
+            )
+        }
 
-    var dismissing by remember {
-        mutableStateOf(false)
-    }
+    var dismissing by
+        remember {
+            mutableStateOf(
+                false
+            )
+        }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(
+        Unit
+    ) {
         entrance.animateTo(
-            targetValue = 0f,
+            targetValue =
+                0f,
             animationSpec =
-                tween(410)
+                tween(
+                    durationMillis =
+                        410
+                )
         )
 
         onOpened()
@@ -342,24 +392,36 @@ fun NowPlaying(
     LaunchedEffect(
         pop?.key
     ) {
-        if (pop != null) {
-            delay(1_900L)
-            pop = null
+        if (
+            pop != null
+        ) {
+            delay(
+                1_900L
+            )
+
+            pop =
+                null
         }
     }
 
     suspend fun closePlayer() {
-        if (dismissing) {
+        if (
+            dismissing
+        ) {
             return
         }
 
-        dismissing = true
+        dismissing =
+            true
 
         playerY.animateTo(
             targetValue =
                 screenHeight,
             animationSpec =
-                tween(330)
+                tween(
+                    durationMillis =
+                        330
+                )
         )
 
         dismiss()
@@ -368,16 +430,21 @@ fun NowPlaying(
     BackHandler {
         when {
             fullLyrics -> {
-                fullLyrics = false
-                artworkLyrics = true
+                fullLyrics =
+                    false
+
+                artworkLyrics =
+                    true
             }
 
             overlay != null -> {
-                overlay = null
+                overlay =
+                    null
             }
 
             artworkLyrics -> {
-                artworkLyrics = false
+                artworkLyrics =
+                    false
             }
 
             else -> {
@@ -389,68 +456,79 @@ fun NowPlaying(
     }
 
     Box(
-        Modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                awaitPointerEventScope {
-                    while (true) {
-                        awaitPointerEvent()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                /*
+                 * Consume the full overlay input surface so Home
+                 * and NavBar never receive touch-through.
+                 */
+                .pointerInput(
+                    Unit
+                ) {
+                    awaitPointerEventScope {
+                        while (true) {
+                            awaitPointerEvent()
+                        }
                     }
                 }
-            }
-            .onSizeChanged {
-                screenHeight =
-                    it.height
-                        .toFloat()
-                        .coerceAtLeast(1f)
-            }
-            .graphicsLayer {
-                translationY =
-                    playerY.value +
-                        entrance.value *
-                        screenHeight
-            }
-            .clip(
-                RoundedCornerShape(
-                    topStart =
-                        (
-                            88f *
-                                (
-                                    playerY.value /
-                                        screenHeight
-                                    )
-                                    .coerceIn(
-                                        0f,
-                                        1f
-                                    )
-                            ).dp,
-
-                    topEnd =
-                        (
-                            88f *
-                                (
-                                    playerY.value /
-                                        screenHeight
-                                    )
-                                    .coerceIn(
-                                        0f,
-                                        1f
-                                    )
-                            ).dp
+                .onSizeChanged {
+                    screenHeight =
+                        it.height
+                            .toFloat()
+                            .coerceAtLeast(
+                                1f
+                            )
+                }
+                .graphicsLayer {
+                    translationY =
+                        playerY.value +
+                            entrance.value *
+                            screenHeight
+                }
+                .clip(
+                    RoundedCornerShape(
+                        topStart =
+                            (
+                                88f *
+                                    (
+                                        playerY.value /
+                                            screenHeight
+                                        )
+                                        .coerceIn(
+                                            0f,
+                                            1f
+                                        )
+                                ).dp,
+                        topEnd =
+                            (
+                                88f *
+                                    (
+                                        playerY.value /
+                                            screenHeight
+                                        )
+                                        .coerceIn(
+                                            0f,
+                                            1f
+                                        )
+                                ).dp
+                    )
                 )
-            )
     ) {
         PlayerBackground(
             dominant =
                 displayColor,
-            deep = deep,
-            theme = theme
+            deep =
+                deep,
+            theme =
+                theme
         )
 
         Column(
-            Modifier
-                .fillMaxSize()
-                .statusBarsPadding()
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .statusBarsPadding()
         ) {
             PlayerHeader(
                 source =
@@ -458,7 +536,8 @@ fun NowPlaying(
                 sourceIsCategory =
                     sourceIsCategory,
                 foreground =
-                    themeColors.overlayText,
+                    themeColors
+                        .overlayText,
                 playerY =
                     playerY,
                 screenHeight =
@@ -467,8 +546,12 @@ fun NowPlaying(
                     closePlayer()
                 },
                 dismissAfterDrag = {
-                    if (!dismissing) {
-                        dismissing = true
+                    if (
+                        !dismissing
+                    ) {
+                        dismissing =
+                            true
+
                         dismiss()
                     }
                 },
@@ -482,12 +565,16 @@ fun NowPlaying(
                 },
                 options = {
                     overlay =
-                        PlayerOverlay.Options
+                        PlayerOverlay
+                            .Options
                 }
             )
 
             Spacer(
-                Modifier.height(93.dp)
+                modifier =
+                    Modifier.height(
+                        93.dp
+                    )
             )
 
             PlayerArtwork(
@@ -496,12 +583,15 @@ fun NowPlaying(
                 currentIndex =
                     currentIndex,
                 current =
-                    currentSong?.artwork
+                    currentSong
+                        ?.artwork
                         ?: fallbackArtwork,
                 previous =
-                    previousSong?.artwork,
+                    previousSong
+                        ?.artwork,
                 next =
-                    nextSong?.artwork,
+                    nextSong
+                        ?.artwork,
                 canPrevious =
                     state.hasPrevious,
                 canNext =
@@ -530,41 +620,51 @@ fun NowPlaying(
                 },
                 pickLyrics = {
                     lyricPicker.launch(
-                        arrayOf("*/*")
+                        arrayOf(
+                            "*/*"
+                        )
                     )
                 },
                 fullscreenLyrics = {
-                    artworkLyrics = true
-                    fullLyrics = true
+                    artworkLyrics =
+                        true
+
+                    fullLyrics =
+                        true
                 }
             )
 
             Spacer(
-                Modifier.height(95.dp)
+                modifier =
+                    Modifier.height(
+                        95.dp
+                    )
             )
 
             Column(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .clip(
-                        RoundedCornerShape(
-                            topStart = 28.dp,
-                            topEnd = 28.dp
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(
+                            1f
                         )
-                    )
-                    .background(
-                        themeColors.panel
-                    )
-                    /*
-                     * Panel content starts slightly higher.
-                     */
-                    .padding(
-                        start = 12.dp,
-                        top = 10.dp,
-                        end = 12.dp,
-                        bottom = 2.dp
-                    )
+                        .clip(
+                            RoundedCornerShape(
+                                topStart =
+                                    28.dp,
+                                topEnd =
+                                    28.dp
+                            )
+                        )
+                        .background(
+                            themeColors.panel
+                        )
+                        .padding(
+                            start = 12.dp,
+                            top = 10.dp,
+                            end = 12.dp,
+                            bottom = 2.dp
+                        )
             ) {
                 PlayerInfo(
                     title =
@@ -584,7 +684,8 @@ fun NowPlaying(
                     accent =
                         accent,
                     softButton =
-                        themeColors.softButton,
+                        themeColors
+                            .softButton,
                     toggleLike = {
                         toggleLike()
 
@@ -599,28 +700,36 @@ fun NowPlaying(
                     },
                     openCategories = {
                         overlay =
-                            PlayerOverlay.Options
+                            PlayerOverlay
+                                .Options
                     },
                     openSleep = {
                         overlay =
-                            PlayerOverlay.Sleep
+                            PlayerOverlay
+                                .Sleep
                     },
                     openQueue = {
                         overlay =
-                            PlayerOverlay.Queue
+                            PlayerOverlay
+                                .Queue
                     },
                     openDetails = {
                         overlay =
-                            PlayerOverlay.Details
+                            PlayerOverlay
+                                .Details
                     },
                     openArtist = {
                         overlay =
-                            PlayerOverlay.Artist
+                            PlayerOverlay
+                                .Artist
                     }
                 )
 
                 Spacer(
-                    Modifier.height(3.dp)
+                    modifier =
+                        Modifier.height(
+                            3.dp
+                        )
                 )
 
                 PlayerBody(
@@ -647,7 +756,8 @@ fun NowPlaying(
                     controlForeground =
                         themeColors.controls,
                     playBackground =
-                        themeColors.playBackground,
+                        themeColors
+                            .playBackground,
                     seekTo =
                         seekTo,
                     togglePlay =
@@ -664,10 +774,13 @@ fun NowPlaying(
             }
         }
 
-        when (overlay) {
+        when (
+            overlay
+        ) {
             PlayerOverlay.Queue -> {
                 QueueSheet(
-                    queue = queue,
+                    queue =
+                        queue,
                     currentSongId =
                         state.currentSongId,
                     colors =
@@ -675,7 +788,8 @@ fun NowPlaying(
                     playIndex =
                         playQueueIndex,
                     dismiss = {
-                        overlay = null
+                        overlay =
+                            null
                     }
                 )
             }
@@ -691,7 +805,8 @@ fun NowPlaying(
                     liked =
                         liked,
                     close = {
-                        overlay = null
+                        overlay =
+                            null
                     },
                     toggleLike = {
                         toggleLike()
@@ -704,7 +819,8 @@ fun NowPlaying(
                             )
                         }
 
-                        overlay = null
+                        overlay =
+                            null
                     },
                     setCategory = {
                             category,
@@ -730,10 +846,12 @@ fun NowPlaying(
                     colors =
                         colors,
                     active =
-                        state.sleepTimerRemainingMs >
+                        state
+                            .sleepTimerRemainingMs >
                             0L,
                     dismiss = {
-                        overlay = null
+                        overlay =
+                            null
                     },
                     setTimer = {
                             duration,
@@ -746,7 +864,8 @@ fun NowPlaying(
                             duration
                         )
 
-                        overlay = null
+                        overlay =
+                            null
 
                         pop =
                             PopMessage(
@@ -754,10 +873,13 @@ fun NowPlaying(
                             )
                     },
                     cancel = {
-                        sleepTotalMs = null
+                        sleepTotalMs =
+                            null
+
                         cancelSleepTimer()
 
-                        overlay = null
+                        overlay =
+                            null
 
                         pop =
                             PopMessage(
@@ -776,7 +898,8 @@ fun NowPlaying(
                     colors =
                         colors,
                     close = {
-                        overlay = null
+                        overlay =
+                            null
                     }
                 )
             }
@@ -790,7 +913,8 @@ fun NowPlaying(
                     colors =
                         colors,
                     close = {
-                        overlay = null
+                        overlay =
+                            null
                     }
                 )
             }
@@ -799,30 +923,67 @@ fun NowPlaying(
                 Unit
         }
 
+        /*
+         * Small lyrics remains selected underneath this layer.
+         * Closing fullscreen therefore returns directly to the
+         * artwork-sized lyrics surface.
+         */
         AnimatedVisibility(
             visible =
                 fullLyrics,
             enter =
                 fadeIn(
-                    tween(300)
+                    animationSpec =
+                        tween(
+                            durationMillis =
+                                360
+                        )
                 ) +
                     slideInVertically(
                         animationSpec =
-                            tween(360),
+                            tween(
+                                durationMillis =
+                                    420
+                            ),
                         initialOffsetY = {
-                            it / 10
+                            it / 18
                         }
+                    ) +
+                    scaleIn(
+                        initialScale =
+                            .965f,
+                        animationSpec =
+                            tween(
+                                durationMillis =
+                                    420
+                            )
                     ),
             exit =
                 fadeOut(
-                    tween(260)
+                    animationSpec =
+                        tween(
+                            durationMillis =
+                                260
+                        )
                 ) +
                     slideOutVertically(
                         animationSpec =
-                            tween(330),
+                            tween(
+                                durationMillis =
+                                    360
+                            ),
                         targetOffsetY = {
-                            it / 10
+                            it / 20
                         }
+                    ) +
+                    scaleOut(
+                        targetScale =
+                            .975f,
+                        animationSpec =
+                            tween(
+                                durationMillis =
+                                    330
+                            )
                     )
         ) {
             FullLyrics(
@@ -837,7 +998,9 @@ fun NowPlaying(
                 artist =
                     state.artist,
                 artwork =
-                    currentSong?.artwork,
+                    currentSong
+                        ?.artwork
+                        ?: fallbackArtwork,
                 dominant =
                     displayColor,
                 deep =
@@ -861,8 +1024,11 @@ fun NowPlaying(
                 seekTo =
                     seekTo,
                 close = {
-                    fullLyrics = false
-                    artworkLyrics = true
+                    fullLyrics =
+                        false
+
+                    artworkLyrics =
+                        true
                 }
             )
         }
