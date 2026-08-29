@@ -3,6 +3,7 @@ package com.xmo.music.ui.nowplaying
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.animateScrollBy
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -25,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -41,7 +41,7 @@ internal fun FollowLyrics(
     lyrics: SongLyrics?,
     position: Long,
     colors: HomeColors,
-    accent: Color,
+    accent: androidx.compose.ui.graphics.Color,
     fullscreen: Boolean,
     modifier: Modifier = Modifier
 ) {
@@ -101,14 +101,6 @@ internal fun FollowLyrics(
             mutableLongStateOf(0L)
         }
 
-    /*
-     * Manual browsing:
-     *
-     * user scrolls
-     * -> automatic following stops
-     * -> 4 seconds after scrolling stops
-     * -> current lyric returns to exact viewport center
-     */
     LaunchedEffect(
         listState.isScrollInProgress
     ) {
@@ -137,13 +129,10 @@ internal fun FollowLyrics(
             modifier.fillMaxSize()
     ) {
         /*
-         * Half viewport padding is intentional.
-         *
-         * It gives the first AND final lyric enough physical
-         * scroll range to reach the real center. The previous
-         * fixed 155dp/300dp values could not guarantee that.
+         * Half the real viewport on both ends lets even the first
+         * and last lyric reach the physical viewport centre.
          */
-        val verticalCenterSpace =
+        val centrePadding =
             maxHeight / 2
 
         LazyColumn(
@@ -152,8 +141,8 @@ internal fun FollowLyrics(
                 Modifier.fillMaxSize(),
             contentPadding =
                 PaddingValues(
-                    top = verticalCenterSpace,
-                    bottom = verticalCenterSpace
+                    top = centrePadding,
+                    bottom = centrePadding
                 ),
             verticalArrangement =
                 Arrangement.spacedBy(
@@ -193,9 +182,12 @@ internal fun FollowLyrics(
 
                 val lineColor by
                     animateColorAsState(
-                        targetValue = targetColor,
+                        targetValue =
+                            targetColor,
                         animationSpec =
-                            tween(280),
+                            tween(
+                                durationMillis = 280
+                            ),
                         label =
                             "lyricColor$index"
                     )
@@ -222,11 +214,10 @@ internal fun FollowLyrics(
                         Alignment.Center
                 ) {
                     /*
-                     * No graphicsLayer scale.
-                     *
-                     * Font size itself participates in layout,
-                     * therefore multiline selected lyrics cannot
-                     * visually grow outside unreserved bounds.
+                     * No graphicsLayer scaling. Font metrics own
+                     * their real layout size, so multiline lyrics
+                     * cannot get visually clipped by an unscaled
+                     * LazyColumn item.
                      */
                     Text(
                         text = line.text,
@@ -279,21 +270,12 @@ internal fun FollowLyrics(
             }
         }
 
-        /*
-         * Do this after the list has its real viewport.
-         *
-         * centerLyricExactly measures both:
-         *
-         * viewport center
-         * item center
-         *
-         * and scrolls their exact pixel difference.
-         */
         LaunchedEffect(
             active,
             userBrowsing,
             fullscreen,
-            maxHeight
+            maxHeight,
+            lyrics
         ) {
             if (
                 active < 0 ||
@@ -329,12 +311,6 @@ private suspend fun centerLyricExactly(
             }
 
     if (target == null) {
-        /*
-         * First bring the target into the viewport.
-         *
-         * Final positioning is based on measured item geometry,
-         * not a guessed scrollOffset.
-         */
         state.scrollToItem(
             index = index
         )
@@ -350,17 +326,13 @@ private suspend fun centerLyricExactly(
                 ?: return
     }
 
-    /*
-     * Measure after composition because a multiline current
-     * lyric can be much taller than a normal line.
-     */
-    val info =
+    val layout =
         state.layoutInfo
 
     val viewportCenter =
         (
-            info.viewportStartOffset +
-                info.viewportEndOffset
+            layout.viewportStartOffset +
+                layout.viewportEndOffset
             ) / 2f
 
     val itemCenter =
@@ -371,20 +343,18 @@ private suspend fun centerLyricExactly(
         itemCenter -
             viewportCenter
 
-    if (
-        abs(delta) >
-        .5f
-    ) {
+    if (abs(delta) > .5f) {
         state.animateScrollBy(
-            delta,
+            value = delta,
             animationSpec =
-                tween(430)
+                tween(
+                    durationMillis = 430
+                )
         )
     }
 
     /*
-     * One final measured correction removes rounding/layout
-     * differences and leaves the current line truly centered.
+     * Correct any remaining rounding or multiline remeasurement.
      */
     withFrameNanos { }
 
@@ -396,13 +366,13 @@ private suspend fun centerLyricExactly(
             }
             ?: return
 
-    val correctedInfo =
+    val correctedLayout =
         state.layoutInfo
 
     val correctedViewportCenter =
         (
-            correctedInfo.viewportStartOffset +
-                correctedInfo.viewportEndOffset
+            correctedLayout.viewportStartOffset +
+                correctedLayout.viewportEndOffset
             ) / 2f
 
     val correctedItemCenter =
@@ -413,10 +383,7 @@ private suspend fun centerLyricExactly(
         correctedItemCenter -
             correctedViewportCenter
 
-    if (
-        abs(correction) >
-        1f
-    ) {
+    if (abs(correction) > 1f) {
         state.scrollBy(
             correction
         )
