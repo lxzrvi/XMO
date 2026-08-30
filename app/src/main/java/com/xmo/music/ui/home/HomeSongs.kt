@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
+import com.xmo.music.ui.XmoFont
 
 @Composable
 internal fun HomeCompactSongs(
