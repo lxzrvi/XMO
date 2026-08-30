@@ -11,12 +11,14 @@ import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
 import com.xmo.music.data.SongLyrics
@@ -28,8 +30,6 @@ import com.xmo.music.ui.homeColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.ui.layout.onSizeChanged
 
 @Composable
 fun NowPlaying(
@@ -66,6 +66,12 @@ fun NowPlaying(
     val context =
         LocalContext.current
 
+    val configuration =
+        LocalConfiguration.current
+
+    val density =
+        LocalDensity.current
+
     val scope =
         rememberCoroutineScope()
 
@@ -76,6 +82,23 @@ fun NowPlaying(
 
     val accent =
         LocalXmoAccent.current
+
+    /*
+     * Real screen height exists on the first composition.
+     *
+     * This replaces the previous 1px / measurement-gated setup
+     * that could make Now Playing never render.
+     */
+    val screenHeight =
+        with(density) {
+            configuration
+                .screenHeightDp
+                .dp
+                .toPx()
+        }
+        .coerceAtLeast(
+            1f
+        )
 
     /*
      * =========================================================
@@ -114,6 +137,12 @@ fun NowPlaying(
                 Uri::parse
             )
 
+    /*
+     * =========================================================
+     * REAL CURRENT SONG DATA
+     * =========================================================
+     */
+
     val inCategory =
         currentSong?.let { song ->
             categories.any {
@@ -133,7 +162,9 @@ fun NowPlaying(
                     ?.trim()
                     .orEmpty()
 
-            if (artist.isBlank()) {
+            if (
+                artist.isBlank()
+            ) {
                 0
             } else {
                 songs.count {
@@ -141,7 +172,8 @@ fun NowPlaying(
                         .trim()
                         .equals(
                             artist,
-                            ignoreCase = true
+                            ignoreCase =
+                                true
                         )
                 }
             }
@@ -149,7 +181,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * CAROUSEL + ARTWORK COLOR
+     * CAROUSEL
      * =========================================================
      */
 
@@ -207,6 +239,12 @@ fun NowPlaying(
         )
     }
 
+    /*
+     * =========================================================
+     * ARTWORK COLOR
+     * =========================================================
+     */
+
     val artworkColors =
         rememberPlayerColors(
             context =
@@ -241,7 +279,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * PLAYBACK POSITION
+     * POSITION
      * =========================================================
      */
 
@@ -249,11 +287,15 @@ fun NowPlaying(
         state.currentSongId,
         state.isPlaying
     ) {
-        while (isActive) {
+        while (
+            isActive
+        ) {
             refreshPosition()
 
             delay(
-                if (state.isPlaying) {
+                if (
+                    state.isPlaying
+                ) {
                     250L
                 } else {
                     500L
@@ -286,7 +328,9 @@ fun NowPlaying(
             lyricsUri?.let {
                 readLyrics(
                     context,
-                    Uri.parse(it)
+                    Uri.parse(
+                        it
+                    )
                 )
             }
     }
@@ -301,7 +345,9 @@ fun NowPlaying(
             ActivityResultContracts
                 .OpenDocument()
         ) { uri ->
-            if (uri != null) {
+            if (
+                uri != null
+            ) {
                 runCatching {
                     context
                         .contentResolver
@@ -331,7 +377,7 @@ fun NowPlaying(
         }
 
     /*
-     * Song change does NOT reset artwork lyrics mode.
+     * Deliberately independent from current song.
      */
     var artworkLyrics by
         remember {
@@ -375,18 +421,16 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * OPEN / CLOSE ANIMATION
+     * PLAYER ENTRANCE / CLOSE
      * =========================================================
      *
-     * Old issue:
+     * entrance starts at 1:
      *
-     * screenHeight initially = 1px
-     * -> entrance=1 drew player almost fully onscreen
-     * -> real height arrived later
-     * -> player jumped offscreen and slid back
+     * translation =
+     * 1 * real screen height
      *
-     * Now the content is not rendered until its real host height
-     * has been measured by a tiny measurement layer below.
+     * Therefore the very first visible frame is already below
+     * screen. No flash before slide-in.
      */
 
     val entrance =
@@ -403,27 +447,6 @@ fun NowPlaying(
             )
         }
 
-    var screenHeight by
-        remember {
-            mutableFloatStateOf(
-                0f
-            )
-        }
-
-    var measured by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    var entranceStarted by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
     var dismissing by
         remember {
             mutableStateOf(
@@ -431,25 +454,9 @@ fun NowPlaying(
             )
         }
 
-    /*
-     * Animate only after an actual non-zero full-screen height is
-     * known. There is no first-frame glimpse anymore.
-     */
     LaunchedEffect(
-        screenHeight,
-        measured
+        Unit
     ) {
-        if (
-            !measured ||
-            screenHeight <= 1f ||
-            entranceStarted
-        ) {
-            return@LaunchedEffect
-        }
-
-        entranceStarted =
-            true
-
         entrance.snapTo(
             1f
         )
@@ -469,8 +476,7 @@ fun NowPlaying(
 
     suspend fun closePlayer() {
         if (
-            dismissing ||
-            screenHeight <= 1f
+            dismissing
         ) {
             return
         }
@@ -493,7 +499,7 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * POP LIFETIME
+     * POP
      * =========================================================
      */
 
@@ -548,231 +554,172 @@ fun NowPlaying(
 
     /*
      * =========================================================
-     * ROOT HOST
+     * RENDER
      * =========================================================
      */
 
-    NowPlayingHost(
-        measured =
-            measured,
+    NowPlayingContent(
+        state =
+            state,
+        theme =
+            theme,
+        source =
+            source,
+        sourceIsCategory =
+            sourceIsCategory,
+        queue =
+            queue,
+        categories =
+            categories,
+        liked =
+            liked,
+
+        currentIndex =
+            currentIndex,
+        currentSong =
+            currentSong,
+        previousSong =
+            previousSong,
+        nextSong =
+            nextSong,
+        fallbackArtwork =
+            fallbackArtwork,
+
+        artistTrackCount =
+            artistTrackCount,
+        inCategory =
+            inCategory,
+
+        lyrics =
+            lyrics,
+
+        colors =
+            colors,
+        accent =
+            accent,
+
+        displayColor =
+            displayColor,
+        deep =
+            deep,
+        themeColors =
+            themeColors,
+
+        carousel =
+            carousel,
+
+        overlay =
+            overlay,
+        artworkLyrics =
+            artworkLyrics,
+        fullLyrics =
+            fullLyrics,
+
+        pop =
+            pop,
+        sleepTotalMs =
+            sleepTotalMs,
+
+        entrance =
+            entrance,
+        playerY =
+            playerY,
         screenHeight =
             screenHeight,
-        onMeasured = {
-            val height =
-                it.coerceAtLeast(
-                    1f
-                )
 
+        /*
+         * Kept because NowPlayingContent already has this callback
+         * in its stable rendering signature. Screen height is now
+         * configuration-owned and does not need to mutate here.
+         */
+        updateScreenHeight = {
+            Unit
+        },
+
+        closePlayer = {
+            closePlayer()
+        },
+
+        dismissAfterDrag = {
             if (
-                height > 1f
+                !dismissing
             ) {
-                screenHeight =
-                    height
-
-                measured =
+                dismissing =
                     true
+
+                dismiss()
             }
-        }
-    ) {
-        if (
-            measured
-        ) {
-            NowPlayingContent(
-                state =
-                    state,
-                theme =
-                    theme,
-                source =
-                    source,
-                sourceIsCategory =
-                    sourceIsCategory,
-                queue =
-                    queue,
-                categories =
-                    categories,
-                liked =
-                    liked,
+        },
 
-                currentIndex =
-                    currentIndex,
-                currentSong =
-                    currentSong,
-                previousSong =
-                    previousSong,
-                nextSong =
-                    nextSong,
-                fallbackArtwork =
-                    fallbackArtwork,
+        setOverlay = {
+            overlay =
+                it
+        },
 
-                artistTrackCount =
-                    artistTrackCount,
-                inCategory =
-                    inCategory,
-                lyrics =
-                    lyrics,
+        setArtworkLyrics = {
+            artworkLyrics =
+                it
+        },
 
-                colors =
-                    colors,
-                accent =
-                    accent,
+        setFullLyrics = {
+            fullLyrics =
+                it
+        },
 
-                displayColor =
-                    displayColor,
-                deep =
-                    deep,
-                themeColors =
-                    themeColors,
+        setPop = {
+            pop =
+                it
+        },
 
-                carousel =
-                    carousel,
+        setSleepTotalMs = {
+            sleepTotalMs =
+                it
+        },
 
-                overlay =
-                    overlay,
-                artworkLyrics =
-                    artworkLyrics,
-                fullLyrics =
-                    fullLyrics,
-
-                pop =
-                    pop,
-                sleepTotalMs =
-                    sleepTotalMs,
-
-                entrance =
-                    entrance,
-                playerY =
-                    playerY,
-                screenHeight =
-                    screenHeight,
-
-                updateScreenHeight = {
-                    if (
-                        it > 1f
-                    ) {
-                        screenHeight =
-                            it
-                    }
-                },
-
-                closePlayer = {
-                    closePlayer()
-                },
-
-                dismissAfterDrag = {
-                    if (
-                        !dismissing
-                    ) {
-                        dismissing =
-                            true
-
-                        dismiss()
-                    }
-                },
-
-                setOverlay = {
-                    overlay =
-                        it
-                },
-
-                setArtworkLyrics = {
-                    artworkLyrics =
-                        it
-                },
-
-                setFullLyrics = {
-                    fullLyrics =
-                        it
-                },
-
-                setPop = {
-                    pop =
-                        it
-                },
-
-                setSleepTotalMs = {
-                    sleepTotalMs =
-                        it
-                },
-
-                pickLyrics = {
-                    lyricPicker.launch(
-                        arrayOf(
-                            "*/*"
-                        )
-                    )
-                },
-
-                shareCurrentSong = {
-                    currentSong?.let {
-                        shareSong(
-                            context,
-                            it
-                        )
-                    }
-                },
-
-                togglePlay =
-                    togglePlay,
-                previous =
-                    previous,
-                previousItem =
-                    previousItem,
-                next =
-                    next,
-                playQueueIndex =
-                    playQueueIndex,
-                seekTo =
-                    seekTo,
-                toggleLike =
-                    toggleLike,
-                toggleShuffle =
-                    toggleShuffle,
-                cycleRepeat =
-                    cycleRepeat,
-                setSleepTimer =
-                    setSleepTimer,
-                cancelSleepTimer =
-                    cancelSleepTimer,
-                setSongInCategory =
-                    setSongInCategory,
-                createCategory =
-                    createCategory
+        pickLyrics = {
+            lyricPicker.launch(
+                arrayOf(
+                    "*/*"
+                )
             )
-        }
-    }
-}
+        },
 
-@Composable
-private fun NowPlayingHost(
-    measured: Boolean,
-    screenHeight: Float,
-    onMeasured: (Float) -> Unit,
-    content: @Composable () -> Unit
-) {
-    androidx.compose.foundation.layout.Box(
-        modifier =
-            androidx.compose.ui.Modifier
-                .fillMaxSize()
-                .onSizeChanged {
-                    val height =
-                        it.height
-                            .toFloat()
+        shareCurrentSong = {
+            currentSong?.let {
+                shareSong(
+                    context,
+                    it
+                )
+            }
+        },
 
-                    if (
-                        height > 1f &&
-                        (
-                            !measured ||
-                                height != screenHeight
-                            )
-                    ) {
-                        onMeasured(
-                            height
-                        )
-                    }
-                }
-    ) {
-        content()
-    }
+        togglePlay =
+            togglePlay,
+        previous =
+            previous,
+        previousItem =
+            previousItem,
+        next =
+            next,
+        playQueueIndex =
+            playQueueIndex,
+        seekTo =
+            seekTo,
+        toggleLike =
+            toggleLike,
+        toggleShuffle =
+            toggleShuffle,
+        cycleRepeat =
+            cycleRepeat,
+        setSleepTimer =
+            setSleepTimer,
+        cancelSleepTimer =
+            cancelSleepTimer,
+        setSongInCategory =
+            setSongInCategory,
+        createCategory =
+            createCategory
+    )
 }
 
 private fun shareSong(
