@@ -41,33 +41,14 @@ enum class XmoTheme {
 
 @Composable
 fun App() {
-    val context =
-        LocalContext.current
+    val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val scope = rememberCoroutineScope()
+    val hazeState = rememberLiveBlurState()
 
-    val configuration =
-        LocalConfiguration.current
-
-    val scope =
-        rememberCoroutineScope()
-
-    /*
-     * Still required by existing Home surfaces.
-     *
-     * MiniPlayer/NavBar do not depend on it.
-     */
-    val hazeState =
-        rememberLiveBlurState()
-
-    /*
-     * =========================================================
-     * PLAYER
-     * =========================================================
-     */
-
-    val player =
-        remember {
-            XmoPlayer(context)
-        }
+    val player = remember {
+        XmoPlayer(context)
+    }
 
     DisposableEffect(player) {
         player.connect()
@@ -78,142 +59,63 @@ fun App() {
     }
 
     val playback by
-        player.state
-            .collectAsState()
+        player.state.collectAsState()
 
-    /*
-     * =========================================================
-     * APP STATE / PERSISTENCE
-     * =========================================================
-     */
-
-    val appState =
-        remember {
-            XmoAppState()
-        }
+    val appState = remember {
+        XmoAppState()
+    }
 
     val persistence =
-        remember(
-            context,
-            appState
-        ) {
+        remember(context, appState) {
             XmoAppPersistence(
-                context =
-                    context.applicationContext,
-                state =
-                    appState
+                context.applicationContext,
+                appState
             )
         }
 
-    /*
-     * =========================================================
-     * AUDIO PERMISSION
-     * =========================================================
-     */
-
     val audioPermission =
-        if (
-            Build.VERSION.SDK_INT >=
-            33
-        ) {
-            Manifest.permission
-                .READ_MEDIA_AUDIO
+        if (Build.VERSION.SDK_INT >= 33) {
+            Manifest.permission.READ_MEDIA_AUDIO
         } else {
-            Manifest.permission
-                .READ_EXTERNAL_STORAGE
+            Manifest.permission.READ_EXTERNAL_STORAGE
         }
-
-    LaunchedEffect(
-        audioPermission
-    ) {
-        appState.allowed =
-            ContextCompat
-                .checkSelfPermission(
-                    context,
-                    audioPermission
-                ) ==
-                PackageManager
-                    .PERMISSION_GRANTED
-    }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
-            ActivityResultContracts
-                .RequestPermission()
+            ActivityResultContracts.RequestPermission()
         ) {
             appState.allowed = it
         }
 
-    /*
-     * =========================================================
-     * INITIAL LOAD
-     * =========================================================
-     */
-
     LaunchedEffect(Unit) {
         appState.allowed =
-            ContextCompat
-                .checkSelfPermission(
-                    context,
-                    audioPermission
-                ) ==
-                PackageManager
-                    .PERMISSION_GRANTED
+            ContextCompat.checkSelfPermission(
+                context,
+                audioPermission
+            ) == PackageManager.PERMISSION_GRANTED
 
         persistence.loadInitial()
     }
-
-    /*
-     * =========================================================
-     * LIBRARY
-     * =========================================================
-     */
-
-    LaunchedEffect(
-        appState.loaded,
-        appState.setupComplete,
-        appState.allowed
-    ) {
-        if (
-            appState.loaded &&
-            appState.setupComplete &&
-            appState.allowed &&
-            appState.songs.isEmpty()
-        ) {
-            persistence.loadLibrary()
-        }
-    }
-
-    /*
-     * =========================================================
-     * PLAYER PREFERENCES
-     * =========================================================
-     */
 
     LaunchedEffect(
         playback.connected,
         appState.playbackPreferences
     ) {
         if (playback.connected) {
-            persistence
-                .applyPlaybackPreferences(
-                    player
-                )
+            persistence.applyPlaybackPreferences(
+                player
+            )
         }
     }
 
-    LaunchedEffect(
-        playback.connected
-    ) {
+    LaunchedEffect(playback.connected) {
         if (
             playback.connected &&
-            !appState
-                .playerPersistenceReady
+            !appState.playerPersistenceReady
         ) {
-            persistence
-                .restorePlayerModes(
-                    player
-                )
+            persistence.restorePlayerModes(
+                player
+            )
         }
     }
 
@@ -222,46 +124,18 @@ fun App() {
         playback.repeatMode,
         appState.playerPersistenceReady
     ) {
-        if (
-            appState.playerPersistenceReady
-        ) {
-            persistence
-                .persistPlayerModes(
-                    playback
-                )
+        if (appState.playerPersistenceReady) {
+            persistence.persistPlayerModes(
+                playback
+            )
         }
     }
 
-    /*
-     * =========================================================
-     * RECENTS
-     * =========================================================
-     */
-
-    LaunchedEffect(
-        playback.currentSongId
-    ) {
-        playback.currentSongId
-            ?.let {
-                persistence
-                    .recordCurrentSong(
-                        it
-                    )
-            }
+    LaunchedEffect(playback.currentSongId) {
+        playback.currentSongId?.let {
+            persistence.recordCurrentSong(it)
+        }
     }
-
-    /*
-     * =========================================================
-     * MINIPLAYER RECOVERY
-     * =========================================================
-     *
-     * Important distinction:
-     *
-     * song-row taps explicitly make MiniPlayer visible through
-     * XmoAppActions.
-     *
-     * This effect handles restoration/recovery only.
-     */
 
     LaunchedEffect(
         playback.currentSongId,
@@ -269,60 +143,36 @@ fun App() {
         appState.profileOpen
     ) {
         when {
-            playback.currentSongId ==
-                null -> {
-                appState.miniVisible =
-                    false
+            playback.currentSongId == null -> {
+                appState.miniVisible = false
             }
 
             !appState.showNowPlaying &&
                 !appState.profileOpen &&
                 !appState.miniVisible -> {
-                appState.miniVisible =
-                    true
+                appState.miniVisible = true
             }
         }
     }
 
-    /*
-     * =========================================================
-     * LOADING
-     * =========================================================
-     */
-
     if (!appState.loaded) {
         Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        homeColors(
-                            XmoTheme.Dark
-                        ).bg
-                    )
+            Modifier
+                .fillMaxSize()
+                .background(
+                    homeColors(XmoTheme.Dark).bg
+                )
         )
 
         return
     }
 
-    /*
-     * =========================================================
-     * SETUP
-     * =========================================================
-     */
-
     if (!appState.setupComplete) {
         Setup(
-            initialProfile =
-                appState.profile,
-            existingCategories =
-                appState.categories,
-
-            onCategoriesChanged = {
-                categories ->
-
-                appState.categories =
-                    categories
+            initialProfile = appState.profile,
+            existingCategories = appState.categories,
+            onCategoriesChanged = { categories ->
+                appState.categories = categories
 
                 scope.launch {
                     Store.saveCategories(
@@ -331,40 +181,30 @@ fun App() {
                     )
 
                     val customIds =
-                        categories.map {
-                            it.id
-                        }
+                        categories.map { it.id }
 
                     val builtIns =
-                        appState.order
-                            .filter {
-                                it in
-                                    Store.defaults
-                            }
+                        appState.order.filter {
+                            it in Store.defaults
+                        }
 
                     val existingCustom =
-                        appState.order
-                            .filter {
-                                it !in
-                                    Store.defaults &&
-                                    it in
-                                    customIds
-                            }
+                        appState.order.filter {
+                            it !in Store.defaults &&
+                                it in customIds
+                        }
 
                     val missing =
-                        customIds
-                            .filterNot {
-                                it in
-                                    existingCustom
-                            }
+                        customIds.filterNot {
+                            it in existingCustom
+                        }
 
                     val nextOrder =
                         builtIns +
                             existingCustom +
                             missing
 
-                    appState.order =
-                        nextOrder
+                    appState.order = nextOrder
 
                     Store.saveOrder(
                         context,
@@ -372,77 +212,57 @@ fun App() {
                     )
                 }
             },
-
-            finish = {
-                profile ->
-
+            finish = { profile ->
                 scope.launch {
                     appState.allowed =
-                        ContextCompat
-                            .checkSelfPermission(
-                                context,
-                                audioPermission
-                            ) ==
-                            PackageManager
-                                .PERMISSION_GRANTED
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            audioPermission
+                        ) ==
+                            PackageManager.PERMISSION_GRANTED
 
                     if (!appState.allowed) {
-                        permissionLauncher
-                            .launch(
-                                audioPermission
-                            )
-
+                        permissionLauncher.launch(
+                            audioPermission
+                        )
                         return@launch
                     }
 
-                    appState.profile =
-                        profile
+                    appState.profile = profile
 
                     Store.finishSetup(
                         context,
                         profile
                     )
 
-                    appState.setupComplete =
-                        true
-
+                    appState.setupComplete = true
                     persistence.loadLibrary()
                 }
             },
-
-            setupLater = {
-                profile ->
-
+            setupLater = { profile ->
                 scope.launch {
                     appState.allowed =
-                        ContextCompat
-                            .checkSelfPermission(
-                                context,
-                                audioPermission
-                            ) ==
-                            PackageManager
-                                .PERMISSION_GRANTED
+                        ContextCompat.checkSelfPermission(
+                            context,
+                            audioPermission
+                        ) ==
+                            PackageManager.PERMISSION_GRANTED
 
                     if (!appState.allowed) {
-                        permissionLauncher
-                            .launch(
-                                audioPermission
-                            )
-
+                        permissionLauncher.launch(
+                            audioPermission
+                        )
                         return@launch
                     }
 
-                    appState.profile =
-                        profile
+                    appState.profile = profile
 
                     Store.finishSetup(
                         context,
                         profile
                     )
 
-                    appState.setupComplete =
-                        true
-
+                    appState.setupComplete = true
                     persistence.loadLibrary()
                 }
             }
@@ -450,12 +270,6 @@ fun App() {
 
         return
     }
-
-    /*
-     * =========================================================
-     * THEME
-     * =========================================================
-     */
 
     val systemDark =
         (
@@ -467,11 +281,7 @@ fun App() {
                 .UI_MODE_NIGHT_YES
 
     val theme =
-        when (
-            appState
-                .appearance
-                .themeMode
-        ) {
+        when (appState.appearance.themeMode) {
             ThemeMode.System ->
                 if (systemDark) {
                     XmoTheme.Dark
@@ -489,24 +299,13 @@ fun App() {
                 XmoTheme.Amoled
         }
 
-    /*
-     * =========================================================
-     * ACTIONS
-     * =========================================================
-     */
-
     val actions: XmoAppActions =
         buildXmoAppActions(
-            context =
-                context,
-            state =
-                appState,
-            player =
-                player,
-            scope =
-                scope,
-            persistence =
-                persistence,
+            context = context,
+            state = appState,
+            player = player,
+            scope = scope,
+            persistence = persistence,
             requestAudioPermission = {
                 permissionLauncher.launch(
                     audioPermission
@@ -514,65 +313,35 @@ fun App() {
             }
         )
 
-    /*
-     * =========================================================
-     * CURRENT SONG
-     * =========================================================
-     */
-
     val currentSong =
-        playback.currentSongId
-            ?.let {
-                id ->
-
-                appState.songs
-                    .firstOrNull {
-                        it.id == id
-                    }
+        playback.currentSongId?.let { id ->
+            appState.songs.firstOrNull {
+                it.id == id
             }
-            ?: player.currentSong()
-
-    /*
-     * =========================================================
-     * RENDER
-     * =========================================================
-     */
+        } ?: player.currentSong()
 
     XmoAppContent(
         state =
             XmoAppUiState(
-                playback =
-                    playback,
-                theme =
-                    theme,
-                hazeState =
-                    hazeState,
+                playback = playback,
+                theme = theme,
+                hazeState = hazeState,
 
-                profile =
-                    appState.profile,
-                appearance =
-                    appState.appearance,
+                profile = appState.profile,
+                appearance = appState.appearance,
                 libraryPreferences =
-                    appState
-                        .libraryPreferences,
+                    appState.libraryPreferences,
                 playbackPreferences =
-                    appState
-                        .playbackPreferences,
+                    appState.playbackPreferences,
                 resumeOnHeadphones =
-                    appState
-                        .resumeOnHeadphones,
+                    appState.resumeOnHeadphones,
 
-                songs =
-                    appState.songs,
-                playbackQueue =
-                    player.queue(),
-                currentSong =
-                    currentSong,
+                songs = appState.songs,
+                playbackQueue = player.queue(),
+                currentSong = currentSong,
 
-                order =
-                    appState.order,
-                categories =
-                    appState.categories,
+                order = appState.order,
+                categories = appState.categories,
                 likedSongIds =
                     appState.likedSongIds,
                 recentPlays =
@@ -580,13 +349,11 @@ fun App() {
                 lyricsFiles =
                     appState.lyricsFiles,
 
-                allowed =
-                    appState.allowed,
-                scanning =
-                    appState.scanning,
+                allowed = appState.allowed,
+                scanning = appState.scanning,
+                loaded = appState.loaded,
 
-                tab =
-                    appState.tab,
+                tab = appState.tab,
                 profileOpen =
                     appState.profileOpen,
 
@@ -600,10 +367,8 @@ fun App() {
                 playingSource =
                     appState.playingSource,
                 playingSourceIsCategory =
-                    appState
-                        .playingSourceIsCategory
+                    appState.playingSourceIsCategory
             ),
-        actions =
-            actions
+        actions = actions
     )
 }
