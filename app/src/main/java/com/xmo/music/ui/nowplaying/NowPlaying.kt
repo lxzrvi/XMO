@@ -15,10 +15,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
 import com.xmo.music.data.SongLyrics
@@ -76,19 +76,11 @@ fun NowPlaying(
         rememberCoroutineScope()
 
     val colors =
-        homeColors(
-            theme
-        )
+        homeColors(theme)
 
     val accent =
         LocalXmoAccent.current
 
-    /*
-     * Real screen height exists on the first composition.
-     *
-     * This replaces the previous 1px / measurement-gated setup
-     * that could make Now Playing never render.
-     */
     val screenHeight =
         with(density) {
             configuration
@@ -96,15 +88,7 @@ fun NowPlaying(
                 .dp
                 .toPx()
         }
-        .coerceAtLeast(
-            1f
-        )
-
-    /*
-     * =========================================================
-     * REAL QUEUE WINDOW
-     * =========================================================
-     */
+            .coerceAtLeast(1f)
 
     val currentIndex =
         state.currentIndex
@@ -121,27 +105,54 @@ fun NowPlaying(
             currentIndex
         )
 
+    /*
+     * Wrap-aware VISUAL neighbors.
+     *
+     * We only expose the wrapped destination when Media3 says
+     * that direction is actually available.
+     */
     val previousSong =
-        queue.getOrNull(
-            currentIndex - 1
-        )
+        when {
+            currentIndex !in
+                queue.indices ->
+                null
+
+            currentIndex > 0 ->
+                queue.getOrNull(
+                    currentIndex - 1
+                )
+
+            state.hasPrevious &&
+                queue.size > 1 ->
+                queue.lastOrNull()
+
+            else ->
+                null
+        }
 
     val nextSong =
-        queue.getOrNull(
-            currentIndex + 1
-        )
+        when {
+            currentIndex !in
+                queue.indices ->
+                null
+
+            currentIndex <
+                queue.lastIndex ->
+                queue.getOrNull(
+                    currentIndex + 1
+                )
+
+            state.hasNext &&
+                queue.size > 1 ->
+                queue.firstOrNull()
+
+            else ->
+                null
+        }
 
     val fallbackArtwork =
         state.artworkUri
-            ?.let(
-                Uri::parse
-            )
-
-    /*
-     * =========================================================
-     * REAL CURRENT SONG DATA
-     * =========================================================
-     */
+            ?.let(Uri::parse)
 
     val inCategory =
         currentSong?.let { song ->
@@ -162,9 +173,7 @@ fun NowPlaying(
                     ?.trim()
                     .orEmpty()
 
-            if (
-                artist.isBlank()
-            ) {
+            if (artist.isBlank()) {
                 0
             } else {
                 songs.count {
@@ -172,18 +181,11 @@ fun NowPlaying(
                         .trim()
                         .equals(
                             artist,
-                            ignoreCase =
-                                true
+                            ignoreCase = true
                         )
                 }
             }
         }
-
-    /*
-     * =========================================================
-     * CAROUSEL
-     * =========================================================
-     */
 
     val carousel =
         remember {
@@ -239,24 +241,15 @@ fun NowPlaying(
         )
     }
 
-    /*
-     * =========================================================
-     * ARTWORK COLOR
-     * =========================================================
-     */
-
     val artworkColors =
         rememberPlayerColors(
-            context =
-                context,
-            carousel =
-                carousel
+            context = context,
+            carousel = carousel
         )
 
     val displayColor =
         playerDisplayColor(
-            colors =
-                artworkColors,
+            colors = artworkColors,
             coverX =
                 carousel.x.value,
             coverWidth =
@@ -271,31 +264,20 @@ fun NowPlaying(
 
     val themeColors =
         playerThemeColors(
-            theme =
-                theme,
+            theme = theme,
             displayColor =
                 displayColor
         )
-
-    /*
-     * =========================================================
-     * POSITION
-     * =========================================================
-     */
 
     LaunchedEffect(
         state.currentSongId,
         state.isPlaying
     ) {
-        while (
-            isActive
-        ) {
+        while (isActive) {
             refreshPosition()
 
             delay(
-                if (
-                    state.isPlaying
-                ) {
+                if (state.isPlaying) {
                     250L
                 } else {
                     500L
@@ -303,12 +285,6 @@ fun NowPlaying(
             )
         }
     }
-
-    /*
-     * =========================================================
-     * LOCAL LYRICS
-     * =========================================================
-     */
 
     var fileLyrics by
         remember(
@@ -328,9 +304,7 @@ fun NowPlaying(
             lyricsUri?.let {
                 readLyrics(
                     context,
-                    Uri.parse(
-                        it
-                    )
+                    Uri.parse(it)
                 )
             }
     }
@@ -345,9 +319,7 @@ fun NowPlaying(
             ActivityResultContracts
                 .OpenDocument()
         ) { uri ->
-            if (
-                uri != null
-            ) {
+            if (uri != null) {
                 runCatching {
                     context
                         .contentResolver
@@ -363,12 +335,6 @@ fun NowPlaying(
             }
         }
 
-    /*
-     * =========================================================
-     * PLAYER UI STATE
-     * =========================================================
-     */
-
     var overlay by
         remember {
             mutableStateOf<PlayerOverlay?>(
@@ -376,21 +342,14 @@ fun NowPlaying(
             )
         }
 
-    /*
-     * Deliberately independent from current song.
-     */
     var artworkLyrics by
         remember {
-            mutableStateOf(
-                false
-            )
+            mutableStateOf(false)
         }
 
     var fullLyrics by
         remember {
-            mutableStateOf(
-                false
-            )
+            mutableStateOf(false)
         }
 
     var pop by
@@ -414,60 +373,33 @@ fun NowPlaying(
             state.sleepTimerRemainingMs <=
             0L
         ) {
-            sleepTotalMs =
-                null
+            sleepTotalMs = null
         }
     }
 
-    /*
-     * =========================================================
-     * PLAYER ENTRANCE / CLOSE
-     * =========================================================
-     *
-     * entrance starts at 1:
-     *
-     * translation =
-     * 1 * real screen height
-     *
-     * Therefore the very first visible frame is already below
-     * screen. No flash before slide-in.
-     */
-
     val entrance =
         remember {
-            Animatable(
-                1f
-            )
+            Animatable(1f)
         }
 
     val playerY =
         remember {
-            Animatable(
-                0f
-            )
+            Animatable(0f)
         }
 
     var dismissing by
         remember {
-            mutableStateOf(
-                false
-            )
+            mutableStateOf(false)
         }
 
-    LaunchedEffect(
-        Unit
-    ) {
-        entrance.snapTo(
-            1f
-        )
+    LaunchedEffect(Unit) {
+        entrance.snapTo(1f)
 
         entrance.animateTo(
-            targetValue =
-                0f,
+            targetValue = 0f,
             animationSpec =
                 tween(
-                    durationMillis =
-                        410
+                    durationMillis = 410
                 )
         )
 
@@ -475,73 +407,46 @@ fun NowPlaying(
     }
 
     suspend fun closePlayer() {
-        if (
-            dismissing
-        ) {
+        if (dismissing) {
             return
         }
 
-        dismissing =
-            true
+        dismissing = true
 
         playerY.animateTo(
             targetValue =
                 screenHeight,
             animationSpec =
                 tween(
-                    durationMillis =
-                        330
+                    durationMillis = 330
                 )
         )
 
         dismiss()
     }
 
-    /*
-     * =========================================================
-     * POP
-     * =========================================================
-     */
-
     LaunchedEffect(
         pop?.key
     ) {
-        if (
-            pop != null
-        ) {
-            delay(
-                1_900L
-            )
-
-            pop =
-                null
+        if (pop != null) {
+            delay(1_900L)
+            pop = null
         }
     }
-
-    /*
-     * =========================================================
-     * BACK
-     * =========================================================
-     */
 
     BackHandler {
         when {
             fullLyrics -> {
-                fullLyrics =
-                    false
-
-                artworkLyrics =
-                    true
+                fullLyrics = false
+                artworkLyrics = true
             }
 
             overlay != null -> {
-                overlay =
-                    null
+                overlay = null
             }
 
             artworkLyrics -> {
-                artworkLyrics =
-                    false
+                artworkLyrics = false
             }
 
             else -> {
@@ -552,27 +457,16 @@ fun NowPlaying(
         }
     }
 
-    /*
-     * =========================================================
-     * RENDER
-     * =========================================================
-     */
-
     NowPlayingContent(
-        state =
-            state,
-        theme =
-            theme,
-        source =
-            source,
+        state = state,
+        theme = theme,
+        source = source,
         sourceIsCategory =
             sourceIsCategory,
-        queue =
-            queue,
+        queue = queue,
         categories =
             categories,
-        liked =
-            liked,
+        liked = liked,
 
         currentIndex =
             currentIndex,
@@ -589,49 +483,34 @@ fun NowPlaying(
             artistTrackCount,
         inCategory =
             inCategory,
+        lyrics = lyrics,
 
-        lyrics =
-            lyrics,
-
-        colors =
-            colors,
-        accent =
-            accent,
+        colors = colors,
+        accent = accent,
 
         displayColor =
             displayColor,
-        deep =
-            deep,
+        deep = deep,
         themeColors =
             themeColors,
 
-        carousel =
-            carousel,
+        carousel = carousel,
 
-        overlay =
-            overlay,
+        overlay = overlay,
         artworkLyrics =
             artworkLyrics,
         fullLyrics =
             fullLyrics,
 
-        pop =
-            pop,
+        pop = pop,
         sleepTotalMs =
             sleepTotalMs,
 
-        entrance =
-            entrance,
-        playerY =
-            playerY,
+        entrance = entrance,
+        playerY = playerY,
         screenHeight =
             screenHeight,
 
-        /*
-         * Kept because NowPlayingContent already has this callback
-         * in its stable rendering signature. Screen height is now
-         * configuration-owned and does not need to mutate here.
-         */
         updateScreenHeight = {
             Unit
         },
@@ -641,46 +520,35 @@ fun NowPlaying(
         },
 
         dismissAfterDrag = {
-            if (
-                !dismissing
-            ) {
-                dismissing =
-                    true
-
+            if (!dismissing) {
+                dismissing = true
                 dismiss()
             }
         },
 
         setOverlay = {
-            overlay =
-                it
+            overlay = it
         },
 
         setArtworkLyrics = {
-            artworkLyrics =
-                it
+            artworkLyrics = it
         },
 
         setFullLyrics = {
-            fullLyrics =
-                it
+            fullLyrics = it
         },
 
         setPop = {
-            pop =
-                it
+            pop = it
         },
 
         setSleepTotalMs = {
-            sleepTotalMs =
-                it
+            sleepTotalMs = it
         },
 
         pickLyrics = {
             lyricPicker.launch(
-                arrayOf(
-                    "*/*"
-                )
+                arrayOf("*/*")
             )
         },
 
