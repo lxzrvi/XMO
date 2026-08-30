@@ -1,9 +1,6 @@
 package com.xmo.music.ui.miniplayer
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -27,6 +24,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import com.xmo.music.player.PlaybackState
@@ -70,6 +68,9 @@ fun XmoMiniPlayer(
     val keyboardController =
         LocalSoftwareKeyboardController.current
 
+    val view =
+        LocalView.current
+
     val x =
         remember {
             Animatable(0f)
@@ -82,14 +83,14 @@ fun XmoMiniPlayer(
 
     /*
      * =========================================================
-     * NORMAL / IME POSITION
+     * SYSTEM INSETS
      * =========================================================
      *
-     * Normal geometry remains exactly where it was.
+     * There is deliberately NO Compose tween around the IME
+     * inset. Android already animates this value.
      *
-     * When the IME appears, only bottom placement changes.
-     * riseKey / gesture Y are not involved, preventing the old
-     * keyboard-close -> down -> rise behavior.
+     * MiniPlayer therefore follows the keyboard's actual
+     * frame-by-frame movement instead of arriving late.
      */
 
     val navigationBottomPx =
@@ -114,43 +115,29 @@ fun XmoMiniPlayer(
             imeBottomPx.toDp()
         }
 
-    val targetBottomPadding =
+    val bottomPadding =
         if (keyboardVisible) {
             /*
-             * Small gap directly above keyboard.
+             * Keyboard's current animated top.
+             *
+             * As IME opens/closes, this value follows it directly.
              */
             imeBottomDp +
                 6.dp
         } else {
             /*
-             * Existing approved normal position.
+             * Existing normal MiniPlayer position.
              */
             navigationBottomDp +
                 128.dp
         }
 
-    val bottomPadding by
-        animateDpAsState(
-            targetValue =
-                targetBottomPadding,
-            animationSpec =
-                tween(
-                    durationMillis = 180,
-                    easing =
-                        FastOutSlowInEasing
-                ),
-            label =
-                "xmoMiniImePosition"
-        )
-
     /*
      * =========================================================
-     * ENTRANCE
+     * RETURN FROM NOW PLAYING
      * =========================================================
      *
-     * Only used when returning from Now Playing.
-     *
-     * Keyboard opening/closing never mutates this value.
+     * This is separate from keyboard positioning.
      */
 
     val riseDistance =
@@ -217,12 +204,30 @@ fun XmoMiniPlayer(
 
     /*
      * =========================================================
-     * ORDERED OPEN
+     * FULL SCREEN EXIT DISTANCE
      * =========================================================
      *
-     * MiniPlayer only needs to pass behind the NavBar before
-     * Now Playing can begin. It does not need to travel hundreds
-     * of extra pixels below the physical screen.
+     * Uses the actual Android view height.
+     *
+     * This guarantees that MiniPlayer really reaches below the
+     * physical screen instead of stopping at an arbitrary 96dp /
+     * 220dp offset.
+     */
+
+    val screenExitY =
+        view.height
+            .toFloat()
+            .takeIf {
+                it > 0f
+            }
+            ?: with(density) {
+                900.dp.toPx()
+            }
+
+    /*
+     * =========================================================
+     * OPEN NOW PLAYING
+     * =========================================================
      */
 
     suspend fun openOrdered() {
@@ -236,43 +241,41 @@ fun XmoMiniPlayer(
         opening = true
 
         /*
-         * Search keyboard must not remain over Now Playing.
+         * Search keyboard must not survive into Now Playing.
+         *
+         * We do not wait for its animation to complete.
          */
         keyboardController?.hide()
 
         x.snapTo(0f)
 
         /*
-         * Start exactly at the current dragged position.
+         * IMPORTANT:
          *
-         * No y -> 0 reset.
+         * Do not reset y to zero.
+         *
+         * If user released the card while raised, its current
+         * dragged position is the start of this direct downward
+         * exit.
          */
-        val hiddenBehindNavBar =
-            with(density) {
-                96.dp.toPx()
-            }
-
         y.animateTo(
             targetValue =
-                hiddenBehindNavBar,
+                screenExitY,
             animationSpec =
-                tween(
-                    durationMillis = 210,
-                    easing =
-                        FastOutSlowInEasing
-                )
+                XmoMiniPlayerAnimation
+                    .openExitSpec
         )
 
         /*
-         * MiniPlayer is now visually behind NavBar.
-         * Start Now Playing immediately.
+         * Only now, after MiniPlayer is physically below the
+         * screen, create Now Playing.
          */
         openPlayer()
     }
 
     /*
      * =========================================================
-     * ORDERED CLOSE
+     * CLOSE PLAYBACK
      * =========================================================
      */
 
@@ -289,17 +292,12 @@ fun XmoMiniPlayer(
         x.snapTo(0f)
 
         /*
-         * Real close travels farther because there will be no
-         * Now Playing surface replacing it.
+         * Same behavior:
+         * current downward stretch -> directly below screen.
          */
-        val fullExit =
-            with(density) {
-                220.dp.toPx()
-            }
-
         y.animateTo(
             targetValue =
-                fullExit,
+                screenExitY,
             animationSpec =
                 XmoMiniPlayerAnimation
                     .closeExitSpec
@@ -322,8 +320,7 @@ fun XmoMiniPlayer(
             Alignment.BottomCenter
     ) {
         /*
-         * Invisible gesture acquisition area.
-         * No visual grab pill.
+         * Invisible gesture host.
          */
         Box(
             modifier =
@@ -455,7 +452,8 @@ fun XmoMiniPlayer(
                                                         .horizontalThresholdPx
 
                                             x.animateTo(
-                                                targetValue = 0f,
+                                                targetValue =
+                                                    0f,
                                                 animationSpec =
                                                     XmoMiniPlayerAnimation
                                                         .horizontalReturnSpec
@@ -479,11 +477,6 @@ fun XmoMiniPlayer(
                                                 finalY <=
                                                     XmoMiniPlayerAnimation
                                                         .openThresholdPx -> {
-                                                    /*
-                                                     * Directly continue from
-                                                     * raised drag position to
-                                                     * hidden-behind-NavBar.
-                                                     */
                                                     openOrdered()
                                                 }
 
@@ -495,7 +488,8 @@ fun XmoMiniPlayer(
 
                                                 else -> {
                                                     y.animateTo(
-                                                        targetValue = 0f,
+                                                        targetValue =
+                                                            0f,
                                                         animationSpec =
                                                             XmoMiniPlayerAnimation
                                                                 .verticalReturnSpec
@@ -509,6 +503,7 @@ fun XmoMiniPlayer(
                                         XmoMiniAxis.None -> {
                                             x.snapTo(0f)
                                             y.snapTo(0f)
+
                                             moved = false
                                         }
                                     }
@@ -518,14 +513,16 @@ fun XmoMiniPlayer(
                             onDragCancel = {
                                 scope.launch {
                                     x.animateTo(
-                                        targetValue = 0f,
+                                        targetValue =
+                                            0f,
                                         animationSpec =
                                             XmoMiniPlayerAnimation
                                                 .horizontalReturnSpec
                                     )
 
                                     y.animateTo(
-                                        targetValue = 0f,
+                                        targetValue =
+                                            0f,
                                         animationSpec =
                                             XmoMiniPlayerAnimation
                                                 .verticalReturnSpec
