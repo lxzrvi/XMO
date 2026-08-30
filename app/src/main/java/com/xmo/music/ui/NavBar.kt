@@ -32,9 +32,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -44,11 +44,7 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /*
- * =============================================================
- * APPROVED XMO NAVBAR GEOMETRY
- * =============================================================
- *
- * Do not alter these values when tuning visual styling.
+ * Approved XMO NavBar geometry.
  */
 private val BarW = 246.dp
 private val BarH = 64.dp
@@ -78,9 +74,6 @@ fun BoxScope.NavBar(
             mutableFloatStateOf(0f)
         }
 
-    /*
-     * External selection / Android Back.
-     */
     LaunchedEffect(selected) {
         if (!down) {
             pos =
@@ -89,30 +82,21 @@ fun BoxScope.NavBar(
     }
 
     /*
-     * At rest, the original spring remains.
+     * Original selector physics.
      *
-     * While dragging, using raw pos avoids placing a spring
-     * between the user's finger and selector on every pointer
-     * frame.
+     * Spring remains between pos and rendered x during drag as
+     * well as settle.
      */
-    val settledX by
+    val x by
         animateFloatAsState(
             targetValue = pos,
             animationSpec =
                 spring(
-                    dampingRatio = .76f,
-                    stiffness = 1050f
+                    dampingRatio = .72f,
+                    stiffness = 900f
                 ),
-            label =
-                "navPosition"
+            label = "position"
         )
-
-    val x =
-        if (down) {
-            pos
-        } else {
-            settledX
-        }
 
     /*
      * Original hold/drag expansion.
@@ -127,11 +111,10 @@ fun BoxScope.NavBar(
                 },
             animationSpec =
                 spring(
-                    dampingRatio = .80f,
-                    stiffness = 920f
+                    dampingRatio = .78f,
+                    stiffness = 850f
                 ),
-            label =
-                "navGrow"
+            label = "grow"
         )
 
     /*
@@ -147,24 +130,21 @@ fun BoxScope.NavBar(
                 },
             animationSpec =
                 spring(
-                    dampingRatio = .80f,
-                    stiffness = 980f
+                    dampingRatio = .78f,
+                    stiffness = 900f
                 ),
-            label =
-                "navBarScale"
+            label = "bar"
         )
 
     /*
      * =========================================================
-     * THEME MATERIAL
+     * THEME SURFACES
      * =========================================================
      *
      * No Haze.
-     * No backdrop blur.
+     * No blur.
      * No shadow.
-     *
-     * Tiny transparency is retained so it does not read as a
-     * completely dead block.
+     * Neutral blacks rather than blue-grey.
      */
 
     val parentBackground =
@@ -206,47 +186,48 @@ fun BoxScope.NavBar(
                 )
         }
 
-    val parentTopReflection =
+    val parentReflection =
         when (theme) {
             XmoTheme.Light ->
                 Color.White.copy(
-                    alpha = .54f
+                    alpha = .46f
                 )
 
             XmoTheme.Dark ->
                 Color.White.copy(
-                    alpha = .075f
+                    alpha = .07f
                 )
 
             XmoTheme.Amoled ->
                 Color.White.copy(
-                    alpha = .065f
+                    alpha = .055f
                 )
         }
 
     /*
-     * Selector is neutral and slightly separated from its parent.
+     * More transparent selector.
      *
-     * No blue-grey tint.
+     * Parent surface can subtly show through it, giving it a
+     * glass-like layer without actual backdrop blur.
      */
     val selector =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFFE8E8EA)
+                Color(0xFFF4F4F5)
                     .copy(
-                        alpha = .91f
+                        alpha = .54f
                     )
 
             XmoTheme.Dark ->
-                Color(0xFF29292B)
+                Color(0xFF303031)
                     .copy(
-                        alpha = .93f
+                        alpha = .52f
                     )
 
             XmoTheme.Amoled ->
-                Color(0xFF1C1C1E)
+                Color(0xFF292929)
                     .copy(
-                        alpha = .94f
+                        alpha = .48f
                     )
         }
 
@@ -259,73 +240,66 @@ fun BoxScope.NavBar(
 
             XmoTheme.Dark ->
                 Color.White.copy(
-                    alpha = .17f
+                    alpha = .16f
                 )
 
             XmoTheme.Amoled ->
                 Color.White.copy(
-                    alpha = .20f
+                    alpha = .19f
                 )
         }
 
-    /*
-     * Optical glass reflections.
-     *
-     * These do not sample/blur the background. Their uneven
-     * positions merely give the selector a refracted glass-edge
-     * character while keeping rendering lightweight.
-     */
     val selectorReflection =
         when (theme) {
             XmoTheme.Light ->
                 Color.White.copy(
-                    alpha = .58f
+                    alpha = .52f
                 )
 
             XmoTheme.Dark ->
-                Color.White.copy(
-                    alpha = .18f
-                )
-
-            XmoTheme.Amoled ->
                 Color.White.copy(
                     alpha = .15f
                 )
+
+            XmoTheme.Amoled ->
+                Color.White.copy(
+                    alpha = .12f
+                )
         }
 
-    val selectorSoftReflection =
+    val selectorMidReflection =
         when (theme) {
             XmoTheme.Light ->
                 Color.White.copy(
-                    alpha = .24f
+                    alpha = .16f
                 )
 
             XmoTheme.Dark ->
                 Color.White.copy(
-                    alpha = .075f
+                    alpha = .055f
                 )
 
             XmoTheme.Amoled ->
                 Color.White.copy(
-                    alpha = .065f
+                    alpha = .045f
                 )
         }
 
-    val selectorDarkRefraction =
+    val selectorLowerShade =
         when (theme) {
             XmoTheme.Light ->
                 Color.Black.copy(
-                    alpha = .075f
+                    alpha = .045f
                 )
 
             XmoTheme.Dark ->
                 Color.Black.copy(
-                    alpha = .25f
+                    alpha = .12f
                 )
 
             XmoTheme.Amoled ->
                 Color.Black.copy(
-                    alpha = .34f
+                    alpha = .20f
                 )
         }
 
@@ -333,13 +307,13 @@ fun BoxScope.NavBar(
         when (theme) {
             XmoTheme.Light ->
                 Color.Black.copy(
-                    alpha = .50f
+                    alpha = .46f
                 )
 
             XmoTheme.Dark,
             XmoTheme.Amoled ->
                 Color.White.copy(
-                    alpha = .46f
+                    alpha = .42f
                 )
         }
 
@@ -364,14 +338,15 @@ fun BoxScope.NavBar(
 
     /*
      * =========================================================
-     * ORIGINAL 96dp GESTURE HOST
+     * ORIGINAL GESTURE HOST
      * =========================================================
      *
-     * Only placement changed:
+     * Geometry is unchanged.
+     * Only whole-host placement is lower:
      *
-     * 35dp -> 29dp
-     *
-     * The complete NavBar therefore sits 6dp lower.
+     * original 35dp
+     * previous 29dp
+     * now      24dp
      */
 
     Box(
@@ -382,7 +357,7 @@ fun BoxScope.NavBar(
                 )
                 .navigationBarsPadding()
                 .padding(
-                    bottom = 29.dp
+                    bottom = 24.dp
                 )
                 .size(
                     BarW,
@@ -415,7 +390,9 @@ fun BoxScope.NavBar(
                         down = true
                         velocity = 0f
 
-                        while (change.pressed) {
+                        while (
+                            change.pressed
+                        ) {
                             val event =
                                 awaitPointerEvent()
 
@@ -423,7 +400,9 @@ fun BoxScope.NavBar(
                                 event.changes
                                     .first()
 
-                            if (change.pressed) {
+                            if (
+                                change.pressed
+                            ) {
                                 val dx =
                                     change.position.x -
                                         lastX
@@ -442,7 +421,7 @@ fun BoxScope.NavBar(
                                         .38f
 
                                 /*
-                                 * Original finger-follow math.
+                                 * Original finger-follow input.
                                  */
                                 pos =
                                     (
@@ -495,11 +474,6 @@ fun BoxScope.NavBar(
                         pos =
                             target.toFloat()
 
-                        /*
-                         * Screen switch is dispatched immediately
-                         * on resolved release. Selector spring does
-                         * not block the navigation callback.
-                         */
                         if (
                             target !=
                             selected
@@ -513,7 +487,7 @@ fun BoxScope.NavBar(
     ) {
         /*
          * =====================================================
-         * PARENT — EXACT 246 × 64
+         * PARENT — 246 × 64
          * =====================================================
          */
 
@@ -528,11 +502,8 @@ fun BoxScope.NavBar(
                         BarH
                     )
                     .graphicsLayer {
-                        scaleX =
-                            barScale
-
-                        scaleY =
-                            barScale
+                        scaleX = barScale
+                        scaleY = barScale
 
                         shape =
                             RoundedCornerShape(
@@ -545,24 +516,20 @@ fun BoxScope.NavBar(
                         parentBackground
                     )
                     .drawBehind {
-                        /*
-                         * Very subtle upper material reflection.
-                         * Not blur and not shadow.
-                         */
                         drawRoundRect(
                             brush =
                                 Brush.verticalGradient(
                                     colorStops =
                                         arrayOf(
                                             0f to
-                                                parentTopReflection,
-                                            .22f to
-                                                parentTopReflection.copy(
+                                                parentReflection,
+                                            .23f to
+                                                parentReflection.copy(
                                                     alpha =
-                                                        parentTopReflection.alpha *
-                                                            .32f
+                                                        parentReflection.alpha *
+                                                            .27f
                                                 ),
-                                            .55f to
+                                            .54f to
                                                 Color.Transparent
                                         )
                                 ),
@@ -574,8 +541,7 @@ fun BoxScope.NavBar(
                     }
                     .border(
                         width = .65.dp,
-                        color =
-                            parentBorder,
+                        color = parentBorder,
                         shape =
                             RoundedCornerShape(
                                 33.dp
@@ -585,7 +551,7 @@ fun BoxScope.NavBar(
 
         /*
          * =====================================================
-         * SELECTOR — ORIGINAL GEOMETRY
+         * SELECTOR — ORIGINAL GEOMETRY + PHYSICS
          * =====================================================
          */
 
@@ -640,9 +606,6 @@ fun BoxScope.NavBar(
                         selectorH
                     )
                     .graphicsLayer {
-                        /*
-                         * Original velocity deformation preserved.
-                         */
                         val skew =
                             (
                                 velocity *
@@ -693,13 +656,17 @@ fun BoxScope.NavBar(
                         selector
                     )
                     .drawBehind {
-                        val corner =
+                        val cornerRadius =
                             CornerRadius(
                                 radius.toPx()
                             )
 
                         /*
-                         * Broad top reflection.
+                         * Soft glass-like internal reflection.
+                         *
+                         * No left vertical line: the tiny white
+                         * artifact from the previous revision is
+                         * intentionally gone.
                          */
                         drawRoundRect(
                             brush =
@@ -708,139 +675,86 @@ fun BoxScope.NavBar(
                                         arrayOf(
                                             0f to
                                                 selectorReflection,
-                                            .20f to
-                                                selectorSoftReflection,
+                                            .18f to
+                                                selectorMidReflection,
                                             .54f to
                                                 Color.Transparent,
                                             1f to
-                                                selectorDarkRefraction
+                                                selectorLowerShade
                                         )
                                 ),
                             cornerRadius =
-                                corner
+                                cornerRadius
                         )
 
                         /*
-                         * Left refracted edge.
-                         *
-                         * Intentionally short and uneven instead
-                         * of outlining the entire pill.
+                         * A broad, low-alpha diagonal light field
+                         * avoids a hard straight reflection edge.
                          */
-                        drawLine(
-                            color =
-                                selectorReflection.copy(
-                                    alpha =
-                                        selectorReflection.alpha *
-                                            .72f
+                        drawRoundRect(
+                            brush =
+                                Brush.linearGradient(
+                                    colorStops =
+                                        arrayOf(
+                                            0f to
+                                                Color.Transparent,
+                                            .38f to
+                                                selectorMidReflection,
+                                            .55f to
+                                                Color.Transparent,
+                                            1f to
+                                                Color.Transparent
+                                        ),
+                                    start =
+                                        Offset(
+                                            x = 0f,
+                                            y =
+                                                size.height
+                                        ),
+                                    end =
+                                        Offset(
+                                            x =
+                                                size.width,
+                                            y = 0f
+                                        )
                                 ),
-                            start =
-                                Offset(
-                                    x =
-                                        2.2.dp.toPx(),
-                                    y =
-                                        size.height *
-                                            .27f
-                                ),
-                            end =
-                                Offset(
-                                    x =
-                                        2.2.dp.toPx(),
-                                    y =
-                                        size.height *
-                                            .63f
-                                ),
-                            strokeWidth =
-                                1.1.dp.toPx(),
-                            cap =
-                                StrokeCap.Round
+                            cornerRadius =
+                                cornerRadius
                         )
 
                         /*
-                         * Broken/shattered-style top-right
-                         * reflection. Purely optical and cheap.
-                         */
-                        drawLine(
-                            color =
-                                selectorReflection.copy(
-                                    alpha =
-                                        selectorReflection.alpha *
-                                            .58f
-                                ),
-                            start =
-                                Offset(
-                                    x =
-                                        size.width *
-                                            .68f,
-                                    y =
-                                        1.8.dp.toPx()
-                                ),
-                            end =
-                                Offset(
-                                    x =
-                                        size.width *
-                                            .81f,
-                                    y =
-                                        1.1.dp.toPx()
-                                ),
-                            strokeWidth =
-                                .9.dp.toPx(),
-                            cap =
-                                StrokeCap.Round
-                        )
-
-                        drawLine(
-                            color =
-                                selectorSoftReflection,
-                            start =
-                                Offset(
-                                    x =
-                                        size.width *
-                                            .84f,
-                                    y =
-                                        2.0.dp.toPx()
-                                ),
-                            end =
-                                Offset(
-                                    x =
-                                        size.width *
-                                            .91f,
-                                    y =
-                                        3.5.dp.toPx()
-                                ),
-                            strokeWidth =
-                                .75.dp.toPx(),
-                            cap =
-                                StrokeCap.Round
-                        )
-
-                        /*
-                         * Subtle internal refraction on the lower
-                         * opposite edge.
+                         * Very soft lower refraction. It stays
+                         * inside the selector rather than drawing
+                         * a disconnected border fragment.
                          */
                         drawArc(
                             color =
-                                selectorDarkRefraction,
-                            startAngle = 18f,
-                            sweepAngle = 64f,
+                                selectorLowerShade,
+                            startAngle = 25f,
+                            sweepAngle = 52f,
                             useCenter = false,
                             topLeft =
                                 Offset(
-                                    size.width *
-                                        .49f,
-                                    size.height *
-                                        .43f
+                                    x =
+                                        size.width *
+                                            .52f,
+                                    y =
+                                        size.height *
+                                            .52f
                                 ),
                             size =
-                                androidx.compose.ui.geometry.Size(
-                                    size.width *
-                                        .48f,
-                                    size.height *
-                                        .49f
+                                Size(
+                                    width =
+                                        size.width *
+                                            .39f,
+                                    height =
+                                        size.height *
+                                            .35f
                                 ),
                             style =
                                 Stroke(
                                     width =
-                                        .75.dp.toPx()
+                                        .55.dp.toPx()
                                 )
                         )
                     }
@@ -857,8 +771,11 @@ fun BoxScope.NavBar(
 
         /*
          * =====================================================
-         * ICON ROW — ORIGINAL GEOMETRY
+         * ICONS
          * =====================================================
+         *
+         * Activation follows selector distance continuously.
+         * No abrupt selected/unselected color switch.
          */
 
         Row(
@@ -881,31 +798,46 @@ fun BoxScope.NavBar(
                     index,
                     icon ->
 
-                val chosen =
-                    abs(
-                        x -
-                            index
-                    ) <
-                        .5f
+                /*
+                 * 1 when selector is exactly centered on icon,
+                 * smoothly falls to 0 by one full slot away.
+                 */
+                val proximity =
+                    (
+                        1f -
+                            abs(
+                                x -
+                                    index.toFloat()
+                            )
+                        )
+                        .coerceIn(
+                            0f,
+                            1f
+                        )
 
-                val scale by
-                    animateFloatAsState(
-                        targetValue =
-                            if (
-                                chosen &&
-                                down
-                            ) {
-                                1.10f
-                            } else {
-                                1f
-                            },
-                        animationSpec =
-                            spring(
-                                dampingRatio = .78f,
-                                stiffness = 1050f
-                            ),
-                        label =
-                            "navIcon$index"
+                /*
+                 * While held, only the icon actually under the
+                 * selector receives the original extra zoom,
+                 * but the value fades continuously as selector
+                 * leaves it.
+                 */
+                val iconScale =
+                    1f +
+                        if (down) {
+                            .10f *
+                                proximity
+                        } else {
+                            0f
+                        }
+
+                val tint =
+                    mixNavColor(
+                        from =
+                            inactive,
+                        to =
+                            active,
+                        fraction =
+                            proximity
                     )
 
                 Box(
@@ -925,12 +857,7 @@ fun BoxScope.NavBar(
                                 1 -> "Search"
                                 else -> "Settings"
                             },
-                        tint =
-                            if (chosen) {
-                                active
-                            } else {
-                                inactive
-                            },
+                        tint = tint,
                         modifier =
                             Modifier
                                 .offset(
@@ -947,14 +874,66 @@ fun BoxScope.NavBar(
                                 .size(25.dp)
                                 .graphicsLayer {
                                     scaleX =
-                                        scale
+                                        iconScale
 
                                     scaleY =
-                                        scale
+                                        iconScale
+
+                                    /*
+                                     * Tiny optical fade reinforces
+                                     * the selector moving away.
+                                     */
+                                    alpha =
+                                        .88f +
+                                            .12f *
+                                            proximity
                                 }
                     )
                 }
             }
         }
     }
+}
+
+private fun mixNavColor(
+    from: Color,
+    to: Color,
+    fraction: Float
+): Color {
+    val value =
+        fraction.coerceIn(
+            0f,
+            1f
+        )
+
+    return Color(
+        red =
+            from.red +
+                (
+                    to.red -
+                        from.red
+                    ) *
+                value,
+        green =
+            from.green +
+                (
+                    to.green -
+                        from.green
+                    ) *
+                value,
+        blue =
+            from.blue +
+                (
+                    to.blue -
+                        from.blue
+                    ) *
+                value,
+        alpha =
+            from.alpha +
+                (
+                    to.alpha -
+                        from.alpha
+                    ) *
+                value
+    )
 }
