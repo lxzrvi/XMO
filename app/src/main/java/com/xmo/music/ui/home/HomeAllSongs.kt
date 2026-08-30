@@ -1,7 +1,5 @@
 package com.xmo.music.ui.home
 
-import coil3.request.CachePolicy
-import coil3.request.ImageRequest
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -11,6 +9,8 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -26,30 +26,67 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlin.math.abs
+
+@Stable
+private class HomeSongScroller {
+    var click by mutableIntStateOf(0)
+        private set
+
+    var hold by mutableStateOf(false)
+        private set
+
+    fun tap() {
+        click++
+    }
+
+    fun begin() {
+        hold = true
+    }
+
+    fun stop() {
+        hold = false
+    }
+}
 
 @Composable
 internal fun HomeAllSongs(
@@ -80,13 +117,61 @@ internal fun HomeAllSongs(
     val grid =
         rememberLazyGridState()
 
+    val scope =
+        rememberCoroutineScope()
+
+    val arrow =
+        remember {
+            HomeSongScroller()
+        }
+
     val slots =
-        ((songs.size + 11) / 12) * 12
+        remember(songs.size) {
+            ((songs.size + 11) / 12) * 12
+        }
+
+    LaunchedEffect(arrow.click) {
+        if (arrow.click <= 0) {
+            return@LaunchedEffect
+        }
+
+        val column =
+            grid.firstVisibleItemIndex / 3
+
+        val maxColumn =
+            slots / 3 - 1
+
+        val target =
+            (column + 1)
+                .coerceAtMost(maxColumn)
+
+        if (target > column) {
+            grid.animateScrollToItem(
+                target * 3
+            )
+        }
+    }
+
+    LaunchedEffect(arrow.hold) {
+        while (
+            arrow.hold &&
+            isActive
+        ) {
+            val consumed =
+                grid.scrollBy(19f)
+
+            if (abs(consumed) < .1f) {
+                break
+            }
+
+            delay(16L)
+        }
+    }
 
     BoxWithConstraints(
         Modifier
             .fillMaxWidth()
-            .height(330.dp)
+            .background(c.bg)
     ) {
         val edge = 8.dp
         val gap = 8.dp
@@ -123,16 +208,23 @@ internal fun HomeAllSongs(
             items(
                 count = slots,
                 key = {
-                    "home_song_slot_$it"
+                    "all_song_slot_$it"
                 },
                 contentType = {
-                    "home_song"
+                    "home_song_slot"
                 }
             ) { slot ->
-                val page = slot / 12
-                val local = slot % 12
-                val row = local % 3
-                val column = local / 3
+                val page =
+                    slot / 12
+
+                val local =
+                    slot % 12
+
+                val row =
+                    local % 3
+
+                val column =
+                    local / 3
 
                 val sourceIndex =
                     page * 12 +
@@ -142,39 +234,96 @@ internal fun HomeAllSongs(
                 Box(
                     Modifier.width(cardWidth)
                 ) {
-                    songs
-                        .getOrNull(sourceIndex)
-                        ?.let { song ->
-                            HomeSongTile(
-                                song = song,
-                                c = c,
-                                theme = theme,
-                                playing =
-                                    playback.currentSongId ==
-                                        song.id,
-                                active =
-                                    playback.currentSongId ==
-                                        song.id &&
-                                        playback.isPlaying,
-                                modifier =
-                                    Modifier.width(
-                                        cardWidth
-                                    ),
-                                play = {
-                                    if (
-                                        playback.currentSongId !=
-                                        song.id
-                                    ) {
-                                        play(song)
-                                    }
-                                },
-                                options = {
-                                    options(song)
+                    val song =
+                        songs.getOrNull(
+                            sourceIndex
+                        )
+
+                    if (song != null) {
+                        HomeSongTile(
+                            song = song,
+                            c = c,
+                            theme = theme,
+                            playing =
+                                playback.currentSongId ==
+                                    song.id,
+                            active =
+                                playback.currentSongId ==
+                                    song.id &&
+                                    playback.isPlaying,
+                            modifier =
+                                Modifier.width(
+                                    cardWidth
+                                ),
+                            onClick = {
+                                if (
+                                    playback.currentSongId !=
+                                    song.id
+                                ) {
+                                    play(song)
                                 }
-                            )
-                        }
+                            },
+                            onOptions = {
+                                options(song)
+                            }
+                        )
+                    }
                 }
             }
+        }
+
+        Box(
+            Modifier
+                .align(Alignment.CenterEnd)
+                .padding(end = 9.dp)
+                .size(31.dp)
+                .clip(CircleShape)
+                .background(
+                    LocalXmoAccent.current
+                        .copy(alpha = .20f)
+                )
+                .pointerInput(arrow) {
+                    detectTapGestures(
+                        onPress = {
+                            var held =
+                                false
+
+                            val job =
+                                scope.launch {
+                                    delay(250L)
+
+                                    held = true
+                                    arrow.begin()
+                                }
+
+                            val released =
+                                tryAwaitRelease()
+
+                            job.cancel()
+                            arrow.stop()
+
+                            if (
+                                released &&
+                                !held
+                            ) {
+                                arrow.tap()
+                            }
+                        }
+                    )
+                },
+            contentAlignment =
+                Alignment.Center
+        ) {
+            Icon(
+                imageVector =
+                    Icons.Rounded.ArrowForwardIos,
+                contentDescription =
+                    "Next songs",
+                tint =
+                    LocalXmoAccent.current,
+                modifier =
+                    Modifier.size(14.dp)
+            )
         }
     }
 }
@@ -188,56 +337,59 @@ private fun HomeSongTile(
     playing: Boolean,
     active: Boolean,
     modifier: Modifier,
-    play: () -> Unit,
-    options: () -> Unit
+    onClick: () -> Unit,
+    onOptions: () -> Unit
 ) {
-    val context = LocalContext.current
+    val context =
+        LocalContext.current
 
-    val imageRequest =
-        remember(song.artwork) {
+    val artworkRequest =
+        remember(
+            song.artwork
+        ) {
             ImageRequest.Builder(context)
                 .data(song.artwork)
-                .size(320, 320)
+                .size(192, 192)
                 .memoryCachePolicy(
                     CachePolicy.ENABLED
                 )
                 .diskCachePolicy(
                     CachePolicy.ENABLED
                 )
+                .networkCachePolicy(
+                    CachePolicy.DISABLED
+                )
                 .build()
         }
 
-    val surface =
+    val cardBackground =
         when (theme) {
             XmoTheme.Light ->
-                androidx.compose.ui.graphics.Color(
-                    0xFFF9F9FA
-                )
+                Color(0xFFF9F9FA)
 
             XmoTheme.Dark ->
-                androidx.compose.ui.graphics.Color(
-                    0xFF181819
-                )
+                Color(0xFF181819)
 
             XmoTheme.Amoled ->
-                androidx.compose.ui.graphics.Color(
-                    0xFF080808
-                )
+                Color(0xFF080808)
         }
 
-    val border =
+    val cardBorder =
         when (theme) {
             XmoTheme.Light ->
-                androidx.compose.ui.graphics.Color
-                    .Black.copy(alpha = .06f)
+                Color.Black.copy(
+                    alpha = .06f
+                )
 
             XmoTheme.Dark ->
-                androidx.compose.ui.graphics.Color
-                    .White.copy(alpha = .06f)
+                Color.White.copy(
+                    alpha = .06f
+                )
 
             XmoTheme.Amoled ->
-                androidx.compose.ui.graphics.Color
-                    .White.copy(alpha = .08f)
+                Color.White.copy(
+                    alpha = .085f
+                )
         }
 
     Column(
@@ -246,13 +398,13 @@ private fun HomeSongTile(
                 RoundedCornerShape(10.dp)
             )
             .combinedClickable(
-                onClick = play,
-                onLongClick = options
+                onClick = onClick,
+                onLongClick = onOptions
             )
-            .background(surface)
+            .background(cardBackground)
             .border(
-                .4.dp,
-                border,
+                .45.dp,
+                cardBorder,
                 RoundedCornerShape(10.dp)
             )
             .padding(5.dp)
@@ -270,10 +422,12 @@ private fun HomeSongTile(
                     .background(c.button)
             ) {
                 AsyncImage(
-                    model = imageRequest,
+                    model = artworkRequest,
                     contentDescription = song.title,
-                    modifier = Modifier.fillMaxSize(),
-                    contentScale = ContentScale.Crop
+                    modifier =
+                        Modifier.fillMaxSize(),
+                    contentScale =
+                        ContentScale.Crop
                 )
 
                 if (song.artwork == null) {
@@ -284,8 +438,11 @@ private fun HomeSongTile(
                                 ?.uppercase()
                                 ?: "X",
                         color =
-                            c.text.copy(alpha = .60f),
-                        fontFamily = XmoFont.bold,
+                            c.text.copy(
+                                alpha = .60f
+                            ),
+                        fontFamily =
+                            XmoFont.bold,
                         fontSize = 17.sp,
                         modifier =
                             Modifier.align(
@@ -295,13 +452,13 @@ private fun HomeSongTile(
                 }
 
                 if (playing) {
-                    PlayingWave(
+                    HomePlayingWave(
                         active = active,
                         modifier = Modifier
                             .align(
                                 Alignment.BottomEnd
                             )
-                            .padding(5.dp)
+                            .padding(4.dp)
                     )
                 }
             }
@@ -319,13 +476,9 @@ private fun HomeSongTile(
             ) {
                 Text(
                     text = song.title,
-                    color =
-                        if (playing) {
-                            LocalXmoAccent.current
-                        } else {
-                            c.text
-                        },
-                    fontFamily = XmoFont.bold,
+                    color = c.text,
+                    fontFamily =
+                        XmoFont.bold,
                     fontSize = 10.sp,
                     maxLines = 1,
                     overflow =
@@ -335,7 +488,8 @@ private fun HomeSongTile(
                 Text(
                     text = song.artist,
                     color = c.sub,
-                    fontFamily = XmoFont.normal,
+                    fontFamily =
+                        XmoFont.normal,
                     fontSize = 8.sp,
                     maxLines = 1,
                     overflow =
@@ -346,9 +500,10 @@ private fun HomeSongTile(
             Box(
                 Modifier
                     .size(25.dp)
+                    .clip(CircleShape)
                     .combinedClickable(
-                        onClick = options,
-                        onLongClick = options
+                        onClick = onOptions,
+                        onLongClick = onOptions
                     ),
                 contentAlignment =
                     Alignment.Center
@@ -359,7 +514,8 @@ private fun HomeSongTile(
                     contentDescription =
                         "Song options",
                     tint = c.sub,
-                    modifier = Modifier.size(14.dp)
+                    modifier =
+                        Modifier.size(14.dp)
                 )
             }
         }
@@ -367,41 +523,51 @@ private fun HomeSongTile(
 }
 
 @Composable
-private fun PlayingWave(
+private fun HomePlayingWave(
     active: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val transition =
+    if (!active) {
+        Icon(
+            imageVector =
+                Icons.Rounded.GraphicEq,
+            contentDescription = "Paused",
+            tint = LocalXmoAccent.current,
+            modifier =
+                modifier.size(19.dp)
+        )
+
+        return
+    }
+
+    val animation =
         rememberInfiniteTransition(
-            label = "homePlaying"
+            label = "activeSongWave"
         )
 
     val scale by
-        transition.animateFloat(
+        animation.animateFloat(
             initialValue = .72f,
-            targetValue = 1.15f,
+            targetValue = 1.18f,
             animationSpec =
                 infiniteRepeatable(
-                    animation = tween(420),
+                    animation =
+                        tween(390),
                     repeatMode =
                         RepeatMode.Reverse
                 ),
-            label = "homePlayingScale"
+            label = "activeSongWaveScale"
         )
 
     Icon(
-        imageVector = Icons.Rounded.GraphicEq,
+        imageVector =
+            Icons.Rounded.GraphicEq,
         contentDescription = "Playing",
         tint = LocalXmoAccent.current,
         modifier = modifier
-            .size(20.dp)
+            .size(19.dp)
             .graphicsLayer {
-                scaleY =
-                    if (active) {
-                        scale
-                    } else {
-                        1f
-                    }
+                scaleY = scale
             }
     )
 }
