@@ -2,9 +2,6 @@ package com.xmo.music.ui.nowplaying
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
@@ -60,15 +57,14 @@ internal fun QueueSheet(
             .72f
 
     /*
-     * Known from configuration on first composition, so Queue
-     * begins below its final resting position immediately.
-     *
-     * It never draws as a giant fully-open sheet for one frame.
+     * Initial displacement is known before the first frame.
+     * This keeps the existing no-giant-sheet-flash behavior.
      */
     val initialOffsetPx =
         with(density) {
             sheetHeight.toPx() *
-                .16f
+                XmoPlayerAnimation
+                    .queueInitialOffsetFraction
         }
 
     val sheetY =
@@ -91,7 +87,7 @@ internal fun QueueSheet(
                 with(density) {
                     sheetHeight.toPx()
                 }
-                .coerceAtLeast(1f)
+                    .coerceAtLeast(1f)
             )
         }
 
@@ -102,15 +98,19 @@ internal fun QueueSheet(
             )
         }
 
+    var closing by
+        remember {
+            mutableStateOf(false)
+        }
+
     LaunchedEffect(Unit) {
         coroutineScope {
             launch {
                 backdropAlpha.animateTo(
                     targetValue = 1f,
                     animationSpec =
-                        tween(
-                            durationMillis = 230
-                        )
+                        XmoPlayerAnimation
+                            .queueBackdropEnterSpec
                 )
             }
 
@@ -118,24 +118,27 @@ internal fun QueueSheet(
                 sheetY.animateTo(
                     targetValue = 0f,
                     animationSpec =
-                        spring(
-                            dampingRatio = .88f,
-                            stiffness = 360f
-                        )
+                        XmoPlayerAnimation
+                            .queueEnterSpec
                 )
             }
         }
     }
 
     suspend fun closeSheet() {
+        if (closing) {
+            return
+        }
+
+        closing = true
+
         coroutineScope {
             launch {
                 backdropAlpha.animateTo(
                     targetValue = 0f,
                     animationSpec =
-                        tween(
-                            durationMillis = 180
-                        )
+                        XmoPlayerAnimation
+                            .queueBackdropExitSpec
                 )
             }
 
@@ -144,11 +147,8 @@ internal fun QueueSheet(
                     targetValue =
                         sheetHeightPx,
                     animationSpec =
-                        tween(
-                            durationMillis = 270,
-                            easing =
-                                FastOutSlowInEasing
-                        )
+                        XmoPlayerAnimation
+                            .queueExitSpec
                 )
             }
         }
@@ -157,9 +157,7 @@ internal fun QueueSheet(
     }
 
     BackHandler {
-        if (
-            menuIndex != null
-        ) {
+        if (menuIndex != null) {
             menuIndex = null
         } else {
             scope.launch {
@@ -169,7 +167,8 @@ internal fun QueueSheet(
     }
 
     Box(
-        Modifier.fillMaxSize()
+        modifier =
+            Modifier.fillMaxSize()
     ) {
         Box(
             modifier =
@@ -253,41 +252,32 @@ internal fun QueueSheet(
                                         }
                                     }
                                 },
-
                                 onDragEnd = {
                                     scope.launch {
                                         if (
                                             sheetY.value >
                                             sheetHeightPx *
-                                                .12f
+                                                XmoPlayerAnimation
+                                                    .queueDismissThreshold
                                         ) {
                                             closeSheet()
                                         } else {
                                             sheetY.animateTo(
                                                 targetValue = 0f,
                                                 animationSpec =
-                                                    spring(
-                                                        dampingRatio =
-                                                            .85f,
-                                                        stiffness =
-                                                            380f
-                                                    )
+                                                    XmoPlayerAnimation
+                                                        .queueSettleSpec
                                             )
                                         }
                                     }
                                 },
-
                                 onDragCancel = {
                                     scope.launch {
                                         sheetY.animateTo(
                                             targetValue = 0f,
                                             animationSpec =
-                                                spring(
-                                                    dampingRatio =
-                                                        .86f,
-                                                    stiffness =
-                                                        390f
-                                                )
+                                                XmoPlayerAnimation
+                                                    .queueSettleSpec
                                         )
                                     }
                                 }
