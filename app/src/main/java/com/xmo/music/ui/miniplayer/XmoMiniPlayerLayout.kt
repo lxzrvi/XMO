@@ -1,11 +1,6 @@
 package com.xmo.music.ui.miniplayer
 
 import android.net.Uri
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -20,7 +15,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -32,6 +26,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,16 +43,17 @@ internal fun xmoMiniSurface(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color(0xFFF8F8FA)
-                .copy(alpha = .97f)
+            Color(0xFFF9F9FA)
 
+        /*
+         * Neutral black/charcoal. No blue tint.
+         * Still visibly lighter than AMOLED.
+         */
         XmoTheme.Dark ->
-            Color(0xFF202126)
-                .copy(alpha = .97f)
+            Color(0xFF181819)
 
         XmoTheme.Amoled ->
-            Color(0xFF090A0C)
-                .copy(alpha = .98f)
+            Color(0xFF080808)
     }
 
 internal fun xmoMiniControlSurface(
@@ -65,13 +61,13 @@ internal fun xmoMiniControlSurface(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color(0xFFE8E9EC)
+            Color(0xFFE9EAEC)
 
         XmoTheme.Dark ->
-            Color(0xFF34363C)
+            Color(0xFF2A2A2C)
 
         XmoTheme.Amoled ->
-            Color(0xFF25262A)
+            Color(0xFF1D1D1F)
     }
 
 internal fun xmoMiniBorder(
@@ -86,7 +82,7 @@ internal fun xmoMiniBorder(
         XmoTheme.Dark,
         XmoTheme.Amoled ->
             Color.White.copy(
-                alpha = .12f
+                alpha = .11f
             )
     }
 
@@ -97,22 +93,24 @@ internal fun XmoMiniPlayerCard(
     colors: HomeColors,
     accent: Color,
     liked: Boolean,
-    closeMode: Boolean,
     moved: Boolean,
     opening: Boolean,
     togglePlay: () -> Unit,
     toggleLike: () -> Unit,
-    toggleCloseMode: () -> Unit,
-    close: () -> Unit,
     open: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    /*
+     * Left keeps the original MiniPlayer radius.
+     * Right follows the rounded controls more closely without
+     * turning the whole card into a capsule.
+     */
     val cardShape =
         RoundedCornerShape(
             topStart = 15.dp,
             bottomStart = 15.dp,
-            topEnd = 30.dp,
-            bottomEnd = 30.dp
+            topEnd = 22.dp,
+            bottomEnd = 22.dp
         )
 
     Box(
@@ -125,11 +123,10 @@ internal fun XmoMiniPlayerCard(
                     xmoMiniSurface(theme)
                 )
                 .border(
-                    width = .7.dp,
+                    width = .65.dp,
                     color =
                         xmoMiniBorder(theme),
-                    shape =
-                        cardShape
+                    shape = cardShape
                 )
     ) {
         val progress =
@@ -159,9 +156,11 @@ internal fun XmoMiniPlayerCard(
                 color = accent,
                 size =
                     Size(
-                        size.width *
-                            progress,
-                        size.height
+                        width =
+                            size.width *
+                                progress,
+                        height =
+                            size.height
                     )
             )
         }
@@ -215,8 +214,7 @@ internal fun XmoMiniPlayerCard(
                         colors.text,
                     fontFamily =
                         XmoFont.bold,
-                    fontSize =
-                        12.sp,
+                    fontSize = 12.sp,
                     maxLines = 1,
                     overflow =
                         TextOverflow.Ellipsis
@@ -229,8 +227,7 @@ internal fun XmoMiniPlayerCard(
                         colors.sub,
                     fontFamily =
                         XmoFont.normal,
-                    fontSize =
-                        9.sp,
+                    fontSize = 9.sp,
                     maxLines = 1,
                     overflow =
                         TextOverflow.Ellipsis
@@ -239,10 +236,9 @@ internal fun XmoMiniPlayerCard(
         }
 
         /*
-         * Artwork/title area owns tap + long press.
+         * Tap only.
          *
-         * Long press only changes controls into close mode.
-         * It never opens Now Playing.
+         * Long press intentionally has no action.
          */
         Box(
             modifier =
@@ -258,8 +254,7 @@ internal fun XmoMiniPlayerCard(
                     .pointerInput(
                         state.currentSongId,
                         moved,
-                        opening,
-                        closeMode
+                        opening
                     ) {
                         if (opening) {
                             return@pointerInput
@@ -267,183 +262,107 @@ internal fun XmoMiniPlayerCard(
 
                         detectTapGestures(
                             onTap = {
-                                if (
-                                    !moved &&
-                                    !closeMode
-                                ) {
-                                    open()
-                                }
-                            },
-                            onLongPress = {
                                 if (!moved) {
-                                    toggleCloseMode()
+                                    open()
                                 }
                             }
                         )
                     }
         )
 
-        AnimatedContent(
-            targetState =
-                closeMode,
+        Row(
             modifier =
-                Modifier.align(
-                    Alignment.CenterEnd
-                ),
-            transitionSpec = {
-                fadeIn(
-                    tween(140)
-                )
-                    .togetherWith(
-                        fadeOut(
-                            tween(110)
+                Modifier
+                    .align(
+                        Alignment.CenterEnd
+                    )
+                    .padding(
+                        end = 6.dp
+                    )
+                    .clip(
+                        RoundedCornerShape(
+                            24.dp
                         )
                     )
-            },
-            label =
-                "xmoMiniControls"
-        ) { showingClose ->
-
-            if (showingClose) {
-                Box(
+                    .background(
+                        xmoMiniControlSurface(
+                            theme
+                        )
+                    )
+                    .border(
+                        width = .6.dp,
+                        color =
+                            xmoMiniBorder(theme),
+                        shape =
+                            RoundedCornerShape(
+                                24.dp
+                            )
+                    ),
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(38.dp)
+                        .pointerInput(
+                            liked
+                        ) {
+                            detectTapGestures {
+                                toggleLike()
+                            }
+                        },
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                Icon(
+                    imageVector =
+                        Icons.Rounded.Favorite,
+                    contentDescription =
+                        if (liked) {
+                            "Unlike"
+                        } else {
+                            "Like"
+                        },
+                    tint =
+                        if (liked) {
+                            accent
+                        } else {
+                            colors.icon
+                        },
                     modifier =
-                        Modifier
-                            .padding(
-                                end = 7.dp
-                            )
-                            .size(44.dp)
-                            .clip(
-                                RoundedCornerShape(
-                                    22.dp
-                                )
-                            )
-                            .background(
-                                xmoMiniControlSurface(
-                                    theme
-                                )
-                            )
-                            .pointerInput(Unit) {
-                                detectTapGestures {
-                                    close()
-                                }
-                            },
-                    contentAlignment =
-                        Alignment.Center
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Rounded.Close,
-                        contentDescription =
-                            "Close player",
-                        tint =
+                        Modifier.size(18.dp)
+                )
+            }
+
+            Box(
+                modifier =
+                    Modifier
+                        .size(42.dp)
+                        .pointerInput(
+                            state.isPlaying
+                        ) {
+                            detectTapGestures {
+                                togglePlay()
+                            }
+                        },
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                if (state.isPlaying) {
+                    XmoMiniPauseIcon(
+                        color =
                             colors.text,
                         modifier =
-                            Modifier.size(
-                                22.dp
-                            )
+                            Modifier.size(18.dp)
                     )
-                }
-            } else {
-                Row(
-                    modifier =
-                        Modifier
-                            .padding(
-                                end = 6.dp
-                            )
-                            .clip(
-                                RoundedCornerShape(
-                                    24.dp
-                                )
-                            )
-                            .background(
-                                xmoMiniControlSurface(
-                                    theme
-                                )
-                            )
-                            .border(
-                                width = .6.dp,
-                                color =
-                                    xmoMiniBorder(
-                                        theme
-                                    ),
-                                shape =
-                                    RoundedCornerShape(
-                                        24.dp
-                                    )
-                            ),
-                    verticalAlignment =
-                        Alignment.CenterVertically
-                ) {
-                    Box(
+                } else {
+                    XmoMiniPlayIcon(
+                        color =
+                            colors.text,
                         modifier =
-                            Modifier
-                                .size(38.dp)
-                                .pointerInput(
-                                    liked
-                                ) {
-                                    detectTapGestures {
-                                        toggleLike()
-                                    }
-                                },
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-                        Icon(
-                            imageVector =
-                                Icons.Rounded.Favorite,
-                            contentDescription =
-                                if (liked) {
-                                    "Unlike"
-                                } else {
-                                    "Like"
-                                },
-                            tint =
-                                if (liked) {
-                                    accent
-                                } else {
-                                    colors.icon
-                                },
-                            modifier =
-                                Modifier.size(
-                                    18.dp
-                                )
-                        )
-                    }
-
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(42.dp)
-                                .pointerInput(
-                                    state.isPlaying
-                                ) {
-                                    detectTapGestures {
-                                        togglePlay()
-                                    }
-                                },
-                        contentAlignment =
-                            Alignment.Center
-                    ) {
-                        if (state.isPlaying) {
-                            XmoMiniPauseIcon(
-                                color =
-                                    colors.text,
-                                modifier =
-                                    Modifier.size(
-                                        18.dp
-                                    )
-                            )
-                        } else {
-                            XmoMiniPlayIcon(
-                                color =
-                                    colors.text,
-                                modifier =
-                                    Modifier.size(
-                                        19.dp
-                                    )
-                            )
-                        }
-                    }
+                            Modifier.size(19.dp)
+                    )
                 }
             }
         }
@@ -513,24 +432,24 @@ private fun XmoMiniPlayIcon(
 ) {
     Canvas(modifier) {
         val path =
-            androidx.compose.ui.graphics.Path()
+            Path().apply {
+                moveTo(
+                    size.width * .30f,
+                    size.height * .20f
+                )
 
-        path.moveTo(
-            size.width * .30f,
-            size.height * .20f
-        )
+                lineTo(
+                    size.width * .78f,
+                    size.height * .50f
+                )
 
-        path.lineTo(
-            size.width * .78f,
-            size.height * .50f
-        )
+                lineTo(
+                    size.width * .30f,
+                    size.height * .80f
+                )
 
-        path.lineTo(
-            size.width * .30f,
-            size.height * .80f
-        )
-
-        path.close()
+                close()
+            }
 
         drawPath(
             path = path,
