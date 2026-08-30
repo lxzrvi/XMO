@@ -1,11 +1,14 @@
 package com.xmo.music.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -13,10 +16,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
@@ -25,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
 import com.xmo.music.data.UserCategory
+import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 
 @Composable
@@ -32,8 +42,12 @@ internal fun HomeCategories(
     songs: List<Song>,
     categories: List<UserCategory>,
     c: HomeColors,
+    back: () -> Unit,
+    create: () -> Unit,
     open: (UserCategory) -> Unit
 ) {
+    BackHandler(onBack = back)
+
     val songsById =
         remember(songs) {
             songs.associateBy { it.id }
@@ -42,21 +56,58 @@ internal fun HomeCategories(
     Column(
         Modifier.fillMaxSize()
     ) {
-        Text(
-            text = "Categories",
-            color = c.text,
-            fontFamily = XmoFont.bold,
-            fontSize = 21.sp,
-            modifier = Modifier.padding(
-                start = 16.dp,
-                top = 12.dp,
-                bottom = 12.dp
-            )
-        )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 16.dp,
+                    end = 12.dp,
+                    top = 10.dp,
+                    bottom = 10.dp
+                ),
+            verticalAlignment =
+                Alignment.CenterVertically
+        ) {
+            Column(
+                Modifier.weight(1f)
+            ) {
+                Text(
+                    text = "Categories",
+                    color = c.text,
+                    fontFamily = XmoFont.bold,
+                    fontSize = 21.sp
+                )
+
+                Text(
+                    text = "${categories.size} categories",
+                    color = c.sub,
+                    fontFamily = XmoFont.normal,
+                    fontSize = 9.sp
+                )
+            }
+
+            Box(
+                Modifier
+                    .background(
+                        LocalXmoAccent.current.copy(
+                            alpha = .14f
+                        ),
+                        CircleShape
+                    )
+            ) {
+                IconButton(onClick = create) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Create category",
+                        tint = LocalXmoAccent.current
+                    )
+                }
+            }
+        }
 
         if (categories.isEmpty()) {
             HomeEmpty(
-                "No categories yet",
+                "Create your first category",
                 c
             )
             return
@@ -102,12 +153,11 @@ internal fun HomeCategories(
                         fontFamily = XmoFont.medium,
                         fontSize = 11.sp,
                         maxLines = 1,
-                        modifier =
-                            Modifier.padding(
-                                top = 6.dp,
-                                start = 3.dp,
-                                end = 3.dp
-                            )
+                        modifier = Modifier.padding(
+                            top = 6.dp,
+                            start = 3.dp,
+                            end = 3.dp
+                        )
                     )
                 }
             }
@@ -120,7 +170,7 @@ private fun CategoryCollage(
     covers: List<Song>,
     c: HomeColors
 ) {
-    androidx.compose.foundation.layout.BoxWithConstraints(
+    BoxWithConstraints(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -133,42 +183,29 @@ private fun CategoryCollage(
                 .fillMaxWidth()
                 .height(maxWidth)
         ) {
-            repeat(4) { index ->
-                val x =
-                    if (index % 2 == 0) {
-                        0.dp
-                    } else {
-                        half
-                    }
-
-                val y =
-                    if (index < 2) {
-                        0.dp
-                    } else {
-                        half
-                    }
-
-                Box(
-                    Modifier
+            covers.forEachIndexed { index, song ->
+                AsyncImage(
+                    model = song.artwork,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
                         .padding(
-                            start = x,
-                            top = y
+                            start =
+                                if (index % 2 == 0) {
+                                    0.dp
+                                } else {
+                                    half
+                                },
+                            top =
+                                if (index < 2) {
+                                    0.dp
+                                } else {
+                                    half
+                                }
                         )
                         .height(half)
                         .fillMaxWidth(.5f)
-                        .background(c.button)
-                ) {
-                    covers.getOrNull(index)?.let {
-                        AsyncImage(
-                            model = it.artwork,
-                            contentDescription = null,
-                            modifier =
-                                Modifier.fillMaxSize(),
-                            contentScale =
-                                ContentScale.Crop
-                        )
-                    }
-                }
+                )
             }
         }
     }
