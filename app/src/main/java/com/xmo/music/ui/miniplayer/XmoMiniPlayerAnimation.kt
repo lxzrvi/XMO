@@ -21,17 +21,12 @@ internal enum class XmoMiniAxis {
 
 internal object XmoMiniPlayerAnimation {
 
-    const val axisThresholdPx =
-        9f
+    const val axisThresholdPx = 9f
+    const val horizontalThresholdPx = 48f
+    const val openThresholdPx = -46f
+    const val closeThresholdPx = 44f
 
-    const val horizontalThresholdPx =
-        48f
-
-    const val openThresholdPx =
-        -46f
-
-    const val closeThresholdPx =
-        44f
+    const val previewCommitDelayMs = 320L
 
     fun horizontalResistance(
         value: Float
@@ -45,10 +40,8 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             free +
-                (distance - free) *
-                .07f
-            ) *
-            sign(value)
+                (distance - free) * .07f
+            ) * sign(value)
     }
 
     fun verticalResistance(
@@ -70,15 +63,10 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             free +
-                (distance - free) *
-                .075f
-            ) *
-            sign(value)
+                (distance - free) * .075f
+            ) * sign(value)
     }
 
-    /*
-     * Shared MiniPlayer <-> Now Playing spring family.
-     */
     private val playerTransitionSpec:
         AnimationSpec<Float>
         get() =
@@ -88,16 +76,13 @@ internal object XmoMiniPlayerAnimation {
             )
 
     val riseSpec: AnimationSpec<Float>
-        get() =
-            playerTransitionSpec
+        get() = playerTransitionSpec
 
     val openExitSpec: AnimationSpec<Float>
-        get() =
-            playerTransitionSpec
+        get() = playerTransitionSpec
 
     val closeExitSpec: AnimationSpec<Float>
-        get() =
-            playerTransitionSpec
+        get() = playerTransitionSpec
 
     val horizontalReturnSpec: AnimationSpec<Float>
         get() =
@@ -114,32 +99,65 @@ internal object XmoMiniPlayerAnimation {
             )
 
     /*
-     * =========================================================
-     * SONG METADATA CHANGE
-     * =========================================================
-     *
-     * Old metadata falls downward.
-     * New metadata enters from above.
-     *
-     * AnimatedContent itself clips inside the metadata viewport.
+     * Short content motion is deliberate:
+     * rapid swipes can retarget this without building a slow
+     * visual backlog.
      */
-    fun metadataChange(): ContentTransform =
-        (
-            fadeIn(
-                animationSpec =
-                    tween(
-                        durationMillis = 190,
-                        easing =
-                            FastOutSlowInEasing
+    fun metadataChange(
+        direction: Int
+    ): ContentTransform {
+        val normalized =
+            direction.coerceIn(-1, 1)
+
+        if (normalized == 0) {
+            return fadeIn(
+                tween(130)
+            )
+                .togetherWith(
+                    fadeOut(
+                        tween(110)
                     )
+                )
+        }
+
+        /*
+         * +1 = NEXT:
+         * old goes down, new comes from top.
+         *
+         * -1 = PREVIOUS:
+         * old goes up, new comes from bottom.
+         */
+        val enter =
+            if (normalized > 0) {
+                { height: Int ->
+                    -height
+                }
+            } else {
+                { height: Int ->
+                    height
+                }
+            }
+
+        val exit =
+            if (normalized > 0) {
+                { height: Int ->
+                    height
+                }
+            } else {
+                { height: Int ->
+                    -height
+                }
+            }
+
+        return (
+            fadeIn(
+                tween(125)
             ) +
                 slideInVertically(
-                    initialOffsetY = {
-                        -it
-                    },
+                    initialOffsetY = enter,
                     animationSpec =
                         tween(
-                            durationMillis = 230,
+                            durationMillis = 165,
                             easing =
                                 FastOutSlowInEasing
                         )
@@ -147,63 +165,32 @@ internal object XmoMiniPlayerAnimation {
             )
             .togetherWith(
                 fadeOut(
-                    animationSpec =
-                        tween(
-                            durationMillis = 160
-                        )
+                    tween(105)
                 ) +
                     slideOutVertically(
-                        targetOffsetY = {
-                            it
-                        },
+                        targetOffsetY = exit,
                         animationSpec =
                             tween(
-                                durationMillis = 210,
+                                durationMillis = 145,
                                 easing =
                                     FastOutSlowInEasing
                             )
                     )
             )
+    }
 
     /*
-     * Artwork uses the same compact duration family but moves
-     * horizontally inside its own clipped 50dp square.
+     * Artwork never moves position.
+     * Only old/new cover alpha changes.
      */
-    fun artworkChange(): ContentTransform =
-        (
-            fadeIn(
-                animationSpec =
-                    tween(190)
-            ) +
-                androidx.compose.animation
-                    .slideInHorizontally(
-                        initialOffsetX = {
-                            it
-                        },
-                        animationSpec =
-                            tween(
-                                durationMillis = 230,
-                                easing =
-                                    FastOutSlowInEasing
-                            )
-                    )
-            )
+    fun artworkChange():
+        ContentTransform =
+        fadeIn(
+            tween(145)
+        )
             .togetherWith(
                 fadeOut(
-                    animationSpec =
-                        tween(160)
-                ) +
-                    androidx.compose.animation
-                        .slideOutHorizontally(
-                            targetOffsetX = {
-                                -it
-                            },
-                            animationSpec =
-                                tween(
-                                    durationMillis = 210,
-                                    easing =
-                                        FastOutSlowInEasing
-                                )
-                        )
+                    tween(120)
+                )
             )
 }
