@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,10 +32,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -46,6 +49,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
+import com.xmo.music.ui.LocalXmoAccent
+import com.xmo.music.ui.XmoFont
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -97,14 +102,14 @@ internal fun HomeAllSongs(
 
     val grid = rememberLazyGridState()
     val scope = rememberCoroutineScope()
-
     val slots = ((songs.size + 11) / 12) * 12
 
     LaunchedEffect(arrow.click) {
         if (arrow.click > 0) {
             val column = grid.firstVisibleItemIndex / 3
             val maxColumn = slots / 3 - 1
-            val target = (column + 1).coerceAtMost(maxColumn)
+            val target =
+                (column + 1).coerceAtMost(maxColumn)
 
             if (target > column) {
                 grid.animateScrollToItem(target * 3)
@@ -129,8 +134,11 @@ internal fun HomeAllSongs(
     ) {
         val edge = 8.dp
         val gap = 8.dp
-        val cardWidth = (maxWidth - edge * 2 - gap * 3) / 4
-        val gridHeight = (cardWidth + 37.dp) * 3 + gap * 2
+        val cardWidth =
+            (maxWidth - edge * 2 - gap * 3) / 4
+
+        val gridHeight =
+            (cardWidth + 37.dp) * 3 + gap * 2
 
         LazyHorizontalGrid(
             rows = GridCells.Fixed(3),
@@ -150,7 +158,8 @@ internal fun HomeAllSongs(
                 val local = slot % 12
                 val row = local % 3
                 val column = local / 3
-                val sourceIndex = page * 12 + row * 4 + column
+                val sourceIndex =
+                    page * 12 + row * 4 + column
 
                 Box(
                     Modifier.width(cardWidth)
