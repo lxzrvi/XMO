@@ -42,7 +42,8 @@ internal fun HomeHeader(
     c: HomeColors,
     refresh: () -> Unit,
     openMenu: () -> Unit,
-    openProfile: () -> Unit
+    openProfile: () -> Unit,
+    modifier: Modifier = Modifier
 ) {
     val profile = LocalXmoProfile.current
     val accent = LocalXmoAccent.current
@@ -69,7 +70,7 @@ internal fun HomeHeader(
     }
 
     Row(
-        Modifier
+        modifier
             .fillMaxWidth()
             .padding(
                 start = 16.dp,
