@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
 import com.xmo.music.data.UserCategory
+import com.xmo.music.ui.LocalXmoAccent
+import com.xmo.music.ui.XmoFont
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
