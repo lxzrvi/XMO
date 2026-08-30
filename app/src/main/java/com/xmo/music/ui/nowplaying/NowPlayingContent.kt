@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -25,7 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
@@ -118,13 +118,6 @@ internal fun NowPlayingContent(
                         }
                     }
                 }
-                .onSizeChanged {
-                    updateScreenHeight(
-                        it.height
-                            .toFloat()
-                            .coerceAtLeast(1f)
-                    )
-                }
                 .graphicsLayer {
                     translationY =
                         playerY.value +
@@ -145,7 +138,6 @@ internal fun NowPlayingContent(
                                             1f
                                         )
                                 ).dp,
-
                         topEnd =
                             (
                                 88f *
@@ -162,12 +154,9 @@ internal fun NowPlayingContent(
                 )
     ) {
         PlayerBackground(
-            dominant =
-                displayColor,
-            deep =
-                deep,
-            theme =
-                theme
+            dominant = displayColor,
+            deep = deep,
+            theme = theme
         )
 
         Column(
@@ -177,18 +166,15 @@ internal fun NowPlayingContent(
                     .statusBarsPadding()
         ) {
             PlayerHeader(
-                source =
-                    source,
+                source = source,
                 sourceIsCategory =
                     sourceIsCategory,
                 foreground =
                     themeColors.overlayText,
-                playerY =
-                    playerY,
+                playerY = playerY,
                 screenHeight =
                     screenHeight,
-                close =
-                    closePlayer,
+                close = closePlayer,
                 dismissAfterDrag =
                     dismissAfterDrag,
                 share =
@@ -200,6 +186,9 @@ internal fun NowPlayingContent(
                 }
             )
 
+            /*
+             * Cover position remains unchanged.
+             */
             Spacer(
                 Modifier.height(
                     93.dp
@@ -248,25 +237,20 @@ internal fun NowPlayingContent(
                 pickLyrics =
                     pickLyrics,
                 fullscreenLyrics = {
-                    setArtworkLyrics(
-                        true
-                    )
-
-                    setFullLyrics(
-                        true
-                    )
+                    setArtworkLyrics(true)
+                    setFullLyrics(true)
                 }
             )
 
             /*
-             * Panel brought upward from 95dp gap.
+             * Was 76dp.
              *
-             * Artwork still breathes, but the lower section has
-             * enough usable height for XMO/footer.
+             * Cover has not moved. Only panel top starts 16dp
+             * earlier.
              */
             Spacer(
                 Modifier.height(
-                    76.dp
+                    60.dp
                 )
             )
 
@@ -291,6 +275,11 @@ internal fun NowPlayingContent(
                             bottom = 1.dp
                         )
             ) {
+                /*
+                 * Only the action-row portion is visually pulled
+                 * toward the new panel top. Title/body positions
+                 * are compensated inside PlayerInfo.
+                 */
                 PlayerInfo(
                     title =
                         state.title,
@@ -352,56 +341,65 @@ internal fun NowPlayingContent(
                     }
                 )
 
-                PlayerBody(
-                    position =
-                        state.position,
-                    duration =
-                        state.duration,
-                    isPlaying =
-                        state.isPlaying,
-                    hasPrevious =
-                        state.hasPrevious,
-                    hasNext =
-                        state.hasNext,
-                    shuffleEnabled =
-                        state.shuffleEnabled,
-                    repeatMode =
-                        state.repeatMode,
-                    colors =
-                        colors,
-                    accent =
-                        accent,
-                    border =
-                        themeColors.border,
-                    controlForeground =
-                        themeColors.controls,
-                    playBackground =
-                        themeColors.playBackground,
-                    seekTo =
-                        seekTo,
-                    togglePlay =
-                        togglePlay,
-                    previous =
-                        previous,
-                    next =
-                        next,
-                    toggleShuffle =
-                        toggleShuffle,
-                    cycleRepeat =
-                        cycleRepeat
-                )
+                /*
+                 * Body is compensated for the 16dp panel-edge
+                 * movement so progress/transport do not jump up.
+                 */
+                Box(
+                    modifier =
+                        Modifier.offset(
+                            y = 16.dp
+                        )
+                ) {
+                    PlayerBody(
+                        position =
+                            state.position,
+                        duration =
+                            state.duration,
+                        isPlaying =
+                            state.isPlaying,
+                        hasPrevious =
+                            state.hasPrevious,
+                        hasNext =
+                            state.hasNext,
+                        shuffleEnabled =
+                            state.shuffleEnabled,
+                        repeatMode =
+                            state.repeatMode,
+                        colors =
+                            colors,
+                        accent =
+                            accent,
+                        border =
+                            themeColors.border,
+                        controlForeground =
+                            themeColors.controls,
+                        playBackground =
+                            themeColors.playBackground,
+                        seekTo =
+                            seekTo,
+                        togglePlay =
+                            togglePlay,
+                        previous =
+                            previous,
+                        next =
+                            next,
+                        toggleShuffle =
+                            toggleShuffle,
+                        cycleRepeat =
+                            cycleRepeat
+                    )
+                }
             }
         }
 
         when (overlay) {
             PlayerOverlay.Queue -> {
                 QueueSheet(
-                    queue =
-                        queue,
+                    queue = queue,
                     currentSongId =
                         state.currentSongId,
-                    colors =
-                        colors,
+                    colors = colors,
                     playIndex =
                         playQueueIndex,
                     dismiss = {
@@ -412,20 +410,16 @@ internal fun NowPlayingContent(
 
             PlayerOverlay.Options -> {
                 SongOptionsBox(
-                    song =
-                        currentSong,
+                    song = currentSong,
                     categories =
                         categories,
-                    colors =
-                        colors,
-                    liked =
-                        liked,
+                    colors = colors,
+                    liked = liked,
                     close = {
                         setOverlay(null)
                     },
-                    toggleLike = {
-                        toggleLike()
-                    },
+                    toggleLike =
+                        toggleLike,
                     share = {
                         shareCurrentSong()
                         setOverlay(null)
@@ -449,10 +443,10 @@ internal fun NowPlayingContent(
 
             PlayerOverlay.Sleep -> {
                 SleepTimerBox(
-                    colors =
-                        colors,
+                    colors = colors,
                     active =
-                        state.sleepTimerRemainingMs >
+                        state
+                            .sleepTimerRemainingMs >
                             0L,
                     dismiss = {
                         setOverlay(null)
@@ -461,14 +455,8 @@ internal fun NowPlayingContent(
                             duration,
                             label ->
 
-                        setSleepTotalMs(
-                            duration
-                        )
-
-                        setSleepTimer(
-                            duration
-                        )
-
+                        setSleepTotalMs(duration)
+                        setSleepTimer(duration)
                         setOverlay(null)
 
                         setPop(
@@ -493,12 +481,9 @@ internal fun NowPlayingContent(
 
             PlayerOverlay.Details -> {
                 SongDetailsBox(
-                    song =
-                        currentSong,
-                    album =
-                        state.album,
-                    colors =
-                        colors,
+                    song = currentSong,
+                    album = state.album,
+                    colors = colors,
                     close = {
                         setOverlay(null)
                     }
@@ -507,12 +492,10 @@ internal fun NowPlayingContent(
 
             PlayerOverlay.Artist -> {
                 ArtistInfoBox(
-                    artist =
-                        state.artist,
+                    artist = state.artist,
                     trackCount =
                         artistTrackCount,
-                    colors =
-                        colors,
+                    colors = colors,
                     close = {
                         setOverlay(null)
                     }
@@ -524,7 +507,7 @@ internal fun NowPlayingContent(
         }
 
         /*
-         * Working fullscreen animation intentionally preserved.
+         * Existing fullscreen animation preserved.
          */
         AnimatedVisibility(
             visible =
@@ -549,27 +532,19 @@ internal fun NowPlayingContent(
                     )
         ) {
             FullLyrics(
-                lyrics =
-                    lyrics,
-                position =
-                    state.position,
-                duration =
-                    state.duration,
-                title =
-                    state.title,
-                artist =
-                    state.artist,
+                lyrics = lyrics,
+                position = state.position,
+                duration = state.duration,
+                title = state.title,
+                artist = state.artist,
                 artwork =
                     currentSong?.artwork
                         ?: fallbackArtwork,
                 dominant =
                     displayColor,
-                deep =
-                    deep,
-                theme =
-                    theme,
-                accent =
-                    accent,
+                deep = deep,
+                theme = theme,
+                accent = accent,
                 isPlaying =
                     state.isPlaying,
                 canPrevious =
@@ -593,10 +568,8 @@ internal fun NowPlayingContent(
 
         pop?.let {
             XmoPop(
-                message =
-                    it.text,
-                theme =
-                    theme,
+                message = it.text,
+                theme = theme,
                 modifier =
                     Modifier
                         .align(
