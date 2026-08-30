@@ -29,9 +29,11 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
+import com.xmo.music.data.UserCategory
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.homeColors
+import com.xmo.music.ui.nowplaying.CategoryPickerBox
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -43,13 +45,23 @@ fun XmoMiniPlayer(
     state: PlaybackState,
     theme: XmoTheme,
     queue: List<Song>,
+    categories: List<UserCategory>,
     riseKey: Int,
     likedSongIds: Set<Long>,
     openPlayer: () -> Unit,
     closePlayer: () -> Unit,
     togglePlay: () -> Unit,
     toggleLike: (Long) -> Unit,
-    playQueueIndex: (Int) -> Unit
+    playQueueIndex: (Int) -> Unit,
+    setSongInCategory: (
+        Song,
+        String,
+        Boolean
+    ) -> Unit,
+    createCategory: (
+        String,
+        Song
+    ) -> UserCategory?
 ) {
     if (
         state.currentSongId == null ||
@@ -94,10 +106,6 @@ fun XmoMiniPlayer(
             Animatable(0f)
         }
 
-    /*
-     * Preview index is independent from Media3 until debounce
-     * commits the final destination.
-     */
     var previewIndex by
         remember(
             state.currentSongId,
@@ -118,36 +126,13 @@ fun XmoMiniPlayer(
             mutableIntStateOf(0)
         }
 
-    /*
-     * If Media3 confirms a committed preview, adopt its real
-     * index without creating another content transition.
-     */
-    LaunchedEffect(
-        state.currentSongId,
-        realIndex
-    ) {
-        if (
-            previewIndex ==
-            realIndex
-        ) {
-            return@LaunchedEffect
+    var categoriesSongId by
+        remember {
+            mutableStateOf<Long?>(
+                null
+            )
         }
 
-        /*
-         * Do not overwrite a pending preview. Its revision effect
-         * owns the upcoming commit.
-         */
-        if (previewRevision == 0) {
-            previewIndex =
-                realIndex
-
-            transitionDirection = 0
-        }
-    }
-
-    /*
-     * One playback command after the user stops rapid swiping.
-     */
     LaunchedEffect(
         previewRevision
     ) {
@@ -164,8 +149,7 @@ fun XmoMiniPlayer(
         )
 
         if (
-            revision !=
-            previewRevision
+            revision != previewRevision
         ) {
             return@LaunchedEffect
         }
@@ -186,11 +170,17 @@ fun XmoMiniPlayer(
     }
 
     /*
-     * =========================================================
-     * POSITION
-     * =========================================================
+     * NavBar will move to a 20dp visual bottom gap in Step 2.
+     *
+     * Visible NavBar:
+     * bottom 20
+     * height 64
+     * top 84
+     *
+     * MiniPlayer bottom:
+     * 84 + 20
+     * = 104dp.
      */
-
     val navigationBottomPx =
         WindowInsets.navigationBars
             .getBottom(density)
@@ -202,7 +192,7 @@ fun XmoMiniPlayer(
     val normalBottomPx =
         navigationBottomPx +
             with(density) {
-                144.dp.toPx()
+                104.dp.toPx()
             }
 
     val keyboardBottomPx =
@@ -223,14 +213,14 @@ fun XmoMiniPlayer(
         }
 
     /*
-     * =========================================================
-     * RETURN FROM NOW PLAYING
-     * =========================================================
+     * Shorter entrance distance because the final MiniPlayer
+     * location itself moved lower.
+     *
+     * Spring speed is unchanged.
      */
-
     val riseDistance =
         with(density) {
-            150.dp.toPx()
+            112.dp.toPx()
         }
 
     val entranceY =
@@ -298,7 +288,7 @@ fun XmoMiniPlayer(
     val hiddenTarget =
         hiddenThreshold +
             with(density) {
-                110.dp.toPx()
+                86.dp.toPx()
             }
 
     suspend fun awaitHidden() {
@@ -310,12 +300,6 @@ fun XmoMiniPlayer(
         }
     }
 
-    /*
-     * Commit currently previewed song immediately when opening.
-     *
-     * No 320ms wait should occur after the user explicitly asks
-     * for Now Playing.
-     */
     fun commitPreviewNow() {
         val target =
             previewIndex
@@ -402,6 +386,12 @@ fun XmoMiniPlayer(
         )
             ?: return
 
+    val inCategory =
+        categories.any {
+            visualSong.id in
+                it.songIds
+        }
+
     Box(
         modifier =
             Modifier
@@ -443,6 +433,7 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
+
                                 moved = false
                             },
 
@@ -452,8 +443,11 @@ fun XmoMiniPlayer(
 
                                 change.consume()
 
-                                rawX += amount.x
-                                rawY += amount.y
+                                rawX +=
+                                    amount.x
+
+                                rawY +=
+                                    amount.y
 
                                 if (
                                     axis ==
@@ -522,6 +516,7 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
+
                                 axis =
                                     XmoMiniAxis.None
 
@@ -531,7 +526,7 @@ fun XmoMiniPlayer(
                                             y.snapTo(0f)
 
                                             /*
-                                             * RIGHT -> LEFT = NEXT
+                                             * Right -> Left = NEXT
                                              */
                                             val goNext =
                                                 finalX <
@@ -539,7 +534,7 @@ fun XmoMiniPlayer(
                                                         .horizontalThresholdPx
 
                                             /*
-                                             * LEFT -> RIGHT = PREVIOUS
+                                             * Left -> Right = PREVIOUS
                                              */
                                             val goPrevious =
                                                 finalX >
@@ -551,8 +546,7 @@ fun XmoMiniPlayer(
                                                     previewIndex <
                                                     queue.lastIndex -> {
 
-                                                    transitionDirection =
-                                                        1
+                                                    transitionDirection = 1
 
                                                     previewIndex++
 
@@ -563,8 +557,7 @@ fun XmoMiniPlayer(
                                                     previewIndex >
                                                     0 -> {
 
-                                                    transitionDirection =
-                                                        -1
+                                                    transitionDirection = -1
 
                                                     previewIndex--
 
@@ -573,9 +566,9 @@ fun XmoMiniPlayer(
                                             }
 
                                             /*
-                                             * Visual card itself always
-                                             * returns immediately. Playback
-                                             * is not waiting on this spring.
+                                             * Return card position separately.
+                                             * Playback commit debounce does not
+                                             * wait for this animation.
                                              */
                                             launch {
                                                 x.animateTo(
@@ -596,12 +589,14 @@ fun XmoMiniPlayer(
                                                 finalY <=
                                                     XmoMiniPlayerAnimation
                                                         .openThresholdPx -> {
+
                                                     openOrdered()
                                                 }
 
                                                 finalY >=
                                                     XmoMiniPlayerAnimation
                                                         .closeThresholdPx -> {
+
                                                     closeOrdered()
                                                 }
 
@@ -621,6 +616,7 @@ fun XmoMiniPlayer(
                                         XmoMiniAxis.None -> {
                                             x.snapTo(0f)
                                             y.snapTo(0f)
+
                                             moved = false
                                         }
                                     }
@@ -645,8 +641,10 @@ fun XmoMiniPlayer(
 
                                     rawX = 0f
                                     rawY = 0f
+
                                     axis =
                                         XmoMiniAxis.None
+
                                     moved = false
                                 }
                             }
@@ -654,8 +652,7 @@ fun XmoMiniPlayer(
                     }
         ) {
             XmoMiniPlayerCard(
-                song =
-                    visualSong,
+                song = visualSong,
                 isPlaying =
                     state.isPlaying,
                 position =
@@ -682,6 +679,8 @@ fun XmoMiniPlayer(
                 liked =
                     visualSong.id in
                         likedSongIds,
+                inCategory =
+                    inCategory,
                 transitionDirection =
                     transitionDirection,
                 moved = moved,
@@ -692,6 +691,10 @@ fun XmoMiniPlayer(
                     toggleLike(
                         visualSong.id
                     )
+                },
+                openCategories = {
+                    categoriesSongId =
+                        visualSong.id
                 },
                 open = {
                     if (!moved) {
@@ -715,5 +718,46 @@ fun XmoMiniPlayer(
                         }
             )
         }
+
+        categoriesSongId
+            ?.let { id ->
+                queue
+                    .firstOrNull {
+                        it.id == id
+                    }
+                    ?.let { categorySong ->
+
+                        CategoryPickerBox(
+                            song =
+                                categorySong,
+                            categories =
+                                categories,
+                            colors =
+                                colors,
+                            close = {
+                                categoriesSongId =
+                                    null
+                            },
+                            setCategory = {
+                                    category,
+                                    added ->
+
+                                setSongInCategory(
+                                    categorySong,
+                                    category.id,
+                                    added
+                                )
+                            },
+                            createCategory = {
+                                name ->
+
+                                createCategory(
+                                    name,
+                                    categorySong
+                                ) != null
+                            }
+                        )
+                    }
+            }
     }
 }
