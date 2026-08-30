@@ -97,9 +97,13 @@ internal fun PlayerArtwork(
         )
     }
 
-    LaunchedEffect(
-        currentId
-    ) {
+    /*
+     * Confirmed Media3 transition.
+     *
+     * Frozen visual neighbors remain on screen until the
+     * confirmed destination has completed its travel.
+     */
+    LaunchedEffect(currentId) {
         val oldId =
             carousel.visualSongId
 
@@ -115,6 +119,11 @@ internal fun PlayerArtwork(
             carousel.width
                 .coerceAtLeast(1f)
 
+        /*
+         * Manual drag already moved the real adjacent artwork to
+         * the destination. Media3 confirmation only commits the
+         * new frozen window.
+         */
         if (
             carousel.manualDirection != 0 &&
             carousel.manualSongId == oldId
@@ -134,14 +143,9 @@ internal fun PlayerArtwork(
 
         if (!carousel.transactionActive) {
             /*
-             * Prefer the identity of the frozen adjacent artwork.
-             *
-             * This handles queue wrap:
-             * last -> first remains NEXT,
-             * first -> last remains PREVIOUS.
-             *
-             * Index comparison is only the fallback for a normal
-             * adjacent Media3 transition.
+             * Resolve adjacent direction from the actual frozen
+             * artwork first. This also handles last -> first and
+             * first -> last queue wraps.
              */
             val direction =
                 when {
@@ -196,7 +200,9 @@ internal fun PlayerArtwork(
                             pageDistance
                         },
                     animationSpec =
-                        tween(340)
+                        tween(
+                            durationMillis = 340
+                        )
                 )
 
                 carousel.finishAutomatic(
@@ -209,6 +215,10 @@ internal fun PlayerArtwork(
 
                 carousel.x.snapTo(0f)
             } else {
+                /*
+                 * A genuine non-adjacent external jump must never
+                 * fake a neighboring cover transition.
+                 */
                 carousel.adoptExternalWindow(
                     id = currentId,
                     index = currentIndex,
@@ -222,6 +232,12 @@ internal fun PlayerArtwork(
         }
     }
 
+    /*
+     * This remains the exact approved artwork square.
+     *
+     * Nothing here changes the centered cover's size or vertical
+     * position.
+     */
     BoxWithConstraints(
         modifier =
             Modifier
@@ -244,17 +260,27 @@ internal fun PlayerArtwork(
                 .toFloat()
                 .coerceAtLeast(1f)
 
+        /*
+         * Complete center-to-center page travel.
+         *
+         * Neighbor covers live outside the centered square at
+         * rest. Since this host does not clip horizontally, they
+         * enter from the screen-side area and leave toward the
+         * opposite screen edge instead of appearing at the cover
+         * boundary.
+         */
         val pageDistance =
             coverWidth +
                 gapPx
 
-        LaunchedEffect(
-            pageDistance
-        ) {
+        LaunchedEffect(pageDistance) {
             carousel.width =
                 pageDistance
         }
 
+        /*
+         * Existing artwork <-> lyrics animation is retained.
+         */
         val lyricsTransition =
             remember {
                 Animatable(
@@ -266,9 +292,7 @@ internal fun PlayerArtwork(
                 )
             }
 
-        LaunchedEffect(
-            showLyrics
-        ) {
+        LaunchedEffect(showLyrics) {
             lyricsTransition.animateTo(
                 targetValue =
                     if (showLyrics) {
@@ -289,18 +313,13 @@ internal fun PlayerArtwork(
                 )
 
         /*
-         * Shared rounded clip means the transition can never
-         * expose a thin host strip around either child.
+         * Intentionally NOT clipped here. Horizontal carousel
+         * overflow is allowed to render into the side areas.
          */
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .clip(
-                        RoundedCornerShape(
-                            24.dp
-                        )
-                    )
                     .pointerInput(
                         currentId,
                         canPrevious,
@@ -335,10 +354,12 @@ internal fun PlayerArtwork(
                                     return@detectDragGestures
                                 }
 
-                                rawDragX += drag.x
+                                rawDragX +=
+                                    drag.x
 
                                 if (
-                                    abs(rawDragX) > 6f
+                                    abs(rawDragX) >
+                                    6f
                                 ) {
                                     change.consume()
 
@@ -400,7 +421,10 @@ internal fun PlayerArtwork(
                                                 targetValue =
                                                     -pageDistance,
                                                 animationSpec =
-                                                    tween(250)
+                                                    tween(
+                                                        durationMillis =
+                                                            250
+                                                    )
                                             )
 
                                             nextSong()
@@ -419,7 +443,10 @@ internal fun PlayerArtwork(
                                                 targetValue =
                                                     pageDistance,
                                                 animationSpec =
-                                                    tween(250)
+                                                    tween(
+                                                        durationMillis =
+                                                            250
+                                                    )
                                             )
 
                                             previousSong()
@@ -427,7 +454,8 @@ internal fun PlayerArtwork(
 
                                         else -> {
                                             carousel.x.animateTo(
-                                                targetValue = 0f,
+                                                targetValue =
+                                                    0f,
                                                 animationSpec =
                                                     spring(
                                                         dampingRatio =
@@ -452,7 +480,10 @@ internal fun PlayerArtwork(
                                         carousel.x.animateTo(
                                             targetValue = 0f,
                                             animationSpec =
-                                                tween(180)
+                                                tween(
+                                                    durationMillis =
+                                                        180
+                                                )
                                         )
                                     }
 
@@ -470,6 +501,20 @@ internal fun PlayerArtwork(
                             1f -
                                 lyricsFraction
                         )
+                        .graphicsLayer {
+                            val scale =
+                                1f -
+                                    .018f *
+                                    lyricsFraction
+
+                            scaleX = scale
+                            scaleY = scale
+
+                            /*
+                             * Explicitly keep layer clipping off.
+                             */
+                            clip = false
+                        }
             ) {
                 ArtworkCarousel(
                     current =
@@ -501,15 +546,9 @@ internal fun PlayerArtwork(
                                 lyricsFraction
                             )
                             .graphicsLayer {
-                                /*
-                                 * Lyrics still get a subtle
-                                 * arrival, but overscan slightly
-                                 * rather than becoming smaller
-                                 * than the square host.
-                                 */
                                 val scale =
-                                    1.006f -
-                                        .006f *
+                                    .982f +
+                                        .018f *
                                         lyricsFraction
 
                                 scaleX = scale
@@ -524,7 +563,8 @@ internal fun PlayerArtwork(
                         colors = colors,
                         accent = accent,
                         theme = theme,
-                        pickLyrics = pickLyrics,
+                        pickLyrics =
+                            pickLyrics,
                         fullscreenLyrics =
                             fullscreenLyrics,
                         showArtwork =
@@ -548,8 +588,18 @@ private fun ArtworkCarousel(
     enabled: Boolean,
     toggleLyrics: () -> Unit
 ) {
+    /*
+     * No clipping on this container. Each cover remains exactly
+     * artwork-size but may render outside the center square while
+     * moving.
+     */
     Box(
-        Modifier.fillMaxSize()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    clip = false
+                }
     ) {
         previous?.let {
             Cover(
@@ -561,6 +611,7 @@ private fun ArtworkCarousel(
                             translationX =
                                 x -
                                     pageDistance
+                            clip = false
                         }
             )
         }
@@ -572,6 +623,7 @@ private fun ArtworkCarousel(
                     .fillMaxSize()
                     .graphicsLayer {
                         translationX = x
+                        clip = false
                     }
                     .clickable(
                         interactionSource =
@@ -595,6 +647,7 @@ private fun ArtworkCarousel(
                             translationX =
                                 x +
                                     pageDistance
+                            clip = false
                         }
             )
         }
@@ -631,7 +684,8 @@ private fun Cover(
 
         if (uri == null) {
             Box(
-                Modifier.fillMaxSize(),
+                modifier =
+                    Modifier.fillMaxSize(),
                 contentAlignment =
                     Alignment.Center
             ) {
@@ -641,7 +695,8 @@ private fun Cover(
                         LocalXmoAccent.current,
                     fontFamily =
                         XmoFont.logo,
-                    fontSize = 31.sp
+                    fontSize =
+                        31.sp
                 )
             }
         }
