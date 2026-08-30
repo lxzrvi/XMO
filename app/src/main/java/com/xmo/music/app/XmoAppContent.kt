@@ -37,12 +37,10 @@ internal fun XmoAppContent(
                         state.tab != 0
                     )
     ) {
-        when {
-            state.profileOpen ->
-                actions.closeProfile()
-
-            state.tab != 0 ->
-                actions.selectTab(0)
+        if (state.profileOpen) {
+            actions.closeProfile()
+        } else {
+            actions.selectTab(0)
         }
     }
 
@@ -68,88 +66,79 @@ internal fun XmoAppContent(
                         .zIndex(0f)
                 ) {
                     stateHolder.SaveableStateProvider(
-                        key = "tab_${state.tab}"
+                        "tab_${state.tab}"
                     ) {
                         when (state.tab) {
-                            0 -> {
-                                Home(
-                                    songs = state.songs,
-                                    allowed = state.allowed,
-                                    theme = state.theme,
-                                    hazeState = state.hazeState,
-                                    order = state.order,
-                                    categories = state.categories,
-                                    likedSongIds =
-                                        state.likedSongIds,
-                                    recentPlays =
-                                        state.recentPlays,
-                                    scanning = state.scanning,
-                                    playback = state.playback,
-                                    refresh = {
-                                        if (state.allowed) {
-                                            actions.refreshLibrary()
-                                        } else {
-                                            actions.requestAudioPermission()
-                                        }
-                                    },
-                                    openProfile =
-                                        actions.openProfile,
-                                    saveOrder =
-                                        actions.saveOrder,
-                                    saveCategories =
-                                        actions.saveCategories,
-                                    toggleLike =
-                                        actions.toggleLike,
-                                    playNext =
-                                        actions.playNext,
-                                    removeRecent =
-                                        actions.removeRecent,
-                                    setSongInCategory =
-                                        actions.setSongInCategory,
-                                    onPlaySong =
-                                        actions.playSong
-                                )
-                            }
-
-                            1 -> {
-                                Search(
-                                    songs = state.songs,
-                                    categories =
-                                        state.categories,
-                                    theme = state.theme,
-                                    onPlaySong =
-                                        actions.playSong
-                                )
-                            }
-
-                            else -> {
-                                Settings(
-                                    theme = state.theme,
-                                    appearance =
-                                        state.appearance,
-                                    libraryPreferences =
-                                        state.libraryPreferences,
-                                    playbackPreferences =
-                                        state.playbackPreferences,
-                                    resumeOnHeadphones =
-                                        state.resumeOnHeadphones,
-                                    onAppearanceChanged =
-                                        actions.changeAppearance,
-                                    onLibraryPreferencesChanged =
-                                        actions.changeLibraryPreferences,
-                                    onPlaybackPreferencesChanged =
-                                        actions.changePlaybackPreferences,
-                                    onResumeHeadphonesChanged =
-                                        actions.changeResumeOnHeadphones,
-                                    rescan = {
-                                        if (state.allowed) {
-                                            actions.refreshLibrary()
-                                        } else {
-                                            actions.requestAudioPermission()
-                                        }
+                            0 -> Home(
+                                songs = state.songs,
+                                allowed = state.allowed,
+                                theme = state.theme,
+                                hazeState = state.hazeState,
+                                categories = state.categories,
+                                likedSongIds =
+                                    state.likedSongIds,
+                                recentPlays =
+                                    state.recentPlays,
+                                scanning = state.scanning,
+                                playback = state.playback,
+                                modeName = state.homeMode,
+                                changeMode =
+                                    actions.saveHomeMode,
+                                refresh = {
+                                    if (state.allowed) {
+                                        actions.refreshLibrary()
+                                    } else {
+                                        actions.requestAudioPermission()
                                     }
-                                )
-                            }
+                                },
+                                openProfile =
+                                    actions.openProfile,
+                                togglePlay =
+                                    actions.togglePlay,
+                                toggleLike =
+                                    actions.toggleLike,
+                                playNext =
+                                    actions.playNext,
+                                removeRecent =
+                                    actions.removeRecent,
+                                setSongInCategory =
+                                    actions.setSongInCategory,
+                                shuffleSongs =
+                                    actions.shuffleSongs,
+                                onPlaySong =
+                                    actions.playSong
+                            )
+
+                            1 -> Search(
+                                songs = state.songs,
+                                categories =
+                                    state.categories,
+                                theme = state.theme,
+                                onPlaySong =
+                                    actions.playSong
+                            )
+
+                            else -> Settings(
+                                theme = state.theme,
+                                appearance =
+                                    state.appearance,
+                                libraryPreferences =
+                                    state.libraryPreferences,
+                                playbackPreferences =
+                                    state.playbackPreferences,
+                                resumeOnHeadphones =
+                                    state.resumeOnHeadphones,
+                                onAppearanceChanged =
+                                    actions.changeAppearance,
+                                onLibraryPreferencesChanged =
+                                    actions.changeLibraryPreferences,
+                                onPlaybackPreferencesChanged =
+                                    actions.changePlaybackPreferences,
+                                onResumeHeadphonesChanged =
+                                    actions.changeResumeOnHeadphones,
+                                rescan =
+                                    actions.refreshLibrary
+                            )
                         }
                     }
                 }
@@ -232,10 +221,12 @@ internal fun XmoAppContent(
                         NowPlaying(
                             state = state.playback,
                             theme = state.theme,
-                            source = state.playingSource,
+                            source =
+                                state.playingSource,
                             sourceIsCategory =
                                 state.playingSourceIsCategory,
-                            queue = state.playbackQueue,
+                            queue =
+                                state.playbackQueue,
                             songs = state.songs,
                             liked =
                                 id != null &&
