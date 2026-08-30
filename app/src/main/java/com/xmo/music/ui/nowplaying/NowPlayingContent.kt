@@ -113,6 +113,16 @@ internal fun NowPlayingContent(
 
     createCategory: (String) -> UserCategory?
 ) {
+    val dismissFraction =
+        (
+            playerY.value /
+                screenHeight.coerceAtLeast(1f)
+            )
+            .coerceIn(
+                0f,
+                1f
+            )
+
     Box(
         modifier =
             Modifier
@@ -134,27 +144,13 @@ internal fun NowPlayingContent(
                     RoundedCornerShape(
                         topStart =
                             (
-                                56f *
-                                    (
-                                        playerY.value /
-                                            screenHeight
-                                        )
-                                        .coerceIn(
-                                            0f,
-                                            1f
-                                        )
+                                30f *
+                                    dismissFraction
                                 ).dp,
                         topEnd =
                             (
-                                56f *
-                                    (
-                                        playerY.value /
-                                            screenHeight
-                                        )
-                                        .coerceIn(
-                                            0f,
-                                            1f
-                                        )
+                                30f *
+                                    dismissFraction
                                 ).dp
                     )
                 )
@@ -214,24 +210,18 @@ internal fun NowPlayingContent(
                     state.hasPrevious,
                 canNext =
                     state.hasNext,
-                carousel =
-                    carousel,
+                carousel = carousel,
                 showLyrics =
                     artworkLyrics,
-                lyrics =
-                    lyrics,
+                lyrics = lyrics,
                 position =
                     state.position,
-                colors =
-                    colors,
-                accent =
-                    accent,
-                theme =
-                    theme,
+                colors = colors,
+                accent = accent,
+                theme = theme,
                 previousSong =
                     previousItem,
-                nextSong =
-                    next,
+                nextSong = next,
                 toggleLyrics = {
                     setArtworkLyrics(
                         !artworkLyrics
@@ -245,9 +235,14 @@ internal fun NowPlayingContent(
                 }
             )
 
+            /*
+             * Cover is untouched.
+             *
+             * Only the panel surface starts 8dp higher.
+             */
             Spacer(
                 Modifier.height(
-                    60.dp
+                    52.dp
                 )
             )
 
@@ -265,9 +260,15 @@ internal fun NowPlayingContent(
                         .background(
                             themeColors.panel
                         )
+                        /*
+                         * Extra 8dp internal top padding
+                         * compensates for the earlier panel edge.
+                         * Title/progress/transport therefore do
+                         * not get pulled upward with the panel.
+                         */
                         .padding(
                             start = 12.dp,
-                            top = 8.dp,
+                            top = 16.dp,
                             end = 12.dp,
                             bottom = 1.dp
                         )
@@ -537,12 +538,9 @@ internal fun NowPlayingContent(
 
                 PlayerOverlay.Details -> {
                     SongDetailsBox(
-                        song =
-                            currentSong,
-                        album =
-                            state.album,
-                        colors =
-                            colors,
+                        song = currentSong,
+                        album = state.album,
+                        colors = colors,
                         close = {
                             setOverlay(null)
                         }
@@ -551,12 +549,10 @@ internal fun NowPlayingContent(
 
                 PlayerOverlay.Artist -> {
                     ArtistInfoBox(
-                        artist =
-                            state.artist,
+                        artist = state.artist,
                         trackCount =
                             artistTrackCount,
-                        colors =
-                            colors,
+                        colors = colors,
                         close = {
                             setOverlay(null)
                         }
@@ -567,11 +563,6 @@ internal fun NowPlayingContent(
             }
         }
 
-        /*
-         * Fullscreen lyrics transition is unchanged.
-         * FullLyrics still owns its top translucent glass behind
-         * artwork/title/seek controls.
-         */
         AnimatedVisibility(
             visible = fullLyrics,
             enter =
@@ -595,14 +586,10 @@ internal fun NowPlayingContent(
         ) {
             FullLyrics(
                 lyrics = lyrics,
-                position =
-                    state.position,
-                duration =
-                    state.duration,
-                title =
-                    state.title,
-                artist =
-                    state.artist,
+                position = state.position,
+                duration = state.duration,
+                title = state.title,
+                artist = state.artist,
                 artwork =
                     currentSong?.artwork
                         ?: fallbackArtwork,
