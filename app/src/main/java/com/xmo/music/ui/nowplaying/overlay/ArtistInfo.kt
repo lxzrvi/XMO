@@ -1,8 +1,6 @@
 package com.xmo.music.ui.nowplaying
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -46,22 +44,15 @@ internal fun ArtistInfoBox(
 
     val reveal =
         remember {
-            Animatable(
-                0f
-            )
+            Animatable(0f)
         }
 
     LaunchedEffect(Unit) {
         reveal.animateTo(
-            targetValue =
-                1f,
+            targetValue = 1f,
             animationSpec =
-                tween(
-                    durationMillis =
-                        250,
-                    easing =
-                        FastOutSlowInEasing
-                )
+                XmoPlayerAnimation
+                    .overlayRevealSpec
         )
     }
 
@@ -74,15 +65,10 @@ internal fun ArtistInfoBox(
 
     suspend fun closeAnimated() {
         reveal.animateTo(
-            targetValue =
-                0f,
+            targetValue = 0f,
             animationSpec =
-                tween(
-                    durationMillis =
-                        180,
-                    easing =
-                        FastOutSlowInEasing
-                )
+                XmoPlayerAnimation
+                    .overlayHideSpec
         )
 
         close()
@@ -94,9 +80,6 @@ internal fun ArtistInfoBox(
         contentAlignment =
             Alignment.Center
     ) {
-        /*
-         * Independent animated backdrop.
-         */
         Box(
             modifier =
                 Modifier
@@ -104,7 +87,8 @@ internal fun ArtistInfoBox(
                     .background(
                         Color.Black.copy(
                             alpha =
-                                .28f *
+                                XmoPlayerAnimation
+                                    .overlayBackdropAlpha *
                                     progress
                         )
                     )
@@ -119,31 +103,17 @@ internal fun ArtistInfoBox(
             modifier =
                 Modifier
                     .padding(
-                        horizontal =
-                            32.dp
+                        horizontal = 32.dp
                     )
                     .fillMaxWidth()
                     .graphicsLayer {
-                        alpha =
-                            progress
-
-                        val scale =
-                            .95f +
-                                .05f *
+                        with(
+                            XmoPlayerAnimation
+                        ) {
+                            centerOverlay(
                                 progress
-
-                        scaleX =
-                            scale
-
-                        scaleY =
-                            scale
-
-                        translationY =
-                            (
-                                1f -
-                                    progress
-                                ) *
-                                22f
+                            )
+                        }
                     }
                     .clip(
                         RoundedCornerShape(
@@ -160,16 +130,10 @@ internal fun ArtistInfoBox(
             horizontalAlignment =
                 Alignment.CenterHorizontally
         ) {
-            /*
-             * Same Material Rounded family as the rest of the
-             * revised Now Playing controls.
-             */
             Box(
                 modifier =
                     Modifier
-                        .size(
-                            52.dp
-                        )
+                        .size(52.dp)
                         .clip(
                             RoundedCornerShape(
                                 18.dp
@@ -184,22 +148,17 @@ internal fun ArtistInfoBox(
                 Icon(
                     imageVector =
                         Icons.Rounded.Person,
-                    contentDescription =
-                        null,
+                    contentDescription = null,
                     tint =
                         colors.text,
                     modifier =
-                        Modifier.size(
-                            27.dp
-                        )
+                        Modifier.size(27.dp)
                 )
             }
 
             Spacer(
                 modifier =
-                    Modifier.height(
-                        11.dp
-                    )
+                    Modifier.height(11.dp)
             )
 
             Text(
@@ -211,29 +170,19 @@ internal fun ArtistInfoBox(
                     colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize =
-                    19.sp,
+                fontSize = 19.sp,
                 textAlign =
                     TextAlign.Center
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(
-                        7.dp
-                    )
+                    Modifier.height(7.dp)
             )
 
-            /*
-             * trackCount remains the actual full MediaStore
-             * artist count supplied by NowPlaying.
-             */
             Text(
                 text =
-                    if (
-                        trackCount ==
-                        1
-                    ) {
+                    if (trackCount == 1) {
                         "1 track on this device"
                     } else {
                         "$trackCount tracks on this device"
@@ -242,22 +191,18 @@ internal fun ArtistInfoBox(
                     colors.sub,
                 fontFamily =
                     XmoFont.normal,
-                fontSize =
-                    11.sp,
+                fontSize = 11.sp,
                 textAlign =
                     TextAlign.Center
             )
 
             Spacer(
                 modifier =
-                    Modifier.height(
-                        16.dp
-                    )
+                    Modifier.height(16.dp)
             )
 
             PremiumCircle(
-                size =
-                    39.dp,
+                size = 39.dp,
                 background =
                     colors.button,
                 onClick = {
@@ -274,9 +219,7 @@ internal fun ArtistInfoBox(
                     tint =
                         colors.text,
                     modifier =
-                        Modifier.size(
-                            21.dp
-                        )
+                        Modifier.size(21.dp)
                 )
             }
         }
