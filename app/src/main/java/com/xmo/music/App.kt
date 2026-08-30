@@ -3,14 +3,12 @@ package com.xmo.music
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -19,13 +17,14 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
+import com.xmo.music.app.XmoAppActions
+import com.xmo.music.app.XmoAppContent
+import com.xmo.music.app.XmoAppUiState
 import com.xmo.music.data.Library
 import com.xmo.music.data.LibraryPreferences
 import com.xmo.music.data.PlaybackPreferences
@@ -37,17 +36,7 @@ import com.xmo.music.data.UserCategory
 import com.xmo.music.data.XmoAppearance
 import com.xmo.music.data.XmoProfile
 import com.xmo.music.player.XmoPlayer
-import com.xmo.music.ui.Home
-import com.xmo.music.ui.LocalXmoProfile
-import com.xmo.music.ui.MiniPlayer
-import com.xmo.music.ui.NavBar
-import com.xmo.music.ui.nowplaying.NowPlaying
-import com.xmo.music.ui.ProfileEditor
-import com.xmo.music.ui.ProvideXmoAccent
-import com.xmo.music.ui.Search
-import com.xmo.music.ui.Settings
 import com.xmo.music.ui.Setup
-import com.xmo.music.ui.blur.liveBlurSource
 import com.xmo.music.ui.blur.rememberLiveBlurState
 import com.xmo.music.ui.homeColors
 import kotlinx.coroutines.launch
@@ -61,15 +50,15 @@ enum class XmoTheme {
 
 @Composable
 fun App() {
-    val context = LocalContext.current
-    val scope = rememberCoroutineScope()
-    val stateHolder = rememberSaveableStateHolder()
-    val configuration = LocalConfiguration.current
+    val context =
+        LocalContext.current
 
-    /*
-     * Still retained while older Home/MiniPlayer components use
-     * LiveBlur. NavBar + NowPlaying no longer depend on it.
-     */
+    val configuration =
+        LocalConfiguration.current
+
+    val scope =
+        rememberCoroutineScope()
+
     val hazeState =
         rememberLiveBlurState()
 
@@ -93,138 +82,186 @@ fun App() {
     }
 
     val playback by
-        player.state.collectAsState()
+        player.state
+            .collectAsState()
 
     /*
      * =========================================================
-     * AUDIO PERMISSION
+     * PERMISSION
      * =========================================================
      */
 
     val audioPermission =
-        if (Build.VERSION.SDK_INT >= 33) {
-            Manifest.permission.READ_MEDIA_AUDIO
+        if (
+            Build.VERSION.SDK_INT >=
+            33
+        ) {
+            Manifest.permission
+                .READ_MEDIA_AUDIO
         } else {
-            Manifest.permission.READ_EXTERNAL_STORAGE
+            Manifest.permission
+                .READ_EXTERNAL_STORAGE
         }
 
-    var allowed by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(
-                context,
-                audioPermission
-            ) == PackageManager.PERMISSION_GRANTED
-        )
-    }
+    var allowed by
+        remember {
+            mutableStateOf(
+                ContextCompat
+                    .checkSelfPermission(
+                        context,
+                        audioPermission
+                    ) ==
+                    PackageManager
+                        .PERMISSION_GRANTED
+            )
+        }
 
     val permissionLauncher =
         rememberLauncherForActivityResult(
-            ActivityResultContracts.RequestPermission()
+            ActivityResultContracts
+                .RequestPermission()
         ) {
             allowed = it
         }
 
     /*
      * =========================================================
-     * PERSISTED STATE
+     * PERSISTED / APP STATE
      * =========================================================
      */
 
-    var loaded by remember {
-        mutableStateOf(false)
-    }
+    var loaded by
+        remember {
+            mutableStateOf(false)
+        }
 
-    var setupComplete by remember {
-        mutableStateOf(false)
-    }
+    var setupComplete by
+        remember {
+            mutableStateOf(false)
+        }
 
-    var profile by remember {
-        mutableStateOf(XmoProfile())
-    }
+    var profile by
+        remember {
+            mutableStateOf(
+                XmoProfile()
+            )
+        }
 
-    var appearance by remember {
-        mutableStateOf(XmoAppearance())
-    }
+    var appearance by
+        remember {
+            mutableStateOf(
+                XmoAppearance()
+            )
+        }
 
-    var libraryPreferences by remember {
-        mutableStateOf(LibraryPreferences())
-    }
+    var libraryPreferences by
+        remember {
+            mutableStateOf(
+                LibraryPreferences()
+            )
+        }
 
-    var playbackPreferences by remember {
-        mutableStateOf(PlaybackPreferences())
-    }
+    var playbackPreferences by
+        remember {
+            mutableStateOf(
+                PlaybackPreferences()
+            )
+        }
 
-    var resumeOnHeadphones by remember {
-        mutableStateOf(false)
-    }
+    var resumeOnHeadphones by
+        remember {
+            mutableStateOf(false)
+        }
 
-    var songs by remember {
-        mutableStateOf<List<Song>>(emptyList())
-    }
+    var songs by
+        remember {
+            mutableStateOf<List<Song>>(
+                emptyList()
+            )
+        }
 
-    var order by remember {
-        mutableStateOf(Store.defaults)
-    }
+    var order by
+        remember {
+            mutableStateOf(
+                Store.defaults
+            )
+        }
 
-    var categories by remember {
-        mutableStateOf<List<UserCategory>>(emptyList())
-    }
+    var categories by
+        remember {
+            mutableStateOf<List<UserCategory>>(
+                emptyList()
+            )
+        }
 
-    var likedSongIds by remember {
-        mutableStateOf<Set<Long>>(emptySet())
-    }
+    var likedSongIds by
+        remember {
+            mutableStateOf<Set<Long>>(
+                emptySet()
+            )
+        }
 
-    var recentPlays by remember {
-        mutableStateOf<List<RecentPlay>>(emptyList())
-    }
+    var recentPlays by
+        remember {
+            mutableStateOf<List<RecentPlay>>(
+                emptyList()
+            )
+        }
 
-    var lyricsFiles by remember {
-        mutableStateOf<Map<Long, String>>(emptyMap())
-    }
+    var lyricsFiles by
+        remember {
+            mutableStateOf<Map<Long, String>>(
+                emptyMap()
+            )
+        }
 
-    var scanning by remember {
-        mutableStateOf(false)
-    }
+    var scanning by
+        remember {
+            mutableStateOf(false)
+        }
 
     /*
      * =========================================================
-     * NAVIGATION
+     * UI / NAVIGATION STATE
      * =========================================================
      */
 
-    var tab by remember {
-        mutableIntStateOf(0)
-    }
+    var tab by
+        remember {
+            mutableIntStateOf(0)
+        }
 
-    var profileOpen by remember {
-        mutableStateOf(false)
-    }
+    var profileOpen by
+        remember {
+            mutableStateOf(false)
+        }
 
-    /*
-     * =========================================================
-     * NOW PLAYING
-     * =========================================================
-     */
+    var showNowPlaying by
+        remember {
+            mutableStateOf(false)
+        }
 
-    var showNowPlaying by remember {
-        mutableStateOf(false)
-    }
+    var miniVisible by
+        remember {
+            mutableStateOf(false)
+        }
 
-    var miniVisible by remember {
-        mutableStateOf(false)
-    }
+    var miniRiseKey by
+        remember {
+            mutableIntStateOf(0)
+        }
 
-    var miniRiseKey by remember {
-        mutableIntStateOf(0)
-    }
+    var playingSource by
+        remember {
+            mutableStateOf(
+                "All Songs"
+            )
+        }
 
-    var playingSource by remember {
-        mutableStateOf("All Songs")
-    }
-
-    var playingSourceIsCategory by remember {
-        mutableStateOf(false)
-    }
+    var playingSourceIsCategory by
+        remember {
+            mutableStateOf(false)
+        }
 
     /*
      * =========================================================
@@ -235,9 +272,11 @@ fun App() {
     val systemDark =
         (
             configuration.uiMode and
-                android.content.res.Configuration.UI_MODE_NIGHT_MASK
+                android.content.res.Configuration
+                    .UI_MODE_NIGHT_MASK
             ) ==
-            android.content.res.Configuration.UI_MODE_NIGHT_YES
+            android.content.res.Configuration
+                .UI_MODE_NIGHT_YES
 
     val theme =
         when (appearance.themeMode) {
@@ -260,7 +299,7 @@ fun App() {
 
     /*
      * =========================================================
-     * INITIAL DATA
+     * INITIAL LOAD
      * =========================================================
      */
 
@@ -287,23 +326,31 @@ fun App() {
             Store.lyricsFiles(context)
 
         libraryPreferences =
-            Store.libraryPreferences(context)
+            Store.libraryPreferences(
+                context
+            )
 
         playbackPreferences =
-            Store.playbackPreferences(context)
+            Store.playbackPreferences(
+                context
+            )
 
         resumeOnHeadphones =
-            Store.resumeOnHeadphones(context)
+            Store.resumeOnHeadphones(
+                context
+            )
 
         setupComplete =
-            Store.setupComplete(context)
+            Store.setupComplete(
+                context
+            )
 
         loaded = true
     }
 
     /*
      * =========================================================
-     * PLAYER PREFERENCES
+     * PLAYER SETTINGS
      * =========================================================
      */
 
@@ -314,32 +361,44 @@ fun App() {
         if (playback.connected) {
             player.setPlaybackParameters(
                 speed =
-                    playbackPreferences.playbackSpeed,
+                    playbackPreferences
+                        .playbackSpeed,
                 pitch =
-                    playbackPreferences.playbackPitch
+                    playbackPreferences
+                        .playbackPitch
             )
         }
     }
 
-    LaunchedEffect(playback.connected) {
+    LaunchedEffect(
+        playback.connected
+    ) {
         if (playback.connected) {
             player.setShuffle(
-                Store.shuffleEnabled(context)
+                Store.shuffleEnabled(
+                    context
+                )
             )
 
             player.setRepeatMode(
-                Store.repeatMode(context)
+                Store.repeatMode(
+                    context
+                )
             )
         }
     }
 
-    var playerPersistenceReady by remember {
-        mutableStateOf(false)
-    }
+    var playerPersistenceReady by
+        remember {
+            mutableStateOf(false)
+        }
 
-    LaunchedEffect(playback.connected) {
+    LaunchedEffect(
+        playback.connected
+    ) {
         if (playback.connected) {
-            playerPersistenceReady = true
+            playerPersistenceReady =
+                true
         }
     }
 
@@ -383,11 +442,13 @@ fun App() {
 
             songs =
                 if (
-                    libraryPreferences.ignoreShortAudio
+                    libraryPreferences
+                        .ignoreShortAudio
                 ) {
                     result.filter {
                         it.duration >=
-                            libraryPreferences.minimumDurationMs
+                            libraryPreferences
+                                .minimumDurationMs
                     }
                 } else {
                     result
@@ -412,7 +473,9 @@ fun App() {
         }
     }
 
-    LaunchedEffect(libraryPreferences) {
+    LaunchedEffect(
+        libraryPreferences
+    ) {
         if (
             loaded &&
             setupComplete &&
@@ -424,15 +487,20 @@ fun App() {
 
     /*
      * =========================================================
-     * RECENT PLAYBACK
+     * RECENTS
      * =========================================================
      */
 
-    var recordedSongId by remember {
-        mutableStateOf<Long?>(null)
-    }
+    var recordedSongId by
+        remember {
+            mutableStateOf<Long?>(
+                null
+            )
+        }
 
-    LaunchedEffect(playback.currentSongId) {
+    LaunchedEffect(
+        playback.currentSongId
+    ) {
         val id =
             playback.currentSongId
                 ?: return@LaunchedEffect
@@ -452,19 +520,20 @@ fun App() {
 
     /*
      * =========================================================
-     * FIRST LOAD
+     * LOADING
      * =========================================================
      */
 
     if (!loaded) {
         Box(
-            Modifier
-                .fillMaxSize()
-                .background(
-                    homeColors(
-                        XmoTheme.Dark
-                    ).bg
-                )
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .background(
+                        homeColors(
+                            XmoTheme.Dark
+                        ).bg
+                    )
         )
 
         return
@@ -480,11 +549,11 @@ fun App() {
         Setup(
             initialProfile =
                 profile,
-
             existingCategories =
                 categories,
+            onCategoriesChanged = {
+                    next ->
 
-            onCategoriesChanged = { next ->
                 categories = next
 
                 scope.launch {
@@ -500,18 +569,22 @@ fun App() {
 
                     val builtIns =
                         order.filter {
-                            it in Store.defaults
+                            it in
+                                Store.defaults
                         }
 
                     val existingCustom =
                         order.filter {
-                            it !in Store.defaults &&
-                                it in customIds
+                            it !in
+                                Store.defaults &&
+                                it in
+                                customIds
                         }
 
                     val missing =
                         customIds.filterNot {
-                            it in existingCustom
+                            it in
+                                existingCustom
                         }
 
                     val nextOrder =
@@ -527,20 +600,24 @@ fun App() {
                     )
                 }
             },
+            finish = {
+                    result ->
 
-            finish = { result ->
                 scope.launch {
                     allowed =
-                        ContextCompat.checkSelfPermission(
-                            context,
-                            audioPermission
-                        ) ==
-                            PackageManager.PERMISSION_GRANTED
+                        ContextCompat
+                            .checkSelfPermission(
+                                context,
+                                audioPermission
+                            ) ==
+                            PackageManager
+                                .PERMISSION_GRANTED
 
                     if (!allowed) {
-                        permissionLauncher.launch(
-                            audioPermission
-                        )
+                        permissionLauncher
+                            .launch(
+                                audioPermission
+                            )
 
                         return@launch
                     }
@@ -553,24 +630,27 @@ fun App() {
                     )
 
                     setupComplete = true
-
                     loadLibrary()
                 }
             },
+            setupLater = {
+                    result ->
 
-            setupLater = { result ->
                 scope.launch {
                     allowed =
-                        ContextCompat.checkSelfPermission(
-                            context,
-                            audioPermission
-                        ) ==
-                            PackageManager.PERMISSION_GRANTED
+                        ContextCompat
+                            .checkSelfPermission(
+                                context,
+                                audioPermission
+                            ) ==
+                            PackageManager
+                                .PERMISSION_GRANTED
 
                     if (!allowed) {
-                        permissionLauncher.launch(
-                            audioPermission
-                        )
+                        permissionLauncher
+                            .launch(
+                                audioPermission
+                            )
 
                         return@launch
                     }
@@ -583,7 +663,6 @@ fun App() {
                     )
 
                     setupComplete = true
-
                     loadLibrary()
                 }
             }
@@ -594,7 +673,7 @@ fun App() {
 
     /*
      * =========================================================
-     * COMMANDS
+     * APP COMMANDS
      * =========================================================
      */
 
@@ -609,10 +688,13 @@ fun App() {
                 it.id == song.id
             }
 
-        if (index < 0) return
+        if (index < 0) {
+            return
+        }
 
         playingSource = source
-        playingSourceIsCategory = isCategory
+        playingSourceIsCategory =
+            isCategory
 
         player.play(
             queue,
@@ -642,31 +724,26 @@ fun App() {
         scope.launch {
             categories =
                 Store.setSongInCategory(
-                    context =
-                        context,
+                    context = context,
                     categoryId =
                         categoryId,
                     songId =
                         song.id,
-                    added =
-                        added
+                    added = added
                 )
         }
     }
 
-    /*
-     * Real category creation used by NowPlaying XmoCenterBox.
-     *
-     * Newly created categories are also appended to Home's
-     * persisted reorderable section order.
-     */
     fun createCategory(
         name: String,
         song: Song?
     ): UserCategory? {
         val clean =
             name.trim()
-                .replace("\n", " ")
+                .replace(
+                    "\n",
+                    " "
+                )
                 .take(24)
 
         if (clean.isBlank()) {
@@ -677,10 +754,10 @@ fun App() {
             UserCategory(
                 id =
                     "cat_${UUID.randomUUID()}",
-                name =
-                    clean,
+                name = clean,
                 icon =
-                    categories.size % 4,
+                    categories.size %
+                        4,
                 songIds =
                     if (song != null) {
                         setOf(song.id)
@@ -690,18 +767,16 @@ fun App() {
             )
 
         val nextCategories =
-            categories + category
+            categories +
+                category
 
         val nextOrder =
             (
                 order +
                     category.id
-                ).distinct()
+                )
+                .distinct()
 
-        /*
-         * Compose state updates immediately, persistence follows
-         * without making the options UI wait on disk.
-         */
         categories =
             nextCategories
 
@@ -723,575 +798,376 @@ fun App() {
         return category
     }
 
-    fun currentSong():
-        Song? {
+    fun currentSong(): Song? {
         val id =
             playback.currentSongId
                 ?: return null
 
-        return songs.firstOrNull {
-            it.id == id
-        } ?: player.currentSong()
+        return songs
+            .firstOrNull {
+                it.id == id
+            }
+            ?: player.currentSong()
     }
 
     /*
      * =========================================================
-     * APP BACK
+     * RENDER CONTRACT
      * =========================================================
      */
 
-    BackHandler(
-        enabled =
-            !showNowPlaying &&
-                (
-                    profileOpen ||
-                        tab != 0
-                    )
-    ) {
-        when {
-            profileOpen ->
+    val uiState =
+        XmoAppUiState(
+            playback = playback,
+            theme = theme,
+            hazeState = hazeState,
+
+            profile = profile,
+            appearance = appearance,
+            libraryPreferences =
+                libraryPreferences,
+            playbackPreferences =
+                playbackPreferences,
+            resumeOnHeadphones =
+                resumeOnHeadphones,
+
+            songs = songs,
+            playbackQueue =
+                player.queue(),
+            currentSong =
+                currentSong(),
+
+            order = order,
+            categories = categories,
+            likedSongIds =
+                likedSongIds,
+            recentPlays =
+                recentPlays,
+            lyricsFiles =
+                lyricsFiles,
+
+            allowed = allowed,
+            scanning = scanning,
+
+            tab = tab,
+            profileOpen =
+                profileOpen,
+
+            showNowPlaying =
+                showNowPlaying,
+            miniVisible =
+                miniVisible,
+            miniRiseKey =
+                miniRiseKey,
+
+            playingSource =
+                playingSource,
+            playingSourceIsCategory =
+                playingSourceIsCategory
+        )
+
+    val actions =
+        XmoAppActions(
+            requestAudioPermission = {
+                permissionLauncher.launch(
+                    audioPermission
+                )
+            },
+
+            refreshLibrary = {
+                scope.launch {
+                    loadLibrary()
+                }
+            },
+
+            selectTab = {
+                tab = it
+            },
+
+            openProfile = {
+                profileOpen = true
+            },
+
+            closeProfile = {
                 profileOpen = false
+            },
 
-            tab != 0 ->
-                tab = 0
-        }
-    }
+            saveProfile = {
+                profile = it
 
-    CompositionLocalProvider(
-        LocalXmoProfile provides profile
-    ) {
-        ProvideXmoAccent(
-            appearance = appearance
-        ) {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(
-                        homeColors(theme).bg
+                scope.launch {
+                    Store.saveProfile(
+                        context,
+                        it
                     )
-                    /*
-                     * Temporary while remaining older layouts
-                     * still depend on LiveBlur.
-                     */
-                    .liveBlurSource(
-                        hazeState
-                    )
-            ) {
-                /*
-                 * =================================================
-                 * SCREENS
-                 * =================================================
-                 */
-
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .zIndex(0f)
-                ) {
-                    stateHolder.SaveableStateProvider(
-                        key =
-                            "tab_$tab"
-                    ) {
-                        when (tab) {
-                            0 -> {
-                                Home(
-                                    songs =
-                                        songs,
-
-                                    allowed =
-                                        allowed,
-
-                                    theme =
-                                        theme,
-
-                                    hazeState =
-                                        hazeState,
-
-                                    order =
-                                        order,
-
-                                    categories =
-                                        categories,
-
-                                    likedSongIds =
-                                        likedSongIds,
-
-                                    recentPlays =
-                                        recentPlays,
-
-                                    scanning =
-                                        scanning,
-
-                                    refresh = {
-                                        if (!allowed) {
-                                            permissionLauncher.launch(
-                                                audioPermission
-                                            )
-                                        } else {
-                                            scope.launch {
-                                                loadLibrary()
-                                            }
-                                        }
-                                    },
-
-                                    openProfile = {
-                                        profileOpen = true
-                                    },
-
-                                    saveOrder = {
-                                        order = it
-
-                                        scope.launch {
-                                            Store.saveOrder(
-                                                context,
-                                                it
-                                            )
-                                        }
-                                    },
-
-                                    saveCategories = {
-                                        categories = it
-
-                                        scope.launch {
-                                            Store.saveCategories(
-                                                context,
-                                                it
-                                            )
-                                        }
-                                    },
-
-                                    toggleLike = {
-                                        toggleLike(it.id)
-                                    },
-
-                                    setSongInCategory =
-                                        ::updateCategoryMembership,
-
-                                    onPlaySong =
-                                        ::startSong
-                                )
-                            }
-
-                            1 -> {
-                                Search(
-                                    songs =
-                                        songs,
-
-                                    categories =
-                                        categories,
-
-                                    theme =
-                                        theme,
-
-                                    onPlaySong =
-                                        ::startSong
-                                )
-                            }
-
-                            else -> {
-                                Settings(
-                                    theme =
-                                        theme,
-
-                                    appearance =
-                                        appearance,
-
-                                    libraryPreferences =
-                                        libraryPreferences,
-
-                                    playbackPreferences =
-                                        playbackPreferences,
-
-                                    resumeOnHeadphones =
-                                        resumeOnHeadphones,
-
-                                    onAppearanceChanged = {
-                                        appearance = it
-
-                                        scope.launch {
-                                            Store.saveAppearance(
-                                                context,
-                                                it
-                                            )
-                                        }
-                                    },
-
-                                    onLibraryPreferencesChanged = {
-                                        libraryPreferences = it
-
-                                        scope.launch {
-                                            Store.saveLibraryPreferences(
-                                                context,
-                                                it
-                                            )
-                                        }
-                                    },
-
-                                    onPlaybackPreferencesChanged = {
-                                        playbackPreferences = it
-
-                                        player.setPlaybackParameters(
-                                            speed =
-                                                it.playbackSpeed,
-                                            pitch =
-                                                it.playbackPitch
-                                        )
-
-                                        scope.launch {
-                                            Store.savePlaybackPreferences(
-                                                context,
-                                                it
-                                            )
-                                        }
-                                    },
-
-                                    onResumeHeadphonesChanged = {
-                                        resumeOnHeadphones = it
-
-                                        scope.launch {
-                                            Store.saveResumeOnHeadphones(
-                                                context,
-                                                it
-                                            )
-                                        }
-                                    },
-
-                                    rescan = {
-                                        if (!allowed) {
-                                            permissionLauncher.launch(
-                                                audioPermission
-                                            )
-                                        } else {
-                                            scope.launch {
-                                                loadLibrary()
-                                            }
-                                        }
-                                    }
-                                )
-                            }
-                        }
-                    }
                 }
 
-                /*
-                 * =================================================
-                 * NAVBAR
-                 * =================================================
-                 */
+                profileOpen = false
+            },
 
-                if (!profileOpen) {
-                    NavBar(
-                        selected = tab,
-                        theme = theme
-                    ) {
-                        tab = it
-                    }
+            saveOrder = {
+                order = it
+
+                scope.launch {
+                    Store.saveOrder(
+                        context,
+                        it
+                    )
                 }
+            },
 
+            saveCategories = {
+                categories = it
+
+                scope.launch {
+                    Store.saveCategories(
+                        context,
+                        it
+                    )
+                }
+            },
+
+            playSong =
+                ::startSong,
+
+            toggleLike = {
+                toggleLike(it.id)
+            },
+
+            setSongInCategory = {
+                    song,
+                    categoryId,
+                    added ->
+
+                updateCategoryMembership(
+                    song,
+                    categoryId,
+                    added
+                )
+            },
+
+            changeAppearance = {
+                appearance = it
+
+                scope.launch {
+                    Store.saveAppearance(
+                        context,
+                        it
+                    )
+                }
+            },
+
+            changeLibraryPreferences = {
+                libraryPreferences = it
+
+                scope.launch {
+                    Store
+                        .saveLibraryPreferences(
+                            context,
+                            it
+                        )
+                }
+            },
+
+            changePlaybackPreferences = {
+                playbackPreferences = it
+
+                player.setPlaybackParameters(
+                    speed =
+                        it.playbackSpeed,
+                    pitch =
+                        it.playbackPitch
+                )
+
+                scope.launch {
+                    Store
+                        .savePlaybackPreferences(
+                            context,
+                            it
+                        )
+                }
+            },
+
+            changeResumeOnHeadphones = {
+                resumeOnHeadphones = it
+
+                scope.launch {
+                    Store
+                        .saveResumeOnHeadphones(
+                            context,
+                            it
+                        )
+                }
+            },
+
+            openNowPlayingFromMini = {
+                miniVisible = false
+                showNowPlaying = true
+            },
+
+            closePlaybackFromMini = {
                 /*
-                 * =================================================
-                 * MINIPLAYER
-                 * =================================================
+                 * Real MediaController-backed close.
                  */
+                player.closePlayback()
+
+                miniVisible = false
+                showNowPlaying = false
+            },
+
+            togglePlay = {
+                player.togglePlayPause()
+            },
+
+            miniPrevious = {
+                player.previousItem()
+            },
+
+            next = {
+                player.next()
+            },
+
+            nowPlayingOpened = {
+                miniVisible = false
+            },
+
+            refreshPosition = {
+                player.refreshPosition()
+            },
+
+            previous = {
+                player.previous()
+            },
+
+            previousItem = {
+                player.previousItem()
+            },
+
+            playQueueIndex = {
+                    index ->
+
+                val queue =
+                    player.queue()
 
                 if (
-                    playback.currentSongId != null &&
-                    miniVisible &&
-                    !showNowPlaying &&
-                    !profileOpen
+                    index in
+                    queue.indices
                 ) {
-                    val song =
-                        currentSong()
+                    player.play(
+                        queue,
+                        index
+                    )
+                }
+            },
 
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .zIndex(20f)
-                    ) {
-                        MiniPlayer(
-                            state =
-                                playback,
+            seekTo = {
+                player.seekTo(it)
+            },
 
-                            theme =
-                                theme,
+            toggleCurrentLike = {
+                playback.currentSongId
+                    ?.let {
+                        toggleLike(it)
+                    }
+            },
 
-                            hazeState =
-                                hazeState,
+            toggleShuffle = {
+                player.toggleShuffle()
+            },
 
-                            riseKey =
-                                miniRiseKey,
+            cycleRepeat = {
+                player.cycleRepeatMode()
+            },
 
-                            liked =
-                                playback.currentSongId in
-                                    likedSongIds,
+            setSleepTimer = {
+                player.setSleepTimer(it)
+            },
 
-                            openPlayer = {
-                                miniVisible = false
-                                showNowPlaying = true
-                            },
+            cancelSleepTimer = {
+                player.cancelSleepTimer()
+            },
 
-                            togglePlay = {
-                                player.togglePlayPause()
-                            },
+            saveLyricsUri = {
+                    uri ->
 
-                            toggleLike = {
-                                song?.let {
-                                    toggleLike(it.id)
-                                }
-                            },
+                val songId =
+                    playback.currentSongId
 
-                            previous = {
-                                player.previousItem()
-                            },
-
-                            next = {
-                                player.next()
-                            }
+                if (songId != null) {
+                    scope.launch {
+                        Store.saveLyricsUri(
+                            context,
+                            songId,
+                            uri
                         )
+
+                        lyricsFiles =
+                            Store.lyricsFiles(
+                                context
+                            )
                     }
                 }
+            },
 
-                /*
-                 * =================================================
-                 * PROFILE
-                 * =================================================
-                 */
+            setCurrentSongInCategory = {
+                    categoryId,
+                    added ->
 
-                if (profileOpen) {
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .zIndex(80f)
-                    ) {
-                        ProfileEditor(
-                            profile =
-                                profile,
-
-                            theme =
-                                theme,
-
-                            apply = {
-                                profile = it
-
-                                scope.launch {
-                                    Store.saveProfile(
-                                        context,
-                                        it
-                                    )
-                                }
-
-                                profileOpen = false
-                            },
-
-                            cancel = {
-                                profileOpen = false
-                            }
-                        )
-                    }
+                currentSong()?.let {
+                    updateCategoryMembership(
+                        it,
+                        categoryId,
+                        added
+                    )
                 }
+            },
 
-                /*
-                 * =================================================
-                 * NOW PLAYING
-                 * =================================================
-                 */
+            createCategoryForCurrentSong = {
+                createCategory(
+                    it,
+                    currentSong()
+                )
+            },
 
-                if (showNowPlaying) {
-                    val song =
-                        currentSong()
+            dismissNowPlaying = {
+                showNowPlaying = false
 
-                    val id =
-                        playback.currentSongId
+                miniRiseKey++
 
-                    Box(
-                        Modifier
-                            .fillMaxSize()
-                            .zIndex(100f)
-                    ) {
-                        NowPlaying(
-                            state =
-                                playback,
-
-                            theme =
-                                theme,
-
-                            source =
-                                playingSource,
-
-                            sourceIsCategory =
-                                playingSourceIsCategory,
-
-                            queue =
-                                player.queue(),
-
-                            songs = songs,
-
-                            liked =
-                                id != null &&
-                                    id in likedSongIds,
-
-                            lyricsUri =
-                                id?.let {
-                                    lyricsFiles[it]
-                                },
-
-                            /*
-                             * Real categories exposed to
-                             * XmoCenterBox.
-                             */
-                            categories =
-                                categories,
-
-                            onOpened = {
-                                miniVisible = false
-                            },
-
-                            refreshPosition = {
-                                player.refreshPosition()
-                            },
-
-                            togglePlay = {
-                                player.togglePlayPause()
-                            },
-
-                            previous = {
-                                player.previous()
-                            },
-
-                            previousItem = {
-                                player.previousItem()
-                            },
-
-                            next = {
-                                player.next()
-                            },
-                            
-                            playQueueIndex = { index ->
-                                val currentQueue =
-                                    player.queue()
-                            
-                                if (
-                                    index in currentQueue.indices
-                                ) {
-                                    player.play(
-                                        currentQueue,
-                                        index
-                                    )
-                                }
-                            },
-                            
-                            seekTo = {
-                                player.seekTo(it)
-                            },
-
-                            /*
-                             * Current media item is resolved when
-                             * action fires, not captured from a
-                             * stale composition.
-                             */
-                            toggleLike = {
-                                playback.currentSongId?.let {
-                                    toggleLike(it)
-                                }
-                            },
-
-                            toggleShuffle = {
-                                player.toggleShuffle()
-                            },
-
-                            cycleRepeat = {
-                                player.cycleRepeatMode()
-                            },
-
-                            setSleepTimer = {
-                                player.setSleepTimer(it)
-                            },
-
-                            cancelSleepTimer = {
-                                player.cancelSleepTimer()
-                            },
-
-                            saveLyricsUri = {
-                                val songId =
-                                    playback.currentSongId
-
-                                if (songId != null) {
-                                    scope.launch {
-                                        Store.saveLyricsUri(
-                                            context,
-                                            songId,
-                                            it
-                                        )
-
-                                        lyricsFiles =
-                                            Store.lyricsFiles(
-                                                context
-                                            )
-                                    }
-                                }
-                            },
-
-                            /*
-                             * REAL category membership.
-                             */
-                            setSongInCategory = {
-                                    categoryId,
-                                    added ->
-
-                                currentSong()?.let {
-                                    updateCategoryMembership(
-                                        it,
-                                        categoryId,
-                                        added
-                                    )
-                                }
-                            },
-
-                            /*
-                             * REAL category creation.
-                             * Created category includes the current
-                             * song immediately.
-                             */
-                            createCategory = { name ->
-                                createCategory(
-                                    name,
-                                    currentSong()
-                                )
-                            },
-
-                            dismiss = {
-                                showNowPlaying = false
-
-                                miniRiseKey++
-
-                                miniVisible =
-                                    playback.currentSongId != null
-                            }
-                        )
-                    }
-                }
-
-                /*
-                 * =================================================
-                 * MINIPLAYER RECOVERY
-                 * =================================================
-                 */
-
-                LaunchedEffect(
-                    playback.currentSongId,
-                    showNowPlaying,
-                    profileOpen
-                ) {
-                    if (
-                        playback.currentSongId != null &&
-                        !showNowPlaying &&
-                        !profileOpen &&
-                        !miniVisible
-                    ) {
-                        miniVisible = true
-                    }
-                }
+                miniVisible =
+                    playback
+                        .currentSongId !=
+                    null
             }
+        )
+
+    /*
+     * MiniPlayer recovery.
+     */
+    LaunchedEffect(
+        playback.currentSongId,
+        showNowPlaying,
+        profileOpen
+    ) {
+        if (
+            playback.currentSongId != null &&
+            !showNowPlaying &&
+            !profileOpen &&
+            !miniVisible
+        ) {
+            miniVisible = true
+        }
+
+        if (
+            playback.currentSongId ==
+            null
+        ) {
+            miniVisible = false
         }
     }
+
+    XmoAppContent(
+        state = uiState,
+        actions = actions
+    )
 }
