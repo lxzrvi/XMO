@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.ui.graphics.Color
 import com.xmo.music.data.Song
@@ -12,6 +12,7 @@ internal data class HomeSectionModel(
 
 internal sealed interface HomeLayer {
     data object Menu : HomeLayer
+
     data object Scanner : HomeLayer
 
     data class SongList(
