@@ -9,7 +9,6 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
-import com.xmo.music.ui.Home
 import com.xmo.music.ui.LocalXmoProfile
 import com.xmo.music.ui.NavBar
 import com.xmo.music.ui.ProfileEditor
@@ -17,7 +16,8 @@ import com.xmo.music.ui.ProvideXmoAccent
 import com.xmo.music.ui.Search
 import com.xmo.music.ui.Settings
 import com.xmo.music.ui.blur.liveBlurSource
-import com.xmo.music.ui.homeColors
+import com.xmo.music.ui.home.Home
+import com.xmo.music.ui.home.homeColors
 import com.xmo.music.ui.miniplayer.XmoMiniPlayer
 import com.xmo.music.ui.nowplaying.NowPlaying
 
@@ -67,12 +67,6 @@ internal fun XmoAppContent(
                             state.hazeState
                         )
             ) {
-                /*
-                 * =================================================
-                 * MAIN CONTENT
-                 * =================================================
-                 */
-
                 Box(
                     modifier =
                         Modifier
@@ -196,12 +190,6 @@ internal fun XmoAppContent(
                     }
                 }
 
-                /*
-                 * =================================================
-                 * MINIPLAYER
-                 * =================================================
-                 */
-
                 if (
                     state.playback.currentSongId != null &&
                     state.miniVisible &&
@@ -267,12 +255,6 @@ internal fun XmoAppContent(
                     }
                 }
 
-                /*
-                 * =================================================
-                 * NAVBAR
-                 * =================================================
-                 */
-
                 if (!state.profileOpen) {
                     Box(
                         modifier =
@@ -290,12 +272,6 @@ internal fun XmoAppContent(
                         }
                     }
                 }
-
-                /*
-                 * =================================================
-                 * PROFILE
-                 * =================================================
-                 */
 
                 if (state.profileOpen) {
                     Box(
@@ -316,12 +292,6 @@ internal fun XmoAppContent(
                         )
                     }
                 }
-
-                /*
-                 * =================================================
-                 * NOW PLAYING
-                 * =================================================
-                 */
 
                 if (state.showNowPlaying) {
                     val id =
@@ -350,8 +320,7 @@ internal fun XmoAppContent(
                                 state.songs,
                             liked =
                                 id != null &&
-                                    id in
-                                    state.likedSongIds,
+                                    id in state.likedSongIds,
                             lyricsUri =
                                 id?.let {
                                     state.lyricsFiles[it]
