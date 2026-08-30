@@ -22,32 +22,24 @@ internal class PlayerRuntime(
     private val context: Context
 ) {
     private val mainHandler =
-        Handler(
-            Looper.getMainLooper()
-        )
+        Handler(Looper.getMainLooper())
 
     private val mutableState =
-        MutableStateFlow(
-            PlaybackState()
-        )
+        MutableStateFlow(PlaybackState())
 
     val state: StateFlow<PlaybackState> =
         mutableState.asStateFlow()
 
     private var controllerFuture:
-        ListenableFuture<MediaController>? =
-        null
+        ListenableFuture<MediaController>? = null
 
     private var controller:
-        MediaController? =
-        null
+        MediaController? = null
 
-    private var songQueue:
-        List<Song> =
+    private var songQueue: List<Song> =
         emptyList()
 
-    private var sleepDeadline:
-        Long? =
+    private var sleepDeadline: Long? =
         null
 
     private val listener =
@@ -56,17 +48,9 @@ internal class PlayerRuntime(
                 player: Player,
                 events: Player.Events
             ) {
-                publish(
-                    player
-                )
+                publish(player)
             }
         }
-
-    /*
-     * =========================================================
-     * CONNECTION
-     * =========================================================
-     */
 
     fun connect() {
         if (
@@ -89,214 +73,184 @@ internal class PlayerRuntime(
             MediaController.Builder(
                 context,
                 token
-            )
-                .buildAsync()
+            ).buildAsync()
 
-        controllerFuture =
-            future
+        controllerFuture = future
 
         future.addListener(
             {
                 runCatching {
                     future.get()
+                }.onSuccess { result ->
+                    if (controllerFuture !== future) {
+                        MediaController.releaseFuture(future)
+                        return@onSuccess
+                    }
+
+                    controller = result
+                    result.addListener(listener)
+                    publish(result)
+                }.onFailure {
+                    if (controllerFuture === future) {
+                        controllerFuture = null
+                    }
+
+                    mutableState.value =
+                        PlaybackState()
                 }
-                    .onSuccess { result ->
-                        if (
-                            controllerFuture !==
-                            future
-                        ) {
-                            MediaController
-                                .releaseFuture(
-                                    future
-                                )
-
-                            return@onSuccess
-                        }
-
-                        controller =
-                            result
-
-                        result.addListener(
-                            listener
-                        )
-
-                        publish(
-                            result
-                        )
-                    }
-                    .onFailure {
-                        if (
-                            controllerFuture ===
-                            future
-                        ) {
-                            controllerFuture =
-                                null
-                        }
-
-                        mutableState.value =
-                            PlaybackState()
-                    }
             },
-            ContextCompat
-                .getMainExecutor(
-                    context
-                )
+            ContextCompat.getMainExecutor(context)
         )
     }
 
     fun release() {
-        mainHandler.removeCallbacks(
-            sleepTick
-        )
+        mainHandler.removeCallbacks(sleepTick)
+        sleepDeadline = null
 
-        sleepDeadline =
-            null
+        controller?.removeListener(listener)
 
-        controller
-            ?.removeListener(
-                listener
-            )
+        controllerFuture?.let {
+            MediaController.releaseFuture(it)
+        }
 
-        controllerFuture
-            ?.let {
-                MediaController
-                    .releaseFuture(
-                        it
-                    )
-            }
-
-        controllerFuture =
-            null
-
-        controller =
-            null
-
-        songQueue =
-            emptyList()
-
-        mutableState.value =
-            PlaybackState()
+        controllerFuture = null
+        controller = null
+        songQueue = emptyList()
+        mutableState.value = PlaybackState()
     }
-
-    /*
-     * =========================================================
-     * QUEUE / PLAYBACK
-     * =========================================================
-     */
 
     fun play(
         songs: List<Song>,
         index: Int
     ) {
-        val player =
-            controller
-                ?: return
-
-        if (songs.isEmpty()) {
-            return
-        }
+        val player = controller ?: return
+        if (songs.isEmpty()) return
 
         val safeIndex =
-            index.coerceIn(
-                0,
-                songs.lastIndex
-            )
+            index.coerceIn(0, songs.lastIndex)
 
-        songQueue =
-            songs.toList()
+        songQueue = songs.toList()
 
         player.setMediaItems(
-            songQueue.map {
-                it.toMediaItem()
-            },
+            songQueue.map { it.toMediaItem() },
             safeIndex,
             0L
         )
 
         player.prepare()
         player.play()
-
         publish(player)
     }
 
-    fun playSong(
-        songId: Long
-    ) {
-        val player =
-            controller
-                ?: return
-
-        val index =
-            songQueue
-                .indexOfFirst {
-                    it.id ==
-                        songId
-                }
-
-        if (index < 0) {
-            return
-        }
-
-        player.seekTo(
-            index,
-            0L
-        )
-
-        player.play()
-
-        publish(player)
-    }
-
-    fun playQueueIndex(
-        index: Int
-    ) {
-        val player =
-            controller
-                ?: return
+    fun playNext(song: Song) {
+        val player = controller
 
         if (
-            index !in
-            0 until
-                player.mediaItemCount
+            player == null ||
+            player.mediaItemCount == 0 ||
+            player.currentMediaItemIndex < 0
         ) {
+            play(listOf(song), 0)
             return
         }
 
-        player.seekTo(
-            index,
-            0L
-        )
+        val currentIndex =
+            player.currentMediaItemIndex
 
+        val existingIndex =
+            songQueue.indexOfFirst {
+                it.id == song.id
+            }
+
+        if (existingIndex >= 0) {
+            player.removeMediaItem(existingIndex)
+
+            songQueue =
+                songQueue.toMutableList()
+                    .also {
+                        it.removeAt(existingIndex)
+                    }
+
+            val adjustedCurrent =
+                if (existingIndex < currentIndex) {
+                    currentIndex - 1
+                } else {
+                    currentIndex
+                }
+
+            val target =
+                (adjustedCurrent + 1)
+                    .coerceAtMost(songQueue.size)
+
+            player.addMediaItem(
+                target,
+                song.toMediaItem()
+            )
+
+            songQueue =
+                songQueue.toMutableList()
+                    .also {
+                        it.add(target, song)
+                    }
+        } else {
+            val target =
+                (currentIndex + 1)
+                    .coerceAtMost(songQueue.size)
+
+            player.addMediaItem(
+                target,
+                song.toMediaItem()
+            )
+
+            songQueue =
+                songQueue.toMutableList()
+                    .also {
+                        it.add(target, song)
+                    }
+        }
+
+        publish(player)
+    }
+
+    fun playSong(songId: Long) {
+        val player = controller ?: return
+
+        val index =
+            songQueue.indexOfFirst {
+                it.id == songId
+            }
+
+        if (index < 0) return
+
+        player.seekTo(index, 0L)
         player.play()
+        publish(player)
+    }
 
+    fun playQueueIndex(index: Int) {
+        val player = controller ?: return
+
+        if (index !in 0 until player.mediaItemCount) {
+            return
+        }
+
+        player.seekTo(index, 0L)
+        player.play()
         publish(player)
     }
 
     fun togglePlayPause() {
-        val player =
-            controller
-                ?: return
+        val player = controller ?: return
 
         if (player.isPlaying) {
             player.pause()
         } else {
-            if (
-                player.playbackState ==
-                Player.STATE_ENDED
-            ) {
+            if (player.playbackState == Player.STATE_ENDED) {
                 val index =
-                    player
-                        .currentMediaItemIndex
-                        .coerceAtLeast(0)
+                    player.currentMediaItemIndex.coerceAtLeast(0)
 
-                if (
-                    index <
-                    player.mediaItemCount
-                ) {
-                    player.seekTo(
-                        index,
-                        0L
-                    )
+                if (index < player.mediaItemCount) {
+                    player.seekTo(index, 0L)
                 }
             }
 
@@ -307,19 +261,13 @@ internal class PlayerRuntime(
     }
 
     fun play() {
-        val player =
-            controller
-                ?: return
-
+        val player = controller ?: return
         player.play()
         publish(player)
     }
 
     fun pause() {
-        val player =
-            controller
-                ?: return
-
+        val player = controller ?: return
         player.pause()
         publish(player)
     }
@@ -327,20 +275,12 @@ internal class PlayerRuntime(
     fun previous(
         restartThresholdMs: Long
     ) {
-        val player =
-            controller
-                ?: return
+        val player = controller ?: return
 
-        if (
-            player.currentPosition >
-            restartThresholdMs
-        ) {
+        if (player.currentPosition > restartThresholdMs) {
             player.seekTo(0L)
-        } else if (
-            player.hasPreviousMediaItem()
-        ) {
-            player
-                .seekToPreviousMediaItem()
+        } else if (player.hasPreviousMediaItem()) {
+            player.seekToPreviousMediaItem()
         } else {
             player.seekTo(0L)
         }
@@ -349,105 +289,57 @@ internal class PlayerRuntime(
     }
 
     fun previousItem() {
-        val player =
-            controller
-                ?: return
+        val player = controller ?: return
 
-        if (
-            player.hasPreviousMediaItem()
-        ) {
-            player
-                .seekToPreviousMediaItem()
-
+        if (player.hasPreviousMediaItem()) {
+            player.seekToPreviousMediaItem()
             publish(player)
         }
     }
 
     fun next() {
-        val player =
-            controller
-                ?: return
+        val player = controller ?: return
 
-        if (
-            player.hasNextMediaItem()
-        ) {
-            player
-                .seekToNextMediaItem()
-
+        if (player.hasNextMediaItem()) {
+            player.seekToNextMediaItem()
             publish(player)
         }
     }
 
-    fun seekTo(
-        position: Long
-    ) {
-        val player =
-            controller
-                ?: return
-
-        val duration =
-            player.duration
+    fun seekTo(position: Long) {
+        val player = controller ?: return
+        val duration = player.duration
 
         val target =
             if (duration > 0L) {
-                position.coerceIn(
-                    0L,
-                    duration
-                )
+                position.coerceIn(0L, duration)
             } else {
-                position.coerceAtLeast(
-                    0L
-                )
+                position.coerceAtLeast(0L)
             }
 
         player.seekTo(target)
-
         publish(player)
     }
 
-    fun seekBy(
-        amountMs: Long
-    ) {
-        val player =
-            controller
-                ?: return
+    fun seekBy(amountMs: Long) {
+        val player = controller ?: return
 
         seekTo(
-            player.currentPosition +
-                amountMs
+            player.currentPosition + amountMs
         )
     }
 
-    /*
-     * =========================================================
-     * CLOSE PLAYBACK
-     * =========================================================
-     */
-
     fun closePlayback() {
-        mainHandler.removeCallbacks(
-            sleepTick
-        )
+        mainHandler.removeCallbacks(sleepTick)
+        sleepDeadline = null
+        songQueue = emptyList()
 
-        sleepDeadline =
-            null
-
-        songQueue =
-            emptyList()
-
-        val player =
-            controller
+        val player = controller
 
         if (player != null) {
-            /*
-             * MediaController sends these commands to the
-             * PlaybackService. ExoPlayer itself remains service
-             * owned.
-             */
             player.pause()
             player.stop()
             player.clearMediaItems()
-
             publish(player)
         } else {
             mutableState.value =
@@ -455,29 +347,14 @@ internal class PlayerRuntime(
         }
     }
 
-    /*
-     * =========================================================
-     * SHUFFLE / REPEAT
-     * =========================================================
-     */
-
-    fun setShuffle(
-        enabled: Boolean
-    ) {
-        val player =
-            controller
-                ?: return
-
-        player.shuffleModeEnabled =
-            enabled
-
+    fun setShuffle(enabled: Boolean) {
+        val player = controller ?: return
+        player.shuffleModeEnabled = enabled
         publish(player)
     }
 
     fun toggleShuffle() {
-        val player =
-            controller
-                ?: return
+        val player = controller ?: return
 
         player.shuffleModeEnabled =
             !player.shuffleModeEnabled
@@ -485,12 +362,8 @@ internal class PlayerRuntime(
         publish(player)
     }
 
-    fun setRepeatMode(
-        mode: Int
-    ) {
-        val player =
-            controller
-                ?: return
+    fun setRepeatMode(mode: Int) {
+        val player = controller ?: return
 
         player.repeatMode =
             when (mode) {
@@ -508,9 +381,7 @@ internal class PlayerRuntime(
     }
 
     fun cycleRepeatMode() {
-        val player =
-            controller
-                ?: return
+        val player = controller ?: return
 
         player.repeatMode =
             when (player.repeatMode) {
@@ -527,86 +398,46 @@ internal class PlayerRuntime(
         publish(player)
     }
 
-    /*
-     * =========================================================
-     * PLAYBACK PARAMETERS
-     * =========================================================
-     */
-
     fun setPlaybackParameters(
         speed: Float,
         pitch: Float
     ) {
-        val player =
-            controller
-                ?: return
-
-        val safeSpeed =
-            speed.coerceIn(
-                .25f,
-                3f
-            )
-
-        val safePitch =
-            pitch.coerceIn(
-                .5f,
-                2f
-            )
+        val player = controller ?: return
 
         player.playbackParameters =
             PlaybackParameters(
-                safeSpeed,
-                safePitch
+                speed.coerceIn(.25f, 3f),
+                pitch.coerceIn(.5f, 2f)
             )
 
         publish(player)
     }
 
-    fun setPlaybackSpeed(
-        speed: Float
-    ) {
-        val player =
-            controller
-                ?: return
+    fun setPlaybackSpeed(speed: Float) {
+        val player = controller ?: return
 
         setPlaybackParameters(
-            speed = speed,
-            pitch =
-                player
-                    .playbackParameters
-                    .pitch
+            speed,
+            player.playbackParameters.pitch
         )
     }
-
-    /*
-     * =========================================================
-     * SLEEP TIMER
-     * =========================================================
-     */
 
     private val sleepTick =
         object : Runnable {
             override fun run() {
                 val deadline =
-                    sleepDeadline
-                        ?: return
+                    sleepDeadline ?: return
 
                 val remaining =
                     (
                         deadline -
-                            SystemClock
-                                .elapsedRealtime()
-                        )
-                        .coerceAtLeast(0L)
+                            SystemClock.elapsedRealtime()
+                        ).coerceAtLeast(0L)
 
                 if (remaining <= 0L) {
-                    sleepDeadline =
-                        null
-
+                    sleepDeadline = null
                     controller?.pause()
-
                     publish()
-
                     return
                 }
 
@@ -614,127 +445,78 @@ internal class PlayerRuntime(
 
                 mainHandler.postDelayed(
                     this,
-                    minOf(
-                        1_000L,
-                        remaining
-                    )
+                    minOf(1_000L, remaining)
                 )
             }
         }
 
-    fun setSleepTimer(
-        durationMs: Long
-    ) {
-        mainHandler.removeCallbacks(
-            sleepTick
-        )
+    fun setSleepTimer(durationMs: Long) {
+        mainHandler.removeCallbacks(sleepTick)
 
         if (durationMs <= 0L) {
-            sleepDeadline =
-                null
-
+            sleepDeadline = null
             publish()
-
             return
         }
 
         sleepDeadline =
-            SystemClock
-                .elapsedRealtime() +
+            SystemClock.elapsedRealtime() +
                 durationMs
 
-        mainHandler.post(
-            sleepTick
-        )
+        mainHandler.post(sleepTick)
     }
 
     fun cancelSleepTimer() {
-        sleepDeadline =
-            null
-
-        mainHandler.removeCallbacks(
-            sleepTick
-        )
-
+        sleepDeadline = null
+        mainHandler.removeCallbacks(sleepTick)
         publish()
     }
 
     fun sleepTimerRemaining(): Long {
         val deadline =
-            sleepDeadline
-                ?: return 0L
+            sleepDeadline ?: return 0L
 
         return (
             deadline -
                 SystemClock.elapsedRealtime()
-            )
-            .coerceAtLeast(0L)
+            ).coerceAtLeast(0L)
     }
 
-    /*
-     * =========================================================
-     * PUBLIC STATE HELPERS
-     * =========================================================
-     */
-
     fun publish() {
-        controller?.let {
-            publish(it)
-        }
+        controller?.let(::publish)
     }
 
     fun currentSong(): Song? {
         val id =
-            mutableState
-                .value
-                .currentSongId
+            mutableState.value.currentSongId
                 ?: return null
 
-        return songQueue
-            .firstOrNull {
-                it.id == id
-            }
+        return songQueue.firstOrNull {
+            it.id == id
+        }
     }
 
     fun queue(): List<Song> =
         songQueue
 
-    fun queueSong(
-        index: Int
-    ): Song? =
-        songQueue
-            .getOrNull(index)
+    fun queueSong(index: Int): Song? =
+        songQueue.getOrNull(index)
 
-    /*
-     * =========================================================
-     * STATE PUBLISHING
-     * =========================================================
-     */
-
-    private fun publish(
-        player: Player
-    ) {
-        val item =
-            player.currentMediaItem
-
-        val metadata =
-            item?.mediaMetadata
+    private fun publish(player: Player) {
+        val item = player.currentMediaItem
+        val metadata = item?.mediaMetadata
 
         val duration =
-            player.duration
-                .takeIf {
-                    it > 0L
-                }
-                ?: 0L
+            player.duration.takeIf {
+                it > 0L
+            } ?: 0L
 
         val position =
             player.currentPosition
                 .coerceAtLeast(0L)
                 .let {
                     if (duration > 0L) {
-                        it.coerceAtMost(
-                            duration
-                        )
+                        it.coerceAtMost(duration)
                     } else {
                         it
                     }
@@ -746,106 +528,59 @@ internal class PlayerRuntime(
         mutableState.value =
             PlaybackState(
                 connected = true,
-
                 currentSongId =
-                    item
-                        ?.mediaId
-                        ?.toLongOrNull(),
-
+                    item?.mediaId?.toLongOrNull(),
                 title =
-                    metadata
-                        ?.title
-                        ?.toString()
-                        .orEmpty(),
-
+                    metadata?.title?.toString().orEmpty(),
                 artist =
-                    metadata
-                        ?.artist
-                        ?.toString()
-                        .orEmpty(),
-
+                    metadata?.artist?.toString().orEmpty(),
                 album =
-                    metadata
-                        ?.albumTitle
-                        ?.toString()
-                        .orEmpty(),
-
+                    metadata?.albumTitle?.toString().orEmpty(),
                 artworkUri =
-                    metadata
-                        ?.artworkUri
-                        ?.toString(),
-
+                    metadata?.artworkUri?.toString(),
                 isPlaying =
                     player.isPlaying,
-
                 duration =
                     duration,
-
                 position =
                     position,
-
                 currentIndex =
-                    if (
-                        item != null
-                    ) {
-                        player
-                            .currentMediaItemIndex
+                    if (item != null) {
+                        player.currentMediaItemIndex
                     } else {
                         -1
                     },
-
                 hasPrevious =
-                    player
-                        .hasPreviousMediaItem(),
-
+                    player.hasPreviousMediaItem(),
                 hasNext =
-                    player
-                        .hasNextMediaItem(),
-
+                    player.hasNextMediaItem(),
                 shuffleEnabled =
                     player.shuffleModeEnabled,
-
                 repeatMode =
                     player.repeatMode,
-
                 playbackSpeed =
                     parameters.speed,
-
                 playbackPitch =
                     parameters.pitch,
-
                 sleepTimerRemainingMs =
                     sleepTimerRemaining()
             )
     }
 }
 
-/*
- * =============================================================
- * SONG -> MEDIA3
- * =============================================================
- */
-
-private fun Song.toMediaItem():
-    MediaItem {
+private fun Song.toMediaItem(): MediaItem {
     val metadata =
         MediaMetadata.Builder()
             .setTitle(title)
             .setArtist(artist)
             .setAlbumTitle(album)
-            .setAlbumArtist(
-                albumArtist
-            )
+            .setAlbumArtist(albumArtist)
             .setArtworkUri(artwork)
             .build()
 
     return MediaItem.Builder()
-        .setMediaId(
-            id.toString()
-        )
+        .setMediaId(id.toString())
         .setUri(uri)
-        .setMediaMetadata(
-            metadata
-        )
+        .setMediaMetadata(metadata)
         .build()
 }
