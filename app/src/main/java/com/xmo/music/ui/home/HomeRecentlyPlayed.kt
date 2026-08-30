@@ -1,8 +1,10 @@
 package com.xmo.music.ui.home
 
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,9 +46,9 @@ import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.abs
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun HomeRecentlyPlayed(
     songs: List<Song>,
@@ -55,61 +58,68 @@ internal fun HomeRecentlyPlayed(
 ) {
     if (songs.isEmpty()) return
 
-    val middle = remember(songs.size) {
-        val center = Int.MAX_VALUE / 2
-        center - center % songs.size
-    }
+    val state = rememberLazyListState()
+    val fling =
+        rememberSnapFlingBehavior(state)
 
-    val state = rememberLazyListState(
-        initialFirstVisibleItemIndex = middle
-    )
-
-    var selected by remember {
+    var current by remember {
         mutableIntStateOf(0)
     }
 
-    LaunchedEffect(state, songs.size) {
+    LaunchedEffect(state) {
         snapshotFlow {
             val layout = state.layoutInfo
             val center =
-                (layout.viewportStartOffset + layout.viewportEndOffset) / 2
+                (
+                    layout.viewportStartOffset +
+                        layout.viewportEndOffset
+                    ) / 2
 
-            layout.visibleItemsInfo.minByOrNull {
-                abs((it.offset + it.size / 2) - center)
-            }?.index
-        }
-            .distinctUntilChanged()
-            .collect { index ->
-                if (index != null) {
-                    selected = Math.floorMod(index, songs.size)
+            layout.visibleItemsInfo
+                .minByOrNull {
+                    abs(
+                        it.offset +
+                            it.size / 2 -
+                            center
+                    )
                 }
-            }
+                ?.index
+                ?: 0
+        }.collect {
+            current = it
+        }
     }
 
     BoxWithConstraints(
         Modifier.fillMaxWidth()
     ) {
         val cardWidth = 284.dp
-        val sidePadding =
-            ((maxWidth - cardWidth) / 2).coerceAtLeast(12.dp)
+        val side =
+            ((maxWidth - cardWidth) / 2)
+                .coerceAtLeast(12.dp)
 
         Column(
             Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
+            horizontalAlignment =
+                Alignment.CenterHorizontally
         ) {
             LazyRow(
                 state = state,
-                contentPadding = PaddingValues(horizontal = sidePadding),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                flingBehavior = fling,
+                contentPadding =
+                    PaddingValues(
+                        horizontal = side
+                    ),
+                horizontalArrangement =
+                    Arrangement.spacedBy(12.dp)
             ) {
-                items(
-                    count = Int.MAX_VALUE,
-                    key = { it }
-                ) { index ->
-                    val song =
-                        songs[Math.floorMod(index, songs.size)]
-
-                    RecentSongCard(
+                itemsIndexed(
+                    items = songs,
+                    key = { _, song ->
+                        song.id
+                    }
+                ) { _, song ->
+                    RecentCard(
                         song = song,
                         c = c,
                         play = {
@@ -122,15 +132,30 @@ internal fun HomeRecentlyPlayed(
                 }
             }
 
+            val dots =
+                minOf(6, songs.size)
+
+            val active =
+                if (songs.size <= 1) {
+                    0
+                } else {
+                    (
+                        current.toFloat() /
+                            (songs.size - 1) *
+                            (dots - 1)
+                        ).toInt()
+                }
+
             Row(
                 Modifier.padding(top = 11.dp),
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                horizontalArrangement =
+                    Arrangement.spacedBy(6.dp)
             ) {
-                songs.forEachIndexed { index, _ ->
+                repeat(dots) { index ->
                     Box(
                         Modifier
                             .size(
-                                if (selected == index) {
+                                if (index == active) {
                                     7.dp
                                 } else {
                                     5.dp
@@ -138,10 +163,10 @@ internal fun HomeRecentlyPlayed(
                             )
                             .clip(CircleShape)
                             .background(
-                                if (selected == index) {
+                                if (index == active) {
                                     LocalXmoAccent.current
                                 } else {
-                                    c.sub.copy(alpha = .35f)
+                                    c.sub.copy(alpha = .32f)
                                 }
                             )
                     )
@@ -152,7 +177,7 @@ internal fun HomeRecentlyPlayed(
 }
 
 @Composable
-private fun RecentSongCard(
+private fun RecentCard(
     song: Song,
     c: HomeColors,
     play: () -> Unit,
@@ -189,7 +214,9 @@ private fun RecentSongCard(
                         listOf(
                             Color.Transparent,
                             Color.Transparent,
-                            Color.Black.copy(alpha = .82f)
+                            Color.Black.copy(
+                                alpha = .82f
+                            )
                         )
                     )
                 )
@@ -214,7 +241,9 @@ private fun RecentSongCard(
                 .padding(10.dp)
                 .size(34.dp)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = .46f)),
+                .background(
+                    Color.Black.copy(alpha = .46f)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
