@@ -84,6 +84,7 @@ internal fun XmoAppContent(
                                     recentPlays =
                                         state.recentPlays,
                                     scanning = state.scanning,
+                                    playback = state.playback,
                                     refresh = {
                                         if (state.allowed) {
                                             actions.refreshLibrary()
@@ -99,6 +100,10 @@ internal fun XmoAppContent(
                                         actions.saveCategories,
                                     toggleLike =
                                         actions.toggleLike,
+                                    playNext =
+                                        actions.playNext,
+                                    removeRecent =
+                                        actions.removeRecent,
                                     setSongInCategory =
                                         actions.setSongInCategory,
                                     onPlaySong =
