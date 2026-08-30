@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,7 +41,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
+import com.xmo.music.ui.LocalXmoAccent
+import com.xmo.music.ui.XmoFont
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.abs
 
 @Composable
 internal fun HomeRecentlyPlayed(
@@ -67,13 +71,11 @@ internal fun HomeRecentlyPlayed(
     LaunchedEffect(state, songs.size) {
         snapshotFlow {
             val layout = state.layoutInfo
-            val viewportCenter =
+            val center =
                 (layout.viewportStartOffset + layout.viewportEndOffset) / 2
 
             layout.visibleItemsInfo.minByOrNull {
-                kotlin.math.abs(
-                    (it.offset + it.size / 2) - viewportCenter
-                )
+                abs((it.offset + it.size / 2) - center)
             }?.index
         }
             .distinctUntilChanged()
@@ -88,7 +90,8 @@ internal fun HomeRecentlyPlayed(
         Modifier.fillMaxWidth()
     ) {
         val cardWidth = 284.dp
-        val sidePadding = ((maxWidth - cardWidth) / 2).coerceAtLeast(12.dp)
+        val sidePadding =
+            ((maxWidth - cardWidth) / 2).coerceAtLeast(12.dp)
 
         Column(
             Modifier.fillMaxWidth(),
@@ -103,7 +106,8 @@ internal fun HomeRecentlyPlayed(
                     count = Int.MAX_VALUE,
                     key = { it }
                 ) { index ->
-                    val song = songs[Math.floorMod(index, songs.size)]
+                    val song =
+                        songs[Math.floorMod(index, songs.size)]
 
                     RecentSongCard(
                         song = song,
@@ -118,7 +122,7 @@ internal fun HomeRecentlyPlayed(
                 }
             }
 
-            androidx.compose.foundation.layout.Row(
+            Row(
                 Modifier.padding(top = 11.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
@@ -126,7 +130,11 @@ internal fun HomeRecentlyPlayed(
                     Box(
                         Modifier
                             .size(
-                                if (selected == index) 7.dp else 5.dp
+                                if (selected == index) {
+                                    7.dp
+                                } else {
+                                    5.dp
+                                }
                             )
                             .clip(CircleShape)
                             .background(
