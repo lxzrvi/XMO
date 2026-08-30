@@ -1,5 +1,11 @@
 package com.xmo.music.ui.home
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,6 +29,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -44,15 +51,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
+import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun HomeRecentlyPlayed(
     songs: List<Song>,
     c: HomeColors,
+    playback: PlaybackState,
     play: (Song) -> Unit,
     options: (Song) -> Unit
 ) {
@@ -93,7 +103,10 @@ internal fun HomeRecentlyPlayed(
     BoxWithConstraints(
         Modifier.fillMaxWidth()
     ) {
-        val cardWidth = 284.dp
+        val cardWidth =
+            (maxWidth - 44.dp)
+                .coerceAtMost(320.dp)
+
         val side =
             ((maxWidth - cardWidth) / 2)
                 .coerceAtLeast(12.dp)
@@ -107,9 +120,7 @@ internal fun HomeRecentlyPlayed(
                 state = state,
                 flingBehavior = fling,
                 contentPadding =
-                    PaddingValues(
-                        horizontal = side
-                    ),
+                    PaddingValues(horizontal = side),
                 horizontalArrangement =
                     Arrangement.spacedBy(12.dp)
             ) {
@@ -122,6 +133,14 @@ internal fun HomeRecentlyPlayed(
                     RecentCard(
                         song = song,
                         c = c,
+                        width = cardWidth,
+                        current =
+                            playback.currentSongId ==
+                                song.id,
+                        playing =
+                            playback.currentSongId ==
+                                song.id &&
+                                playback.isPlaying,
                         play = {
                             play(song)
                         },
@@ -143,7 +162,9 @@ internal fun HomeRecentlyPlayed(
                         current.toFloat() /
                             (songs.size - 1) *
                             (dots - 1)
-                        ).toInt()
+                        )
+                        .roundToInt()
+                        .coerceIn(0, dots - 1)
                 }
 
             Row(
@@ -180,13 +201,16 @@ internal fun HomeRecentlyPlayed(
 private fun RecentCard(
     song: Song,
     c: HomeColors,
+    width: androidx.compose.ui.unit.Dp,
+    current: Boolean,
+    playing: Boolean,
     play: () -> Unit,
     options: () -> Unit
 ) {
     Box(
         Modifier
-            .width(284.dp)
-            .height(112.dp)
+            .width(width)
+            .height(116.dp)
             .clip(RoundedCornerShape(18.dp))
             .combinedClickable(
                 onClick = play,
@@ -194,7 +218,7 @@ private fun RecentCard(
             )
             .background(c.surface)
             .border(
-                .7.dp,
+                .6.dp,
                 c.border,
                 RoundedCornerShape(18.dp)
             )
@@ -214,9 +238,7 @@ private fun RecentCard(
                         listOf(
                             Color.Transparent,
                             Color.Transparent,
-                            Color.Black.copy(
-                                alpha = .82f
-                            )
+                            Color.Black.copy(alpha = .84f)
                         )
                     )
                 )
@@ -231,27 +253,88 @@ private fun RecentCard(
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .fillMaxWidth(.76f)
+                .fillMaxWidth(.72f)
                 .padding(12.dp)
         )
 
-        Box(
-            Modifier
+        AnimatedContent(
+            targetState = current to playing,
+            transitionSpec = {
+                fadeIn(
+                    spring(stiffness = 700f)
+                ) togetherWith
+                    fadeOut(
+                        spring(stiffness = 700f)
+                    ) using
+                    SizeTransform(
+                        clip = false
+                    )
+            },
+            label = "recentPlaying",
+            modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(10.dp)
-                .size(34.dp)
-                .clip(CircleShape)
-                .background(
-                    Color.Black.copy(alpha = .46f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.PlayArrow,
-                contentDescription = "Play",
-                tint = Color.White,
-                modifier = Modifier.size(21.dp)
-            )
+        ) { state ->
+            val isCurrent = state.first
+            val isPlaying = state.second
+
+            if (isCurrent) {
+                Row(
+                    Modifier
+                        .height(34.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(
+                            Color.Black.copy(alpha = .56f)
+                        )
+                        .padding(horizontal = 10.dp),
+                    verticalAlignment =
+                        Alignment.CenterVertically,
+                    horizontalArrangement =
+                        Arrangement.spacedBy(5.dp)
+                ) {
+                    Icon(
+                        imageVector =
+                            if (isPlaying) {
+                                Icons.Rounded.Pause
+                            } else {
+                                Icons.Rounded.PlayArrow
+                            },
+                        contentDescription = null,
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
+
+                    Text(
+                        text =
+                            if (isPlaying) {
+                                "Playing"
+                            } else {
+                                "Paused"
+                            },
+                        color = Color.White,
+                        fontFamily = XmoFont.medium,
+                        fontSize = 9.sp
+                    )
+                }
+            } else {
+                Box(
+                    Modifier
+                        .size(34.dp)
+                        .clip(CircleShape)
+                        .background(
+                            Color.Black.copy(alpha = .46f)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector =
+                            Icons.Rounded.PlayArrow,
+                        contentDescription = "Play",
+                        tint = Color.White,
+                        modifier = Modifier.size(21.dp)
+                    )
+                }
+            }
         }
     }
 }
