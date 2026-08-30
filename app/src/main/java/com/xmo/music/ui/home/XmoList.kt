@@ -79,11 +79,13 @@ internal fun XmoSongList(
     song: Song,
     liked: Boolean,
     recent: Boolean,
+    categoryName: String?,
     c: HomeColors,
     dismiss: () -> Unit,
     toggleLike: () -> Unit,
     playNext: () -> Unit,
-    removeRecent: () -> Unit
+    removeRecent: () -> Unit,
+    removeCategory: () -> Unit
 ) {
     val context = LocalContext.current
 
@@ -114,23 +116,34 @@ internal fun XmoSongList(
             )
         }
 
-        XmoListAction(
-            title =
-                if (liked) {
-                    "Remove from Liked Songs"
-                } else {
-                    "Add to Liked Songs"
-                },
-            icon =
-                if (liked) {
-                    Icons.Rounded.Favorite
-                } else {
-                    Icons.Rounded.FavoriteBorder
-                },
-            active = liked,
-            c = c,
-            click = toggleLike
-        )
+        if (categoryName != null) {
+            XmoListAction(
+                title = "Remove from $categoryName",
+                icon = Icons.Rounded.Delete,
+                c = c
+            ) {
+                removeCategory()
+                dismiss()
+            }
+        } else {
+            XmoListAction(
+                title =
+                    if (liked) {
+                        "Remove from Liked Songs"
+                    } else {
+                        "Add to Liked Songs"
+                    },
+                icon =
+                    if (liked) {
+                        Icons.Rounded.Favorite
+                    } else {
+                        Icons.Rounded.FavoriteBorder
+                    },
+                active = liked,
+                c = c,
+                click = toggleLike
+            )
+        }
 
         XmoListAction(
             title = "Play Next",
@@ -146,24 +159,20 @@ internal fun XmoSongList(
             icon = Icons.Rounded.Share,
             c = c
         ) {
-            val intent =
-                Intent(Intent.ACTION_SEND)
-                    .setType("audio/*")
-                    .putExtra(
-                        Intent.EXTRA_STREAM,
-                        song.uri
-                    )
-                    .addFlags(
-                        Intent.FLAG_GRANT_READ_URI_PERMISSION
-                    )
-
             context.startActivity(
                 Intent.createChooser(
-                    intent,
+                    Intent(Intent.ACTION_SEND)
+                        .setType("audio/*")
+                        .putExtra(
+                            Intent.EXTRA_STREAM,
+                            song.uri
+                        )
+                        .addFlags(
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        ),
                     "Share song"
                 )
             )
-
             dismiss()
         }
 
@@ -221,8 +230,7 @@ internal fun XmoListAction(
                 },
             fontFamily = XmoFont.medium,
             fontSize = 12.sp,
-            modifier =
-                Modifier.padding(start = 14.dp)
+            modifier = Modifier.padding(start = 14.dp)
         )
     }
 }
