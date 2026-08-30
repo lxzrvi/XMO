@@ -3,14 +3,13 @@ package com.xmo.music.ui.home
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -59,7 +58,9 @@ fun Home(
         }.getOrDefault(HomeMode.Home)
 
     var page by remember(mode) {
-        mutableStateOf<HomePage>(HomePage.Root)
+        mutableStateOf<HomePage>(
+            HomePage.Root
+        )
     }
 
     var menu by remember {
@@ -91,26 +92,38 @@ fun Home(
     }
 
     var categorySelection by remember {
-        mutableStateOf<Set<Long>>(emptySet())
+        mutableStateOf<Set<Long>>(
+            emptySet()
+        )
     }
 
     val likedSongs =
-        remember(songs, likedSongIds) {
+        remember(
+            songs,
+            likedSongIds
+        ) {
             songs.filter {
                 it.id in likedSongIds
             }
         }
 
     val recentSongs =
-        remember(songs, recentPlays) {
+        remember(
+            songs,
+            recentPlays
+        ) {
             val map =
-                songs.associateBy { it.id }
+                songs.associateBy {
+                    it.id
+                }
 
             recentPlays
                 .mapNotNull {
                     map[it.songId]
                 }
-                .distinctBy { it.id }
+                .distinctBy {
+                    it.id
+                }
                 .take(12)
         }
 
@@ -119,19 +132,20 @@ fun Home(
             page != HomePage.Root ||
                 mode != HomeMode.Home
     ) {
-        when (page) {
-            is HomePage.CategoryPicker -> {
-                val id =
-                    (page as HomePage.CategoryPicker).id
-
-                page = HomePage.Category(id)
-            }
+        when (val current = page) {
+            is HomePage.CategoryPicker ->
+                page =
+                    HomePage.Category(
+                        current.id
+                    )
 
             is HomePage.Category ->
                 page = HomePage.Root
 
             HomePage.Root ->
-                changeMode(HomeMode.Home.name)
+                changeMode(
+                    HomeMode.Home.name
+                )
         }
     }
 
@@ -139,6 +153,9 @@ fun Home(
         Modifier
             .fillMaxSize()
             .background(c.bg)
+            .windowInsetsPadding(
+                WindowInsets.statusBars
+            )
     ) {
         HomeHeader(
             c = c,
@@ -148,8 +165,7 @@ fun Home(
             openMenu = {
                 menu = true
             },
-            openProfile = openProfile,
-            modifier = Modifier
+            openProfile = openProfile
         )
 
         when (val current = page) {
@@ -158,20 +174,28 @@ fun Home(
                     HomeMode.Home -> {
                         HomeRoot(
                             songs = songs,
-                            recentSongs = recentSongs,
+                            recentSongs =
+                                recentSongs,
                             allowed = allowed,
                             theme = theme,
                             c = c,
                             playback = playback,
-                            togglePlay = togglePlay,
-                            play = onPlaySong,
+                            togglePlay =
+                                togglePlay,
+                            play =
+                                onPlaySong,
                             options = {
                                     song,
                                     recent ->
 
-                                recentOption = recent
-                                optionCategoryId = null
-                                optionsSong = song
+                                recentOption =
+                                    recent
+
+                                optionCategoryId =
+                                    null
+
+                                optionsSong =
+                                    song
                             }
                         )
                     }
@@ -238,9 +262,11 @@ fun Home(
 
             is HomePage.Category -> {
                 val category =
-                    categories.firstOrNull {
-                        it.id == current.id
-                    }
+                    categories
+                        .firstOrNull {
+                            it.id ==
+                                current.id
+                        }
 
                 if (category != null) {
                     HomeCategoryDetail(
@@ -249,7 +275,8 @@ fun Home(
                         playback = playback,
                         c = c,
                         back = {
-                            page = HomePage.Root
+                            page =
+                                HomePage.Root
                         },
                         add = {
                             page =
@@ -260,10 +287,13 @@ fun Home(
                         delete = {
                             saveCategories(
                                 categories.filterNot {
-                                    it.id == category.id
+                                    it.id ==
+                                        category.id
                                 }
                             )
-                            page = HomePage.Root
+
+                            page =
+                                HomePage.Root
                         },
                         shuffle = {
                             shuffleSongs(
@@ -290,16 +320,16 @@ fun Home(
                             optionsSong = it
                         }
                     )
-                } else {
-                    page = HomePage.Root
                 }
             }
 
             is HomePage.CategoryPicker -> {
                 val category =
-                    categories.firstOrNull {
-                        it.id == current.id
-                    }
+                    categories
+                        .firstOrNull {
+                            it.id ==
+                                current.id
+                        }
 
                 if (category != null) {
                     HomeCategoryPicker(
@@ -323,8 +353,6 @@ fun Home(
                             )
                         }
                     )
-                } else {
-                    page = HomePage.Root
                 }
             }
         }
@@ -339,7 +367,9 @@ fun Home(
             liked = {
                 menu = false
                 page = HomePage.Root
-                changeMode(HomeMode.Liked.name)
+                changeMode(
+                    HomeMode.Liked.name
+                )
             },
             categories = {
                 menu = false
@@ -372,7 +402,8 @@ fun Home(
     if (createCategory) {
         HomeCreateCategory(
             name = categoryName,
-            selected = categorySelection,
+            selected =
+                categorySelection,
             songs = songs,
             c = c,
             changeName = {
@@ -381,11 +412,14 @@ fun Home(
             toggle = { song ->
                 categorySelection =
                     if (
-                        song.id in categorySelection
+                        song.id in
+                        categorySelection
                     ) {
-                        categorySelection - song.id
+                        categorySelection -
+                            song.id
                     } else {
-                        categorySelection + song.id
+                        categorySelection +
+                            song.id
                     }
             },
             create = {
@@ -394,7 +428,8 @@ fun Home(
 
                 if (
                     name.isNotEmpty() &&
-                    categorySelection.isNotEmpty()
+                    categorySelection
+                        .isNotEmpty()
                 ) {
                     val category =
                         UserCategory(
@@ -402,44 +437,51 @@ fun Home(
                                 "cat_${UUID.randomUUID()}",
                             name = name,
                             icon =
-                                categories.size % 4,
+                                categories.size %
+                                    4,
                             songIds =
                                 categorySelection
                         )
 
                     saveCategories(
-                        categories + category
+                        categories +
+                            category
                     )
 
                     createCategory = false
                     categoryName = ""
-                    categorySelection = emptySet()
+                    categorySelection =
+                        emptySet()
                 }
             },
             dismiss = {
                 createCategory = false
                 categoryName = ""
-                categorySelection = emptySet()
+                categorySelection =
+                    emptySet()
             }
         )
     }
 
     optionsSong?.let { song ->
-        val categoryId =
-            optionCategoryId
-
         val category =
-            categoryId?.let { id ->
-                categories.firstOrNull {
-                    it.id == id
+            optionCategoryId
+                ?.let { id ->
+                    categories
+                        .firstOrNull {
+                            it.id == id
+                        }
                 }
-            }
 
         XmoSongList(
             song = song,
-            liked = song.id in likedSongIds,
-            recent = recentOption,
-            categoryName = category?.name,
+            liked =
+                song.id in
+                    likedSongIds,
+            recent =
+                recentOption,
+            categoryName =
+                category?.name,
             c = c,
             dismiss = {
                 optionsSong = null
@@ -477,21 +519,36 @@ private fun HomeRoot(
     c: HomeColors,
     playback: PlaybackState,
     togglePlay: () -> Unit,
-    play: (Song, String, Boolean, List<Song>) -> Unit,
-    options: (Song, Boolean) -> Unit
+    play: (
+        Song,
+        String,
+        Boolean,
+        List<Song>
+    ) -> Unit,
+    options: (
+        Song,
+        Boolean
+    ) -> Unit
 ) {
     Column(
         Modifier.fillMaxSize()
     ) {
+        Spacer(
+            Modifier.height(7.dp)
+        )
+
         SectionTitle(
             title = "Recently Played",
             subtitle =
-                if (recentSongs.isEmpty()) {
+                if (
+                    recentSongs.isEmpty()
+                ) {
                     "Nothing played yet"
                 } else {
                     "${recentSongs.size} recent tracks"
                 },
-            icon = R.drawable.ic_xmo_history,
+            icon =
+                R.drawable.ic_xmo_history,
             c = c
         )
 
@@ -513,18 +570,32 @@ private fun HomeRoot(
                         recentSongs
                     )
                 },
-                togglePlay = togglePlay,
+                togglePlay =
+                    togglePlay,
                 options = {
-                    options(it, true)
+                    options(
+                        it,
+                        true
+                    )
                 }
             )
         }
 
+        Spacer(
+            Modifier.height(7.dp)
+        )
+
         SectionTitle(
             title = "All Songs",
-            subtitle = "${songs.size} songs",
-            icon = R.drawable.ic_xmo_songs,
+            subtitle =
+                "${songs.size} songs",
+            icon =
+                R.drawable.ic_xmo_songs,
             c = c
+        )
+
+        Spacer(
+            Modifier.height(5.dp)
         )
 
         HomeAllSongs(
@@ -534,20 +605,18 @@ private fun HomeRoot(
             theme = theme,
             playback = playback,
             play = {
-                if (
-                    playback.currentSongId !=
-                    it.id
-                ) {
-                    play(
-                        it,
-                        "All Songs",
-                        false,
-                        songs
-                    )
-                }
+                play(
+                    it,
+                    "All Songs",
+                    false,
+                    songs
+                )
             },
             options = {
-                options(it, false)
+                options(
+                    it,
+                    false
+                )
             }
         )
     }
