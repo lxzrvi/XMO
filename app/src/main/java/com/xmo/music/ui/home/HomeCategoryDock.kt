@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -44,6 +44,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.xmo.music.ui.LocalXmoAccent
+import com.xmo.music.ui.XmoFont
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
@@ -92,11 +94,10 @@ internal fun HomeCategoryDock(
         }
     }
 
-    fun itemInfo(id: String): LazyListItemInfo? {
-        return state.layoutInfo.visibleItemsInfo.firstOrNull {
+    fun itemInfo(id: String): LazyListItemInfo? =
+        state.layoutInfo.visibleItemsInfo.firstOrNull {
             it.key == "category_$id"
         }
-    }
 
     fun stopAutoScroll() {
         autoScroll?.cancel()
@@ -107,37 +108,52 @@ internal fun HomeCategoryDock(
         val from = preview.indexOf(id)
         if (from < 0) return
 
-        val visible = state.layoutInfo.visibleItemsInfo
-            .filter {
-                val key = it.key as? String
-                key?.startsWith("category_") == true
-            }
-
         var destination = from
 
-        visible.forEach { item ->
+        state.layoutInfo.visibleItemsInfo.forEach { item ->
             val key = item.key as? String ?: return@forEach
-            val candidate = key.removePrefix("category_")
-            if (candidate == id) return@forEach
 
-            val candidateIndex = preview.indexOf(candidate)
-            if (candidateIndex < 0) return@forEach
+            if (!key.startsWith("category_")) {
+                return@forEach
+            }
 
-            val center = item.offset + item.size / 2f
+            val candidate =
+                key.removePrefix("category_")
+
+            if (candidate == id) {
+                return@forEach
+            }
+
+            val candidateIndex =
+                preview.indexOf(candidate)
+
+            if (candidateIndex < 0) {
+                return@forEach
+            }
+
+            val center =
+                item.offset + item.size / 2f
 
             if (candidateIndex < from && fingerX < center) {
-                destination = minOf(destination, candidateIndex)
+                destination =
+                    minOf(destination, candidateIndex)
             }
 
             if (candidateIndex > from && fingerX > center) {
-                destination = maxOf(destination, candidateIndex)
+                destination =
+                    maxOf(destination, candidateIndex)
             }
         }
 
         if (destination != from) {
             val next = preview.toMutableList()
             val moving = next.removeAt(from)
-            next.add(destination.coerceIn(0, next.size), moving)
+
+            next.add(
+                destination.coerceIn(0, next.size),
+                moving
+            )
+
             preview = next
         }
     }
@@ -151,7 +167,10 @@ internal fun HomeCategoryDock(
             state = state,
             userScrollEnabled = draggingId == null,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            contentPadding = PaddingValues(
+                horizontal = 10.dp,
+                vertical = 6.dp
+            ),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             item(key = "all") {
@@ -182,19 +201,24 @@ internal fun HomeCategoryDock(
                 items = preview,
                 key = { "category_$it" }
             ) { id ->
-                val section = sections[id] ?: return@items
-                val dragging = draggingId == id
+                val section =
+                    sections[id] ?: return@items
+
+                val dragging =
+                    draggingId == id
 
                 Box(
                     Modifier
                         .graphicsLayer {
-                            alpha = if (dragging) .12f else 1f
+                            alpha =
+                                if (dragging) .12f else 1f
                         }
                         .pointerInput(id, order) {
                             detectDragGesturesAfterLongPress(
                                 onDragStart = { local ->
-                                    val info = itemInfo(id)
-                                        ?: return@detectDragGesturesAfterLongPress
+                                    val info =
+                                        itemInfo(id)
+                                            ?: return@detectDragGesturesAfterLongPress
 
                                     draggingId = id
                                     fingerX = info.offset + local.x
@@ -209,22 +233,27 @@ internal fun HomeCategoryDock(
                                     fingerX += amount.x
                                     moveFromFinger(id)
 
-                                    val start = state.layoutInfo
-                                        .viewportStartOffset
-                                        .toFloat()
+                                    val start =
+                                        state.layoutInfo
+                                            .viewportStartOffset
+                                            .toFloat()
 
-                                    val end = state.layoutInfo
-                                        .viewportEndOffset
-                                        .toFloat()
+                                    val end =
+                                        state.layoutInfo
+                                            .viewportEndOffset
+                                            .toFloat()
 
-                                    val left = fingerX < start + edge &&
-                                        state.canScrollBackward
+                                    val left =
+                                        fingerX < start + edge &&
+                                            state.canScrollBackward
 
-                                    val right = fingerX > end - edge &&
-                                        state.canScrollForward
+                                    val right =
+                                        fingerX > end - edge &&
+                                            state.canScrollForward
 
                                     if (left || right) {
-                                        val direction = if (left) -1f else 1f
+                                        val direction =
+                                            if (left) -1f else 1f
 
                                         if (autoScroll?.isActive != true) {
                                             autoScroll = scope.launch {
@@ -232,9 +261,10 @@ internal fun HomeCategoryDock(
                                                     isActive &&
                                                     draggingId == id
                                                 ) {
-                                                    val consumed = state.scrollBy(
-                                                        direction * 15f
-                                                    )
+                                                    val consumed =
+                                                        state.scrollBy(
+                                                            direction * 15f
+                                                        )
 
                                                     moveFromFinger(id)
 
@@ -301,7 +331,8 @@ internal fun HomeCategoryDock(
         }
 
         draggingId?.let { id ->
-            val section = sections[id] ?: return@let
+            val section =
+                sections[id] ?: return@let
 
             Box(
                 Modifier
@@ -327,7 +358,7 @@ internal fun HomeCategoryDock(
 }
 
 @Composable
-internal fun CategoryChip(
+private fun CategoryChip(
     text: String,
     active: Boolean,
     c: HomeColors,
@@ -358,7 +389,10 @@ internal fun CategoryChip(
                 RoundedCornerShape(18.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(
+                horizontal = 13.dp,
+                vertical = 7.dp
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
@@ -392,16 +426,27 @@ private fun FixedCategoryChip(
     Row(
         Modifier
             .background(
-                if (active) accent.copy(alpha = .17f) else c.button,
+                if (active) {
+                    accent.copy(alpha = .17f)
+                } else {
+                    c.button
+                },
                 RoundedCornerShape(18.dp)
             )
             .border(
                 .6.dp,
-                if (active) accent.copy(alpha = .34f) else c.border,
+                if (active) {
+                    accent.copy(alpha = .34f)
+                } else {
+                    c.border
+                },
                 RoundedCornerShape(18.dp)
             )
             .clickable(onClick = onClick)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
+            .padding(
+                horizontal = 13.dp,
+                vertical = 7.dp
+            ),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp)
     ) {
