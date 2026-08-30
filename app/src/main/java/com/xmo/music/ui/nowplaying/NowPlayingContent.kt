@@ -4,16 +4,6 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -189,9 +179,7 @@ internal fun NowPlayingContent(
             )
 
             Spacer(
-                Modifier.height(
-                    93.dp
-                )
+                Modifier.height(93.dp)
             )
 
             PlayerArtwork(
@@ -210,7 +198,8 @@ internal fun NowPlayingContent(
                     state.hasPrevious,
                 canNext =
                     state.hasNext,
-                carousel = carousel,
+                carousel =
+                    carousel,
                 showLyrics =
                     artworkLyrics,
                 lyrics = lyrics,
@@ -221,7 +210,8 @@ internal fun NowPlayingContent(
                 theme = theme,
                 previousSong =
                     previousItem,
-                nextSong = next,
+                nextSong =
+                    next,
                 toggleLyrics = {
                     setArtworkLyrics(
                         !artworkLyrics
@@ -235,15 +225,8 @@ internal fun NowPlayingContent(
                 }
             )
 
-            /*
-             * Cover is untouched.
-             *
-             * Only the panel surface starts 8dp higher.
-             */
             Spacer(
-                Modifier.height(
-                    52.dp
-                )
+                Modifier.height(52.dp)
             )
 
             Column(
@@ -260,12 +243,6 @@ internal fun NowPlayingContent(
                         .background(
                             themeColors.panel
                         )
-                        /*
-                         * Extra 8dp internal top padding
-                         * compensates for the earlier panel edge.
-                         * Title/progress/transport therefore do
-                         * not get pulled upward with the panel.
-                         */
                         .padding(
                             start = 12.dp,
                             top = 16.dp,
@@ -372,77 +349,23 @@ internal fun NowPlayingContent(
         }
 
         AnimatedContent(
-            targetState = overlay,
+            targetState =
+                overlay,
             modifier =
                 Modifier.fillMaxSize(),
             transitionSpec = {
-                if (
-                    targetState != null &&
-                    initialState == null
-                ) {
-                    (
-                        fadeIn(
-                            animationSpec =
-                                tween(
-                                    durationMillis = 220
-                                )
-                        ) +
-                            scaleIn(
-                                initialScale = .965f,
-                                animationSpec =
-                                    spring(
-                                        dampingRatio = .86f,
-                                        stiffness = 430f
-                                    )
-                            )
-                        )
-                        .togetherWith(
-                            fadeOut(
-                                animationSpec =
-                                    tween(
-                                        durationMillis = 130
-                                    )
-                            )
-                        )
-                } else if (
-                    targetState == null
-                ) {
-                    fadeIn(
-                        animationSpec =
-                            tween(
-                                durationMillis = 120
-                            )
+                XmoPlayerAnimation
+                    .overlayHostTransition(
+                        opening =
+                            targetState != null &&
+                                initialState == null,
+                        closing =
+                            targetState == null
                     )
-                        .togetherWith(
-                            fadeOut(
-                                animationSpec =
-                                    tween(
-                                        durationMillis = 190
-                                    )
-                            ) +
-                                scaleOut(
-                                    targetScale = .975f,
-                                    animationSpec =
-                                        tween(
-                                            durationMillis = 190
-                                        )
-                                )
-                        )
-                } else {
-                    fadeIn(
-                        tween(180)
-                    )
-                        .togetherWith(
-                            fadeOut(
-                                tween(150)
-                            )
-                        )
-                }
             },
             label =
                 "playerOverlay"
         ) { visibleOverlay ->
-
             when (visibleOverlay) {
                 PlayerOverlay.Queue -> {
                     QueueSheet(
@@ -564,32 +487,25 @@ internal fun NowPlayingContent(
         }
 
         AnimatedVisibility(
-            visible = fullLyrics,
+            visible =
+                fullLyrics,
             enter =
-                fadeIn(
-                    tween(310)
-                ) +
-                    scaleIn(
-                        initialScale = .94f,
-                        animationSpec =
-                            tween(390)
-                    ),
+                XmoPlayerAnimation
+                    .fullLyricsEnter,
             exit =
-                fadeOut(
-                    tween(250)
-                ) +
-                    scaleOut(
-                        targetScale = .95f,
-                        animationSpec =
-                            tween(330)
-                    )
+                XmoPlayerAnimation
+                    .fullLyricsExit
         ) {
             FullLyrics(
                 lyrics = lyrics,
-                position = state.position,
-                duration = state.duration,
-                title = state.title,
-                artist = state.artist,
+                position =
+                    state.position,
+                duration =
+                    state.duration,
+                title =
+                    state.title,
+                artist =
+                    state.artist,
                 artwork =
                     currentSong?.artwork
                         ?: fallbackArtwork,
@@ -622,7 +538,8 @@ internal fun NowPlayingContent(
         }
 
         AnimatedVisibility(
-            visible = pop != null,
+            visible =
+                pop != null,
             modifier =
                 Modifier
                     .align(
@@ -633,46 +550,18 @@ internal fun NowPlayingContent(
                         top = 72.dp
                     ),
             enter =
-                fadeIn(
-                    tween(210)
-                ) +
-                    scaleIn(
-                        initialScale = .94f,
-                        animationSpec =
-                            tween(
-                                durationMillis = 250,
-                                easing =
-                                    FastOutSlowInEasing
-                            )
-                    ) +
-                    slideInVertically(
-                        initialOffsetY = {
-                            -it / 5
-                        },
-                        animationSpec =
-                            tween(250)
-                    ),
+                XmoPlayerAnimation
+                    .popHostEnter,
             exit =
-                fadeOut(
-                    tween(190)
-                ) +
-                    scaleOut(
-                        targetScale = .96f,
-                        animationSpec =
-                            tween(190)
-                    ) +
-                    slideOutVertically(
-                        targetOffsetY = {
-                            -it / 7
-                        },
-                        animationSpec =
-                            tween(190)
-                    )
+                XmoPlayerAnimation
+                    .popHostExit
         ) {
             pop?.let {
                 XmoPop(
-                    message = it.text,
-                    theme = theme
+                    message =
+                        it.text,
+                    theme =
+                        theme
                 )
             }
         }
