@@ -17,6 +17,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.Delete
+import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -39,7 +41,9 @@ internal fun HomeCategoryDetail(
     c: HomeColors,
     back: () -> Unit,
     add: () -> Unit,
-    play: (Song) -> Unit,
+    delete: () -> Unit,
+    shuffle: (List<Song>) -> Unit,
+    play: (Song, List<Song>) -> Unit,
     options: (Song) -> Unit
 ) {
     BackHandler(onBack = back)
@@ -56,8 +60,8 @@ internal fun HomeCategoryDetail(
             Modifier
                 .fillMaxWidth()
                 .padding(
-                    horizontal = 10.dp,
-                    vertical = 8.dp
+                    horizontal = 8.dp,
+                    vertical = 7.dp
                 ),
             verticalAlignment =
                 Alignment.CenterVertically
@@ -90,26 +94,33 @@ internal fun HomeCategoryDetail(
                 )
             }
 
-            Box(
-                Modifier
-                    .size(40.dp)
-                    .background(
-                        LocalXmoAccent.current
-                            .copy(alpha = .15f),
-                        CircleShape
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                IconButton(onClick = add) {
-                    Icon(
-                        imageVector =
-                            Icons.Rounded.Add,
-                        contentDescription =
-                            "Add songs",
-                        tint =
-                            LocalXmoAccent.current
-                    )
+            IconButton(
+                enabled = categorySongs.isNotEmpty(),
+                onClick = {
+                    shuffle(categorySongs)
                 }
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Shuffle,
+                    contentDescription = "Shuffle",
+                    tint = LocalXmoAccent.current
+                )
+            }
+
+            IconButton(onClick = add) {
+                Icon(
+                    imageVector = Icons.Rounded.Add,
+                    contentDescription = "Add Songs",
+                    tint = LocalXmoAccent.current
+                )
+            }
+
+            IconButton(onClick = delete) {
+                Icon(
+                    imageVector = Icons.Rounded.Delete,
+                    contentDescription = "Delete",
+                    tint = c.sub
+                )
             }
         }
 
@@ -142,7 +153,15 @@ internal fun HomeCategoryDetail(
                         playback.currentSongId ==
                             song.id,
                     play = {
-                        play(song)
+                        if (
+                            playback.currentSongId !=
+                            song.id
+                        ) {
+                            play(
+                                song,
+                                categorySongs
+                            )
+                        }
                     },
                     options = {
                         options(song)
