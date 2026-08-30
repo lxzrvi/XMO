@@ -34,7 +34,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
@@ -122,18 +121,14 @@ internal fun SongOptionsBox(
         contentAlignment =
             Alignment.Center
     ) {
+        /*
+         * No visible black backdrop.
+         * This layer exists only as the outside-tap target.
+         */
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Color.Black.copy(
-                            alpha =
-                                XmoPlayerAnimation
-                                    .overlayBackdropAlpha *
-                                    progress
-                        )
-                    )
                     .simpleTap {
                         scope.launch {
                             closeAnimated()
@@ -229,17 +224,13 @@ internal fun SongOptionsBox(
                         tint =
                             colors.text,
                         modifier =
-                            Modifier.size(
-                                20.dp
-                            )
+                            Modifier.size(20.dp)
                     )
                 }
             }
 
             Spacer(
-                Modifier.height(
-                    12.dp
-                )
+                Modifier.height(12.dp)
             )
 
             OverlayAction(
@@ -257,8 +248,7 @@ internal fun SongOptionsBox(
                     },
                 colors = colors,
                 active = liked,
-                click =
-                    toggleLike
+                click = toggleLike
             )
 
             OverlayAction(
@@ -266,10 +256,8 @@ internal fun SongOptionsBox(
                     Icons.Rounded.Share,
                 title =
                     "Share Song",
-                colors =
-                    colors,
-                click =
-                    share
+                colors = colors,
+                click = share
             )
 
             OverlayAction(
@@ -279,23 +267,17 @@ internal fun SongOptionsBox(
                     "Delete Song",
                 trailing =
                     "Coming later",
-                colors =
-                    colors,
-                enabled =
-                    false
+                colors = colors,
+                enabled = false
             )
 
             Text(
-                text =
-                    "CATEGORIES",
-                color =
-                    accent,
+                text = "CATEGORIES",
+                color = accent,
                 fontFamily =
                     XmoFont.bold,
-                fontSize =
-                    9.sp,
-                letterSpacing =
-                    1.sp,
+                fontSize = 9.sp,
+                letterSpacing = 1.sp,
                 modifier =
                     Modifier.padding(
                         start = 5.dp,
@@ -307,6 +289,7 @@ internal fun SongOptionsBox(
             categories
                 .take(6)
                 .forEach { category ->
+
                     val added =
                         song?.id in
                             category.songIds
@@ -326,10 +309,8 @@ internal fun SongOptionsBox(
                             } else {
                                 "Add"
                             },
-                        active =
-                            added,
-                        colors =
-                            colors
+                        active = added,
+                        colors = colors
                     ) {
                         setCategory(
                             category,
@@ -339,18 +320,14 @@ internal fun SongOptionsBox(
                 }
 
             Spacer(
-                Modifier.height(
-                    12.dp
-                )
+                Modifier.height(12.dp)
             )
 
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(
-                            46.dp
-                        )
+                        .height(46.dp)
                         .clip(
                             RoundedCornerShape(
                                 14.dp
@@ -367,8 +344,7 @@ internal fun SongOptionsBox(
                     Alignment.CenterVertically
             ) {
                 BasicTextField(
-                    value =
-                        newCategory,
+                    value = newCategory,
                     onValueChange = {
                         newCategory =
                             it.take(24)
@@ -442,9 +418,7 @@ internal fun SongOptionsBox(
                             "Create category",
                         tint = accent,
                         modifier =
-                            Modifier.size(
-                                20.dp
-                            )
+                            Modifier.size(20.dp)
                     )
                 }
             }
