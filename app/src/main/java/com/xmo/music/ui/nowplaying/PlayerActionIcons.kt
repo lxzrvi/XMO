@@ -20,10 +20,9 @@ internal fun FilledHeart(
     color: Color
 ) {
     Canvas(
-        modifier =
-            Modifier.size(
-                20.dp
-            )
+        Modifier.size(
+            21.dp
+        )
     ) {
         val w =
             size.width
@@ -35,92 +34,76 @@ internal fun FilledHeart(
             Path().apply {
                 moveTo(
                     w * .50f,
-                    h * .87f
+                    h * .88f
                 )
 
                 cubicTo(
-                    w * .44f,
-                    h * .81f,
-                    w * .13f,
+                    w * .43f,
+                    h * .82f,
+                    w * .12f,
                     h * .63f,
-                    w * .13f,
+                    w * .12f,
                     h * .36f
                 )
 
                 cubicTo(
-                    w * .13f,
-                    h * .20f,
+                    w * .12f,
+                    h * .19f,
                     w * .25f,
-                    h * .11f,
+                    h * .10f,
                     w * .37f,
-                    h * .11f
+                    h * .10f
                 )
 
                 cubicTo(
                     w * .44f,
-                    h * .11f,
+                    h * .10f,
                     w * .49f,
-                    h * .16f,
+                    h * .15f,
                     w * .50f,
                     h * .23f
                 )
 
                 cubicTo(
                     w * .52f,
-                    h * .16f,
+                    h * .15f,
                     w * .57f,
-                    h * .11f,
+                    h * .10f,
                     w * .64f,
-                    h * .11f
+                    h * .10f
                 )
 
                 cubicTo(
-                    w * .77f,
-                    h * .11f,
-                    w * .87f,
+                    w * .78f,
+                    h * .10f,
+                    w * .88f,
                     h * .20f,
-                    w * .87f,
+                    w * .88f,
                     h * .36f
                 )
 
                 cubicTo(
-                    w * .87f,
+                    w * .88f,
                     h * .63f,
-                    w * .56f,
-                    h * .81f,
+                    w * .57f,
+                    h * .82f,
                     w * .50f,
-                    h * .87f
+                    h * .88f
                 )
 
                 close()
             }
 
-        if (
-            filled
-        ) {
-            drawPath(
-                path =
-                    path,
-                color =
-                    color
-            )
-        } else {
-            drawPath(
-                path =
-                    path,
-                color =
-                    color,
-                style =
-                    Stroke(
-                        width =
-                            1.9.dp.toPx(),
-                        cap =
-                            StrokeCap.Round,
-                        join =
-                            StrokeJoin.Round
-                    )
-            )
-        }
+        /*
+         * Heart is deliberately filled in both states.
+         *
+         * PlayerInfo supplies neutral/white for inactive and
+         * XMO accent red for active.
+         */
+        drawPath(
+            path = path,
+            color = color
+        )
     }
 }
 
@@ -130,38 +113,31 @@ internal fun FilledStar(
     color: Color
 ) {
     Canvas(
-        modifier =
-            Modifier.size(
-                19.dp
-            )
+        Modifier.size(
+            19.dp
+        )
     ) {
         val center =
             Offset(
-                size.width /
-                    2f,
-                size.height /
-                    2f
+                size.width / 2f,
+                size.height / 2f
             )
 
         val outer =
             size.minDimension *
-                .44f
+                .43f
 
         val inner =
             outer *
-                .51f
+                .53f
 
         val path =
             Path()
 
-        repeat(
-            10
-        ) { index ->
+        repeat(10) { index ->
             val radius =
                 if (
-                    index %
-                    2 ==
-                    0
+                    index % 2 == 0
                 ) {
                     outer
                 } else {
@@ -171,8 +147,7 @@ internal fun FilledStar(
             val angle =
                 (
                     -90.0 +
-                        index *
-                        36.0
+                        index * 36.0
                     ) *
                     Math.PI /
                     180.0
@@ -182,27 +157,18 @@ internal fun FilledStar(
                     x =
                         center.x +
                             (
-                                cos(
-                                    angle
-                                ) *
+                                cos(angle) *
                                     radius
-                                )
-                                .toFloat(),
+                                ).toFloat(),
                     y =
                         center.y +
                             (
-                                sin(
-                                    angle
-                                ) *
+                                sin(angle) *
                                     radius
-                                )
-                                .toFloat()
+                                ).toFloat()
                 )
 
-            if (
-                index ==
-                0
-            ) {
+            if (index == 0) {
                 path.moveTo(
                     point.x,
                     point.y
@@ -217,21 +183,15 @@ internal fun FilledStar(
 
         path.close()
 
-        if (
-            filled
-        ) {
+        if (filled) {
             drawPath(
-                path =
-                    path,
-                color =
-                    color
+                path = path,
+                color = color
             )
         } else {
             drawPath(
-                path =
-                    path,
-                color =
-                    color,
+                path = path,
+                color = color,
                 style =
                     Stroke(
                         width =
