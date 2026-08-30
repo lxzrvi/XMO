@@ -1,5 +1,6 @@
 package com.xmo.music.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,7 +19,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.KeyboardArrowDown
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -36,15 +37,24 @@ internal fun HomeFullSongList(
     model: HomeLayer.SongList,
     c: HomeColors,
     close: () -> Unit,
-    play: (Song, String, Boolean, List<Song>) -> Unit,
+    play: (
+        Song,
+        String,
+        Boolean,
+        List<Song>
+    ) -> Unit,
     options: (Song) -> Unit
 ) {
+    BackHandler(onBack = close)
+
     Box(
         Modifier
             .fillMaxSize()
             .zIndex(500f)
             .background(c.bg)
-            .windowInsetsPadding(WindowInsets.statusBars)
+            .windowInsetsPadding(
+                WindowInsets.statusBars
+            )
     ) {
         Column(
             Modifier.fillMaxSize()
@@ -54,8 +64,30 @@ internal fun HomeFullSongList(
                     .fillMaxWidth()
                     .height(66.dp)
                     .padding(horizontal = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment =
+                    Alignment.CenterVertically
             ) {
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .padding(start = 4.dp)
+                ) {
+                    Text(
+                        text = model.title,
+                        color = c.text,
+                        fontFamily = XmoFont.bold,
+                        fontSize = 18.sp
+                    )
+
+                    Text(
+                        text =
+                            "${model.songs.size} songs",
+                        color = c.sub,
+                        fontFamily = XmoFont.normal,
+                        fontSize = 9.sp
+                    )
+                }
+
                 IconButton(
                     onClick = close,
                     modifier = Modifier
@@ -66,43 +98,31 @@ internal fun HomeFullSongList(
                         )
                 ) {
                     Icon(
-                        imageVector = Icons.Rounded.KeyboardArrowDown,
-                        contentDescription = "Close",
+                        imageVector =
+                            Icons.Rounded.Close,
+                        contentDescription =
+                            "Back to Home",
                         tint = c.text,
-                        modifier = Modifier.size(25.dp)
-                    )
-                }
-
-                Column(
-                    Modifier.padding(start = 12.dp)
-                ) {
-                    Text(
-                        text = model.title,
-                        color = c.text,
-                        fontFamily = XmoFont.bold,
-                        fontSize = 18.sp
-                    )
-
-                    Text(
-                        text = "${model.songs.size} songs",
-                        color = c.sub,
-                        fontFamily = XmoFont.normal,
-                        fontSize = 9.sp
+                        modifier = Modifier.size(21.dp)
                     )
                 }
             }
 
             LazyColumn(
-                contentPadding = PaddingValues(
-                    start = 12.dp,
-                    end = 12.dp,
-                    bottom = 190.dp
-                ),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+                contentPadding =
+                    PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        bottom = 190.dp
+                    ),
+                verticalArrangement =
+                    Arrangement.spacedBy(6.dp)
             ) {
                 items(
                     items = model.songs,
-                    key = { it.id }
+                    key = {
+                        it.id
+                    }
                 ) { song ->
                     HomeSongRow(
                         song = song,
