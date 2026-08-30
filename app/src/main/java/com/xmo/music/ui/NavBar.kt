@@ -29,13 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
@@ -43,13 +37,17 @@ import com.xmo.music.XmoTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-/*
- * Approved XMO NavBar geometry.
- */
-private val BarW = 246.dp
-private val BarH = 64.dp
-private val RestW = 78.dp
-private val RestH = 56.dp
+private val BarW =
+    246.dp
+
+private val BarH =
+    64.dp
+
+private val RestW =
+    78.dp
+
+private val RestH =
+    56.dp
 
 @Composable
 fun BoxScope.NavBar(
@@ -82,10 +80,7 @@ fun BoxScope.NavBar(
     }
 
     /*
-     * Original selector physics.
-     *
-     * Spring remains between pos and rendered x during drag as
-     * well as settle.
+     * Original approved selector physics.
      */
     val x by
         animateFloatAsState(
@@ -95,12 +90,10 @@ fun BoxScope.NavBar(
                     dampingRatio = .72f,
                     stiffness = 900f
                 ),
-            label = "position"
+            label =
+                "position"
         )
 
-    /*
-     * Original hold/drag expansion.
-     */
     val grow by
         animateFloatAsState(
             targetValue =
@@ -114,12 +107,10 @@ fun BoxScope.NavBar(
                     dampingRatio = .78f,
                     stiffness = 850f
                 ),
-            label = "grow"
+            label =
+                "grow"
         )
 
-    /*
-     * Original parent response.
-     */
     val barScale by
         animateFloatAsState(
             targetValue =
@@ -133,18 +124,14 @@ fun BoxScope.NavBar(
                     dampingRatio = .78f,
                     stiffness = 900f
                 ),
-            label = "bar"
+            label =
+                "bar"
         )
 
     /*
      * =========================================================
-     * THEME SURFACES
+     * PARENT MATERIAL
      * =========================================================
-     *
-     * No Haze.
-     * No blur.
-     * No shadow.
-     * Neutral blacks rather than blue-grey.
      */
 
     val parentBackground =
@@ -186,48 +173,35 @@ fun BoxScope.NavBar(
                 )
         }
 
-    val parentReflection =
-        when (theme) {
-            XmoTheme.Light ->
-                Color.White.copy(
-                    alpha = .46f
-                )
-
-            XmoTheme.Dark ->
-                Color.White.copy(
-                    alpha = .07f
-                )
-
-            XmoTheme.Amoled ->
-                Color.White.copy(
-                    alpha = .055f
-                )
-        }
-
     /*
-     * More transparent selector.
+     * =========================================================
+     * CLEAN TRANSLUCENT SELECTOR
+     * =========================================================
      *
-     * Parent surface can subtly show through it, giving it a
-     * glass-like layer without actual backdrop blur.
+     * No reflection lines.
+     * No arcs.
+     * No fake shattered edges.
+     * No Haze.
      */
+
     val selector =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFFF4F4F5)
+                Color(0xFFEAEAEC)
                     .copy(
-                        alpha = .54f
+                        alpha = .62f
                     )
 
             XmoTheme.Dark ->
                 Color(0xFF303031)
                     .copy(
-                        alpha = .52f
+                        alpha = .58f
                     )
 
             XmoTheme.Amoled ->
                 Color(0xFF292929)
                     .copy(
-                        alpha = .48f
+                        alpha = .54f
                     )
         }
 
@@ -235,71 +209,17 @@ fun BoxScope.NavBar(
         when (theme) {
             XmoTheme.Light ->
                 Color.Black.copy(
-                    alpha = .14f
+                    alpha = .13f
                 )
 
             XmoTheme.Dark ->
                 Color.White.copy(
-                    alpha = .16f
+                    alpha = .155f
                 )
 
             XmoTheme.Amoled ->
                 Color.White.copy(
-                    alpha = .19f
-                )
-        }
-
-    val selectorReflection =
-        when (theme) {
-            XmoTheme.Light ->
-                Color.White.copy(
-                    alpha = .52f
-                )
-
-            XmoTheme.Dark ->
-                Color.White.copy(
-                    alpha = .15f
-                )
-
-            XmoTheme.Amoled ->
-                Color.White.copy(
-                    alpha = .12f
-                )
-        }
-
-    val selectorMidReflection =
-        when (theme) {
-            XmoTheme.Light ->
-                Color.White.copy(
-                    alpha = .16f
-                )
-
-            XmoTheme.Dark ->
-                Color.White.copy(
-                    alpha = .055f
-                )
-
-            XmoTheme.Amoled ->
-                Color.White.copy(
-                    alpha = .045f
-                )
-        }
-
-    val selectorLowerShade =
-        when (theme) {
-            XmoTheme.Light ->
-                Color.Black.copy(
-                    alpha = .045f
-                )
-
-            XmoTheme.Dark ->
-                Color.Black.copy(
-                    alpha = .12f
-                )
-
-            XmoTheme.Amoled ->
-                Color.Black.copy(
-                    alpha = .20f
+                    alpha = .18f
                 )
         }
 
@@ -338,15 +258,10 @@ fun BoxScope.NavBar(
 
     /*
      * =========================================================
-     * ORIGINAL GESTURE HOST
+     * ORIGINAL GESTURE MODEL
      * =========================================================
      *
-     * Geometry is unchanged.
-     * Only whole-host placement is lower:
-     *
-     * original 35dp
-     * previous 29dp
-     * now      24dp
+     * NavBar remains at the newer lower placement: 24dp.
      */
 
     Box(
@@ -420,9 +335,6 @@ fun BoxScope.NavBar(
                                         dx *
                                         .38f
 
-                                /*
-                                 * Original finger-follow input.
-                                 */
                                 pos =
                                     (
                                         start +
@@ -443,9 +355,6 @@ fun BoxScope.NavBar(
                             }
                         }
 
-                        /*
-                         * Original tap / drag resolution.
-                         */
                         val target =
                             if (
                                 abs(total) <=
@@ -486,11 +395,8 @@ fun BoxScope.NavBar(
                 }
     ) {
         /*
-         * =====================================================
-         * PARENT — 246 × 64
-         * =====================================================
+         * Parent geometry unchanged.
          */
-
         Box(
             modifier =
                 Modifier
@@ -515,45 +421,16 @@ fun BoxScope.NavBar(
                     .background(
                         parentBackground
                     )
-                    .drawBehind {
-                        drawRoundRect(
-                            brush =
-                                Brush.verticalGradient(
-                                    colorStops =
-                                        arrayOf(
-                                            0f to
-                                                parentReflection,
-                                            .23f to
-                                                parentReflection.copy(
-                                                    alpha =
-                                                        parentReflection.alpha *
-                                                            .27f
-                                                ),
-                                            .54f to
-                                                Color.Transparent
-                                        )
-                                ),
-                            cornerRadius =
-                                CornerRadius(
-                                    33.dp.toPx()
-                                )
-                        )
-                    }
                     .border(
                         width = .65.dp,
-                        color = parentBorder,
+                        color =
+                            parentBorder,
                         shape =
                             RoundedCornerShape(
                                 33.dp
                             )
                     )
         )
-
-        /*
-         * =====================================================
-         * SELECTOR — ORIGINAL GEOMETRY + PHYSICS
-         * =====================================================
-         */
 
         val selectorW =
             RestW +
@@ -584,6 +461,10 @@ fun BoxScope.NavBar(
                 0f
             }
 
+        /*
+         * Selector size, expansion, offsets and velocity physics
+         * remain exactly the approved model.
+         */
         Box(
             modifier =
                 Modifier
@@ -655,109 +536,6 @@ fun BoxScope.NavBar(
                     .background(
                         selector
                     )
-                    .drawBehind {
-                        val cornerRadius =
-                            CornerRadius(
-                                radius.toPx()
-                            )
-
-                        /*
-                         * Soft glass-like internal reflection.
-                         *
-                         * No left vertical line: the tiny white
-                         * artifact from the previous revision is
-                         * intentionally gone.
-                         */
-                        drawRoundRect(
-                            brush =
-                                Brush.verticalGradient(
-                                    colorStops =
-                                        arrayOf(
-                                            0f to
-                                                selectorReflection,
-                                            .18f to
-                                                selectorMidReflection,
-                                            .54f to
-                                                Color.Transparent,
-                                            1f to
-                                                selectorLowerShade
-                                        )
-                                ),
-                            cornerRadius =
-                                cornerRadius
-                        )
-
-                        /*
-                         * A broad, low-alpha diagonal light field
-                         * avoids a hard straight reflection edge.
-                         */
-                        drawRoundRect(
-                            brush =
-                                Brush.linearGradient(
-                                    colorStops =
-                                        arrayOf(
-                                            0f to
-                                                Color.Transparent,
-                                            .38f to
-                                                selectorMidReflection,
-                                            .55f to
-                                                Color.Transparent,
-                                            1f to
-                                                Color.Transparent
-                                        ),
-                                    start =
-                                        Offset(
-                                            x = 0f,
-                                            y =
-                                                size.height
-                                        ),
-                                    end =
-                                        Offset(
-                                            x =
-                                                size.width,
-                                            y = 0f
-                                        )
-                                ),
-                            cornerRadius =
-                                cornerRadius
-                        )
-
-                        /*
-                         * Very soft lower refraction. It stays
-                         * inside the selector rather than drawing
-                         * a disconnected border fragment.
-                         */
-                        drawArc(
-                            color =
-                                selectorLowerShade,
-                            startAngle = 25f,
-                            sweepAngle = 52f,
-                            useCenter = false,
-                            topLeft =
-                                Offset(
-                                    x =
-                                        size.width *
-                                            .52f,
-                                    y =
-                                        size.height *
-                                            .52f
-                                ),
-                            size =
-                                Size(
-                                    width =
-                                        size.width *
-                                            .39f,
-                                    height =
-                                        size.height *
-                                            .35f
-                                ),
-                            style =
-                                Stroke(
-                                    width =
-                                        .55.dp.toPx()
-                                )
-                        )
-                    }
                     .border(
                         width = .65.dp,
                         color =
@@ -771,11 +549,11 @@ fun BoxScope.NavBar(
 
         /*
          * =====================================================
-         * ICONS
+         * CONTINUOUS ICON RESPONSE
          * =====================================================
          *
-         * Activation follows selector distance continuously.
-         * No abrupt selected/unselected color switch.
+         * Selector leaving an icon gradually returns it to normal
+         * rather than flipping chosen state instantly.
          */
 
         Row(
@@ -798,10 +576,6 @@ fun BoxScope.NavBar(
                     index,
                     icon ->
 
-                /*
-                 * 1 when selector is exactly centered on icon,
-                 * smoothly falls to 0 by one full slot away.
-                 */
                 val proximity =
                     (
                         1f -
@@ -815,12 +589,6 @@ fun BoxScope.NavBar(
                             1f
                         )
 
-                /*
-                 * While held, only the icon actually under the
-                 * selector receives the original extra zoom,
-                 * but the value fades continuously as selector
-                 * leaves it.
-                 */
                 val iconScale =
                     1f +
                         if (down) {
@@ -879,10 +647,6 @@ fun BoxScope.NavBar(
                                     scaleY =
                                         iconScale
 
-                                    /*
-                                     * Tiny optical fade reinforces
-                                     * the selector moving away.
-                                     */
                                     alpha =
                                         .88f +
                                             .12f *
