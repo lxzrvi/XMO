@@ -45,27 +45,34 @@ internal fun HomeHeader(
     openProfile: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val profile = LocalXmoProfile.current
-    val accent = LocalXmoAccent.current
+    val profile =
+        LocalXmoProfile.current
 
-    val subtitles = remember {
-        listOf(
-            "What are you listening today?",
-            "Mood for some chill music?",
-            "Feel the beat & rhythm...",
-            "Turn up the volume!"
-        )
-    }
+    val accent =
+        LocalXmoAccent.current
 
-    var subtitle by remember {
-        mutableIntStateOf(0)
-    }
+    val subtitles =
+        remember {
+            listOf(
+                "What are you listening today?",
+                "Mood for some chill music?",
+                "Feel the beat & rhythm...",
+                "Turn up the volume!"
+            )
+        }
+
+    var subtitle by
+        remember {
+            mutableIntStateOf(0)
+        }
 
     LaunchedEffect(Unit) {
         while (true) {
             delay(4500L)
+
             subtitle =
-                (subtitle + 1) % subtitles.size
+                (subtitle + 1) %
+                    subtitles.size
         }
     }
 
@@ -74,9 +81,9 @@ internal fun HomeHeader(
             .fillMaxWidth()
             .padding(
                 start = 16.dp,
-                top = 9.dp,
+                top = 16.dp,
                 end = 8.dp,
-                bottom = 9.dp
+                bottom = 10.dp
             ),
         verticalAlignment =
             Alignment.CenterVertically
@@ -109,14 +116,19 @@ internal fun HomeHeader(
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow =
+                    TextOverflow.Ellipsis
             )
 
             AnimatedContent(
                 targetState = subtitle,
                 transitionSpec = {
-                    fadeIn(tween(220)) togetherWith
-                        fadeOut(tween(180))
+                    fadeIn(
+                        tween(220)
+                    ) togetherWith
+                        fadeOut(
+                            tween(180)
+                        )
                 },
                 label = "homeSubtitle"
             ) { index ->
@@ -126,7 +138,8 @@ internal fun HomeHeader(
                     fontFamily = XmoFont.normal,
                     fontSize = 11.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
             }
         }
@@ -136,7 +149,8 @@ internal fun HomeHeader(
             modifier = Modifier.size(45.dp)
         ) {
             Icon(
-                imageVector = Icons.Rounded.Refresh,
+                imageVector =
+                    Icons.Rounded.Refresh,
                 contentDescription = "Scan",
                 tint = c.icon,
                 modifier = Modifier.size(23.dp)
@@ -148,7 +162,8 @@ internal fun HomeHeader(
             modifier = Modifier.size(45.dp)
         ) {
             Icon(
-                imageVector = Icons.Rounded.Menu,
+                imageVector =
+                    Icons.Rounded.Menu,
                 contentDescription = "Menu",
                 tint = c.text,
                 modifier = Modifier.size(25.dp)
