@@ -18,6 +18,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
@@ -29,6 +30,7 @@ import com.xmo.music.XmoTheme
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.homeColors
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -82,12 +84,6 @@ fun XmoMiniPlayer(
      * =========================================================
      * RESTING POSITION / IME
      * =========================================================
-     *
-     * Previous: 123dp
-     * New:      118dp
-     *
-     * Reducing bottom clearance by 5dp places MiniPlayer exactly
-     * 5dp lower while preserving its size and horizontal geometry.
      */
 
     val navigationBottomPx =
@@ -114,8 +110,8 @@ fun XmoMiniPlayer(
             }
 
     /*
-     * IME may move MiniPlayer upward, but never below its normal
-     * resting line while the keyboard closes.
+     * MiniPlayer follows IME upward/downward but cannot go below
+     * its normal resting position while keyboard closes.
      */
     val resolvedBottomPx =
         max(
@@ -130,7 +126,7 @@ fun XmoMiniPlayer(
 
     /*
      * =========================================================
-     * RETURN FROM NOW PLAYING
+     * NOW PLAYING -> MINIPLAYER
      * =========================================================
      */
 
@@ -198,13 +194,13 @@ fun XmoMiniPlayer(
 
     /*
      * =========================================================
-     * HIDDEN TARGET
+     * EXIT GEOMETRY
      * =========================================================
      *
-     * Card is 60dp high.
+     * y is translation from the MiniPlayer resting position.
      *
-     * Moving by the complete resolved bottom clearance + card
-     * height + safety puts the whole MiniPlayer below viewport.
+     * When translation reaches resolvedBottomPx + card height,
+     * the entire visible card has crossed the screen bottom.
      */
 
     val cardHeightPx =
@@ -212,15 +208,44 @@ fun XmoMiniPlayer(
             60.dp.toPx()
         }
 
-    val safetyPx =
-        with(density) {
-            16.dp.toPx()
-        }
-
-    val hiddenY =
+    val hiddenThreshold =
         resolvedBottomPx +
-            cardHeightPx +
-            safetyPx
+            cardHeightPx
+
+    /*
+     * Animation target is deliberately farther than the visible
+     * threshold.
+     *
+     * The spring therefore continues moving through the hidden
+     * point instead of visually settling right at the NavBar /
+     * screen boundary.
+     */
+    val hiddenTarget =
+        hiddenThreshold +
+            with(density) {
+                110.dp.toPx()
+            }
+
+    /*
+     * Wait only until the card has physically disappeared.
+     *
+     * Do NOT wait for spring.animateTo() to settle at its final
+     * invisible target.
+     */
+    suspend fun awaitHidden() {
+        while (
+            y.value <
+            hiddenThreshold
+        ) {
+            withFrameNanos { }
+        }
+    }
+
+    /*
+     * =========================================================
+     * MINIPLAYER -> NOW PLAYING
+     * =========================================================
+     */
 
     suspend fun openOrdered() {
         if (
@@ -233,35 +258,46 @@ fun XmoMiniPlayer(
         opening = true
 
         /*
-         * Search keyboard must not remain over Now Playing.
+         * Search keyboard must not remain on Now Playing.
          */
         keyboardController?.hide()
 
         x.snapTo(0f)
 
-        /*
-         * Do not return to y = 0.
-         *
-         * Tap begins from rest.
-         * Swipe-up begins from its actual raised position.
-         *
-         * Both use the exact same spring as the reverse
-         * Now Playing -> MiniPlayer entrance.
-         */
-        y.animateTo(
-            targetValue =
-                hiddenY,
-            animationSpec =
-                XmoMiniPlayerAnimation
-                    .openExitSpec
-        )
+        coroutineScope {
+            /*
+             * Same spring speed as before.
+             *
+             * This animation may continue invisibly after the
+             * hidden threshold is crossed.
+             */
+            launch {
+                y.animateTo(
+                    targetValue =
+                        hiddenTarget,
+                    animationSpec =
+                        XmoMiniPlayerAnimation
+                            .openExitSpec
+                )
+            }
 
-        /*
-         * Now Playing starts only after MiniPlayer is below the
-         * viewport.
-         */
-        openPlayer()
+            /*
+             * As soon as the entire card is below the screen,
+             * open Now Playing immediately.
+             *
+             * No bottom pause and no waiting for spring settling.
+             */
+            awaitHidden()
+
+            openPlayer()
+        }
     }
+
+    /*
+     * =========================================================
+     * SWIPE-DOWN CLOSE
+     * =========================================================
+     */
 
     suspend fun closeOrdered() {
         if (
@@ -275,15 +311,21 @@ fun XmoMiniPlayer(
 
         x.snapTo(0f)
 
-        y.animateTo(
-            targetValue =
-                hiddenY,
-            animationSpec =
-                XmoMiniPlayerAnimation
-                    .closeExitSpec
-        )
+        coroutineScope {
+            launch {
+                y.animateTo(
+                    targetValue =
+                        hiddenTarget,
+                    animationSpec =
+                        XmoMiniPlayerAnimation
+                            .closeExitSpec
+                )
+            }
 
-        closePlayer()
+            awaitHidden()
+
+            closePlayer()
+        }
     }
 
     Box(
