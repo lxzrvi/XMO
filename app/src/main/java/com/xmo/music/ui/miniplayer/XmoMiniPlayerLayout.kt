@@ -22,11 +22,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,6 +34,8 @@ import com.xmo.music.XmoTheme
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.XmoFont
+import com.xmo.music.ui.nowplaying.XmoPauseIcon
+import com.xmo.music.ui.nowplaying.XmoPlayIcon
 
 internal fun xmoMiniSurface(
     theme: XmoTheme
@@ -44,16 +43,21 @@ internal fun xmoMiniSurface(
     when (theme) {
         XmoTheme.Light ->
             Color(0xFFF9F9FA)
+                .copy(
+                    alpha = .98f
+                )
 
-        /*
-         * Neutral black/charcoal. No blue tint.
-         * Still visibly lighter than AMOLED.
-         */
         XmoTheme.Dark ->
             Color(0xFF181819)
+                .copy(
+                    alpha = .98f
+                )
 
         XmoTheme.Amoled ->
             Color(0xFF080808)
+                .copy(
+                    alpha = .985f
+                )
     }
 
 internal fun xmoMiniControlSurface(
@@ -61,13 +65,13 @@ internal fun xmoMiniControlSurface(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color(0xFFE9EAEC)
+            Color(0xFFE9E9EB)
 
         XmoTheme.Dark ->
-            Color(0xFF2A2A2C)
+            Color(0xFF29292B)
 
         XmoTheme.Amoled ->
-            Color(0xFF1D1D1F)
+            Color(0xFF1C1C1E)
     }
 
 internal fun xmoMiniBorder(
@@ -79,10 +83,14 @@ internal fun xmoMiniBorder(
                 alpha = .08f
             )
 
-        XmoTheme.Dark,
+        XmoTheme.Dark ->
+            Color.White.copy(
+                alpha = .105f
+            )
+
         XmoTheme.Amoled ->
             Color.White.copy(
-                alpha = .11f
+                alpha = .13f
             )
     }
 
@@ -101,16 +109,11 @@ internal fun XmoMiniPlayerCard(
     modifier: Modifier = Modifier
 ) {
     /*
-     * Left keeps the original MiniPlayer radius.
-     * Right follows the rounded controls more closely without
-     * turning the whole card into a capsule.
+     * Both sides now use the same approved radius.
      */
     val cardShape =
         RoundedCornerShape(
-            topStart = 15.dp,
-            bottomStart = 15.dp,
-            topEnd = 22.dp,
-            bottomEnd = 22.dp
+            15.dp
         )
 
     Box(
@@ -126,7 +129,8 @@ internal fun XmoMiniPlayerCard(
                     width = .65.dp,
                     color =
                         xmoMiniBorder(theme),
-                    shape = cardShape
+                    shape =
+                        cardShape
                 )
     ) {
         val progress =
@@ -143,6 +147,9 @@ internal fun XmoMiniPlayerCard(
                 0f
             }
 
+        /*
+         * Real playback progress.
+         */
         Canvas(
             modifier =
                 Modifier
@@ -182,7 +189,8 @@ internal fun XmoMiniPlayerCard(
                 model =
                     state.artworkUri
                         ?.let(Uri::parse),
-                contentDescription = null,
+                contentDescription =
+                    null,
                 modifier =
                     Modifier
                         .size(50.dp)
@@ -214,8 +222,10 @@ internal fun XmoMiniPlayerCard(
                         colors.text,
                     fontFamily =
                         XmoFont.bold,
-                    fontSize = 12.sp,
-                    maxLines = 1,
+                    fontSize =
+                        12.sp,
+                    maxLines =
+                        1,
                     overflow =
                         TextOverflow.Ellipsis
                 )
@@ -227,8 +237,10 @@ internal fun XmoMiniPlayerCard(
                         colors.sub,
                     fontFamily =
                         XmoFont.normal,
-                    fontSize = 9.sp,
-                    maxLines = 1,
+                    fontSize =
+                        9.sp,
+                    maxLines =
+                        1,
                     overflow =
                         TextOverflow.Ellipsis
                 )
@@ -236,9 +248,9 @@ internal fun XmoMiniPlayerCard(
         }
 
         /*
-         * Tap only.
+         * Artwork/title region.
          *
-         * Long press intentionally has no action.
+         * Tap only. Long press deliberately does nothing.
          */
         Box(
             modifier =
@@ -270,6 +282,9 @@ internal fun XmoMiniPlayerCard(
                     }
         )
 
+        /*
+         * Same neutral control family as Now Playing.
+         */
         Row(
             modifier =
                 Modifier
@@ -301,6 +316,12 @@ internal fun XmoMiniPlayerCard(
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
+            /*
+             * Filled Rounded heart:
+             *
+             * inactive -> theme foreground
+             * liked    -> XMO accent
+             */
             Box(
                 modifier =
                     Modifier
@@ -328,13 +349,25 @@ internal fun XmoMiniPlayerCard(
                         if (liked) {
                             accent
                         } else {
-                            colors.icon
+                            when (theme) {
+                                XmoTheme.Light ->
+                                    Color(0xFF15161A)
+
+                                XmoTheme.Dark,
+                                XmoTheme.Amoled ->
+                                    Color.White
+                            }
                         },
                     modifier =
-                        Modifier.size(18.dp)
+                        Modifier.size(
+                            19.dp
+                        )
                 )
             }
 
+            /*
+             * Exact approved Now Playing custom transport icons.
+             */
             Box(
                 modifier =
                     Modifier
@@ -350,110 +383,25 @@ internal fun XmoMiniPlayerCard(
                     Alignment.Center
             ) {
                 if (state.isPlaying) {
-                    XmoMiniPauseIcon(
+                    XmoPauseIcon(
                         color =
                             colors.text,
                         modifier =
-                            Modifier.size(18.dp)
+                            Modifier.size(
+                                19.dp
+                            )
                     )
                 } else {
-                    XmoMiniPlayIcon(
+                    XmoPlayIcon(
                         color =
                             colors.text,
                         modifier =
-                            Modifier.size(19.dp)
+                            Modifier.size(
+                                20.dp
+                            )
                     )
                 }
             }
         }
-    }
-}
-
-@Composable
-private fun XmoMiniPauseIcon(
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier) {
-        val barWidth =
-            size.width * .19f
-
-        val barHeight =
-            size.height * .68f
-
-        val top =
-            (
-                size.height -
-                    barHeight
-                ) / 2f
-
-        drawRoundRect(
-            color = color,
-            topLeft =
-                Offset(
-                    size.width * .25f,
-                    top
-                ),
-            size =
-                Size(
-                    barWidth,
-                    barHeight
-                ),
-            cornerRadius =
-                CornerRadius(
-                    barWidth / 2f
-                )
-        )
-
-        drawRoundRect(
-            color = color,
-            topLeft =
-                Offset(
-                    size.width * .56f,
-                    top
-                ),
-            size =
-                Size(
-                    barWidth,
-                    barHeight
-                ),
-            cornerRadius =
-                CornerRadius(
-                    barWidth / 2f
-                )
-        )
-    }
-}
-
-@Composable
-private fun XmoMiniPlayIcon(
-    color: Color,
-    modifier: Modifier = Modifier
-) {
-    Canvas(modifier) {
-        val path =
-            Path().apply {
-                moveTo(
-                    size.width * .30f,
-                    size.height * .20f
-                )
-
-                lineTo(
-                    size.width * .78f,
-                    size.height * .50f
-                )
-
-                lineTo(
-                    size.width * .30f,
-                    size.height * .80f
-                )
-
-                close()
-            }
-
-        drawPath(
-            path = path,
-            color = color
-        )
     }
 }
