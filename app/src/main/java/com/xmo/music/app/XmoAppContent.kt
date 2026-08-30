@@ -67,6 +67,12 @@ internal fun XmoAppContent(
                             state.hazeState
                         )
             ) {
+                /*
+                 * =================================================
+                 * MAIN CONTENT
+                 * =================================================
+                 */
+
                 Box(
                     modifier =
                         Modifier
@@ -102,9 +108,11 @@ internal fun XmoAppContent(
                                         if (
                                             state.allowed
                                         ) {
-                                            actions.refreshLibrary()
+                                            actions
+                                                .refreshLibrary()
                                         } else {
-                                            actions.requestAudioPermission()
+                                            actions
+                                                .requestAudioPermission()
                                         }
                                     },
                                     openProfile =
@@ -114,18 +122,20 @@ internal fun XmoAppContent(
                                     saveCategories =
                                         actions.saveCategories,
                                     toggleLike = {
-                                        actions.toggleLike(it)
+                                        actions
+                                            .toggleLike(it)
                                     },
                                     setSongInCategory = {
                                             song,
                                             categoryId,
                                             added ->
 
-                                        actions.setSongInCategory(
-                                            song,
-                                            categoryId,
-                                            added
-                                        )
+                                        actions
+                                            .setSongInCategory(
+                                                song,
+                                                categoryId,
+                                                added
+                                            )
                                     },
                                     onPlaySong =
                                         actions.playSong
@@ -158,20 +168,26 @@ internal fun XmoAppContent(
                                     resumeOnHeadphones =
                                         state.resumeOnHeadphones,
                                     onAppearanceChanged =
-                                        actions.changeAppearance,
+                                        actions
+                                            .changeAppearance,
                                     onLibraryPreferencesChanged =
-                                        actions.changeLibraryPreferences,
+                                        actions
+                                            .changeLibraryPreferences,
                                     onPlaybackPreferencesChanged =
-                                        actions.changePlaybackPreferences,
+                                        actions
+                                            .changePlaybackPreferences,
                                     onResumeHeadphonesChanged =
-                                        actions.changeResumeOnHeadphones,
+                                        actions
+                                            .changeResumeOnHeadphones,
                                     rescan = {
                                         if (
                                             state.allowed
                                         ) {
-                                            actions.refreshLibrary()
+                                            actions
+                                                .refreshLibrary()
                                         } else {
-                                            actions.requestAudioPermission()
+                                            actions
+                                                .requestAudioPermission()
                                         }
                                     }
                                 )
@@ -181,8 +197,11 @@ internal fun XmoAppContent(
                 }
 
                 /*
-                 * MiniPlayer remains below NavBar layer.
+                 * =================================================
+                 * MINIPLAYER
+                 * =================================================
                  */
+
                 if (
                     state.playback.currentSongId != null &&
                     state.miniVisible &&
@@ -202,23 +221,57 @@ internal fun XmoAppContent(
                                 state.theme,
                             queue =
                                 state.playbackQueue,
+                            categories =
+                                state.categories,
                             riseKey =
                                 state.miniRiseKey,
                             likedSongIds =
                                 state.likedSongIds,
                             openPlayer =
-                                actions.openNowPlayingFromMini,
+                                actions
+                                    .openNowPlayingFromMini,
                             closePlayer =
-                                actions.closePlaybackFromMini,
+                                actions
+                                    .closePlaybackFromMini,
                             togglePlay =
                                 actions.togglePlay,
                             toggleLike =
-                                actions.toggleSongLikeById,
+                                actions
+                                    .toggleSongLikeById,
                             playQueueIndex =
-                                actions.playQueueIndex
+                                actions
+                                    .playQueueIndex,
+                            setSongInCategory = {
+                                    song,
+                                    categoryId,
+                                    added ->
+
+                                actions
+                                    .setSongInCategory(
+                                        song,
+                                        categoryId,
+                                        added
+                                    )
+                            },
+                            createCategory = {
+                                    name,
+                                    song ->
+
+                                actions
+                                    .createCategoryForSong(
+                                        name,
+                                        song
+                                    )
+                            }
                         )
                     }
                 }
+
+                /*
+                 * =================================================
+                 * NAVBAR
+                 * =================================================
+                 */
 
                 if (!state.profileOpen) {
                     Box(
@@ -237,6 +290,12 @@ internal fun XmoAppContent(
                         }
                     }
                 }
+
+                /*
+                 * =================================================
+                 * PROFILE
+                 * =================================================
+                 */
 
                 if (state.profileOpen) {
                     Box(
@@ -258,6 +317,12 @@ internal fun XmoAppContent(
                     }
                 }
 
+                /*
+                 * =================================================
+                 * NOW PLAYING
+                 * =================================================
+                 */
+
                 if (state.showNowPlaying) {
                     val id =
                         state.playback
@@ -277,7 +342,8 @@ internal fun XmoAppContent(
                             source =
                                 state.playingSource,
                             sourceIsCategory =
-                                state.playingSourceIsCategory,
+                                state
+                                    .playingSourceIsCategory,
                             queue =
                                 state.playbackQueue,
                             songs =
@@ -293,9 +359,11 @@ internal fun XmoAppContent(
                             categories =
                                 state.categories,
                             onOpened =
-                                actions.nowPlayingOpened,
+                                actions
+                                    .nowPlayingOpened,
                             refreshPosition =
-                                actions.refreshPosition,
+                                actions
+                                    .refreshPosition,
                             togglePlay =
                                 actions.togglePlay,
                             previous =
@@ -305,27 +373,37 @@ internal fun XmoAppContent(
                             next =
                                 actions.next,
                             playQueueIndex =
-                                actions.playQueueIndex,
+                                actions
+                                    .playQueueIndex,
                             seekTo =
                                 actions.seekTo,
                             toggleLike =
-                                actions.toggleCurrentLike,
+                                actions
+                                    .toggleCurrentLike,
                             toggleShuffle =
-                                actions.toggleShuffle,
+                                actions
+                                    .toggleShuffle,
                             cycleRepeat =
-                                actions.cycleRepeat,
+                                actions
+                                    .cycleRepeat,
                             setSleepTimer =
-                                actions.setSleepTimer,
+                                actions
+                                    .setSleepTimer,
                             cancelSleepTimer =
-                                actions.cancelSleepTimer,
+                                actions
+                                    .cancelSleepTimer,
                             saveLyricsUri =
-                                actions.saveLyricsUri,
+                                actions
+                                    .saveLyricsUri,
                             setSongInCategory =
-                                actions.setCurrentSongInCategory,
+                                actions
+                                    .setCurrentSongInCategory,
                             createCategory =
-                                actions.createCategoryForCurrentSong,
+                                actions
+                                    .createCategoryForCurrentSong,
                             dismiss =
-                                actions.dismissNowPlaying
+                                actions
+                                    .dismissNowPlaying
                         )
                     }
                 }
