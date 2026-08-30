@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
@@ -38,6 +38,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xmo.music.XmoTheme
+import com.xmo.music.ui.LocalXmoAccent
+import com.xmo.music.ui.LocalXmoProfile
+import com.xmo.music.ui.XmoFont
+import com.xmo.music.ui.XmoProfileAvatar
 import kotlinx.coroutines.delay
 
 @Composable
