@@ -1,7 +1,5 @@
 package com.xmo.music.ui.home
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.scrollBy
@@ -9,16 +7,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyListItemInfo
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Home
@@ -34,11 +29,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -50,7 +43,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 @Composable
 internal fun HomeCategoryDock(
@@ -65,398 +57,260 @@ internal fun HomeCategoryDock(
     val state = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val haptic = LocalHapticFeedback.current
-    val density = LocalDensity.current
-    val edge = with(density) { 62.dp.toPx() }
 
     var preview by remember(order) {
         mutableStateOf(order)
     }
 
-    var draggingId by remember {
+    var dragging by remember {
         mutableStateOf<String?>(null)
     }
 
-    var fingerX by remember {
+    var dragX by remember {
         mutableFloatStateOf(0f)
     }
 
-    var grabX by remember {
-        mutableFloatStateOf(0f)
-    }
-
-    var autoScroll by remember {
+    var autoJob by remember {
         mutableStateOf<Job?>(null)
     }
 
     LaunchedEffect(order) {
-        if (draggingId == null) {
+        if (dragging == null) {
             preview = order
         }
     }
 
-    fun itemInfo(id: String): LazyListItemInfo? =
-        state.layoutInfo.visibleItemsInfo.firstOrNull {
-            it.key == "category_$id"
-        }
-
-    fun stopAutoScroll() {
-        autoScroll?.cancel()
-        autoScroll = null
-    }
-
-    fun moveFromFinger(id: String) {
+    fun reorder(id: String) {
         val from = preview.indexOf(id)
         if (from < 0) return
 
-        var destination = from
+        val target =
+            state.layoutInfo.visibleItemsInfo
+                .filter {
+                    (it.key as? String)
+                        ?.startsWith("cat_") == true
+                }
+                .minByOrNull {
+                    kotlin.math.abs(
+                        dragX -
+                            (it.offset + it.size / 2f)
+                    )
+                }
+                ?.key
+                ?.toString()
+                ?.removePrefix("cat_")
+                ?.let(preview::indexOf)
+                ?: return
 
-        state.layoutInfo.visibleItemsInfo.forEach { item ->
-            val key = item.key as? String ?: return@forEach
-
-            if (!key.startsWith("category_")) {
-                return@forEach
-            }
-
-            val candidate =
-                key.removePrefix("category_")
-
-            if (candidate == id) {
-                return@forEach
-            }
-
-            val candidateIndex =
-                preview.indexOf(candidate)
-
-            if (candidateIndex < 0) {
-                return@forEach
-            }
-
-            val center =
-                item.offset + item.size / 2f
-
-            if (candidateIndex < from && fingerX < center) {
-                destination =
-                    minOf(destination, candidateIndex)
-            }
-
-            if (candidateIndex > from && fingerX > center) {
-                destination =
-                    maxOf(destination, candidateIndex)
-            }
+        if (target == from || target < 0) {
+            return
         }
 
-        if (destination != from) {
-            val next = preview.toMutableList()
-            val moving = next.removeAt(from)
-
-            next.add(
-                destination.coerceIn(0, next.size),
-                moving
-            )
-
-            preview = next
-        }
-    }
-
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .height(50.dp)
-    ) {
-        LazyRow(
-            state = state,
-            userScrollEnabled = draggingId == null,
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                horizontal = 10.dp,
-                vertical = 6.dp
-            ),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            item(key = "all") {
-                FixedCategoryChip(
-                    text = "All",
-                    active = selected == "all",
-                    c = c,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Home,
-                            contentDescription = null,
-                            tint = if (selected == "all") {
-                                LocalXmoAccent.current
-                            } else {
-                                c.icon
-                            },
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                ) {
-                    if (draggingId == null) {
-                        select("all")
-                    }
-                }
-            }
-
-            items(
-                items = preview,
-                key = { "category_$it" }
-            ) { id ->
-                val section =
-                    sections[id] ?: return@items
-
-                val dragging =
-                    draggingId == id
-
-                Box(
-                    Modifier
-                        .graphicsLayer {
-                            alpha =
-                                if (dragging) .12f else 1f
-                        }
-                        .pointerInput(id, order) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { local ->
-                                    val info =
-                                        itemInfo(id)
-                                            ?: return@detectDragGesturesAfterLongPress
-
-                                    draggingId = id
-                                    fingerX = info.offset + local.x
-                                    grabX = local.x
-
-                                    haptic.performHapticFeedback(
-                                        HapticFeedbackType.LongPress
-                                    )
-                                },
-                                onDrag = { change, amount ->
-                                    change.consume()
-                                    fingerX += amount.x
-                                    moveFromFinger(id)
-
-                                    val start =
-                                        state.layoutInfo
-                                            .viewportStartOffset
-                                            .toFloat()
-
-                                    val end =
-                                        state.layoutInfo
-                                            .viewportEndOffset
-                                            .toFloat()
-
-                                    val left =
-                                        fingerX < start + edge &&
-                                            state.canScrollBackward
-
-                                    val right =
-                                        fingerX > end - edge &&
-                                            state.canScrollForward
-
-                                    if (left || right) {
-                                        val direction =
-                                            if (left) -1f else 1f
-
-                                        if (autoScroll?.isActive != true) {
-                                            autoScroll = scope.launch {
-                                                while (
-                                                    isActive &&
-                                                    draggingId == id
-                                                ) {
-                                                    val consumed =
-                                                        state.scrollBy(
-                                                            direction * 15f
-                                                        )
-
-                                                    moveFromFinger(id)
-
-                                                    if (abs(consumed) < .1f) {
-                                                        break
-                                                    }
-
-                                                    delay(16L)
-                                                }
-                                            }
-                                        }
-                                    } else {
-                                        stopAutoScroll()
-                                    }
-                                },
-                                onDragEnd = {
-                                    stopAutoScroll()
-                                    val result = preview.toList()
-                                    draggingId = null
-                                    fingerX = 0f
-                                    grabX = 0f
-                                    commit(result)
-                                },
-                                onDragCancel = {
-                                    stopAutoScroll()
-                                    draggingId = null
-                                    preview = order
-                                    fingerX = 0f
-                                    grabX = 0f
-                                }
-                            )
-                        }
-                ) {
-                    CategoryChip(
-                        text = section.title,
-                        active = selected == id,
-                        c = c,
-                        icon = section.icon,
-                        tint = section.tint ?: c.icon
-                    ) {
-                        if (draggingId == null) {
-                            select(id)
-                        }
-                    }
-                }
-            }
-
-            item(key = "add") {
-                FixedCategoryChip(
-                    text = "Add",
-                    active = false,
-                    c = c,
-                    icon = {
-                        Icon(
-                            imageVector = Icons.Rounded.Add,
-                            contentDescription = null,
-                            tint = LocalXmoAccent.current,
-                            modifier = Modifier.size(16.dp)
-                        )
-                    },
-                    onClick = add
+        preview =
+            preview.toMutableList().also {
+                val item = it.removeAt(from)
+                it.add(
+                    target.coerceIn(0, it.size),
+                    item
                 )
             }
+    }
+
+    LazyRow(
+        state = state,
+        userScrollEnabled = dragging == null,
+        contentPadding =
+            PaddingValues(horizontal = 12.dp),
+        horizontalArrangement =
+            Arrangement.spacedBy(18.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(48.dp)
+    ) {
+        item(key = "all") {
+            CategoryLabel(
+                title = "All",
+                selected = selected == "all",
+                c = c,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Home,
+                        contentDescription = null,
+                        tint = if (selected == "all") {
+                            LocalXmoAccent.current
+                        } else {
+                            c.icon
+                        },
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
+            ) {
+                select("all")
+            }
         }
 
-        draggingId?.let { id ->
+        items(
+            items = preview,
+            key = { "cat_$it" }
+        ) { id ->
             val section =
-                sections[id] ?: return@let
+                sections[id] ?: return@items
+
+            val isDragging =
+                dragging == id
 
             Box(
                 Modifier
-                    .zIndex(100f)
                     .graphicsLayer {
-                        translationX = fingerX - grabX
-                        translationY = 5.dp.toPx()
-                        scaleX = 1.06f
-                        scaleY = 1.06f
-                        shadowElevation = 12.dp.toPx()
+                        alpha =
+                            if (isDragging) .25f else 1f
+                    }
+                    .pointerInput(id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                dragging = id
+                                dragX =
+                                    state.layoutInfo
+                                        .visibleItemsInfo
+                                        .firstOrNull {
+                                            it.key == "cat_$id"
+                                        }
+                                        ?.offset
+                                        ?.toFloat()
+                                        ?: 0f
+
+                                haptic.performHapticFeedback(
+                                    HapticFeedbackType.LongPress
+                                )
+                            },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                dragX += amount.x
+                                reorder(id)
+
+                                val viewport =
+                                    state.layoutInfo
+
+                                val direction =
+                                    when {
+                                        dragX <
+                                            viewport.viewportStartOffset +
+                                            80f -> -1f
+
+                                        dragX >
+                                            viewport.viewportEndOffset -
+                                            80f -> 1f
+
+                                        else -> 0f
+                                    }
+
+                                if (
+                                    direction != 0f &&
+                                    autoJob?.isActive != true
+                                ) {
+                                    autoJob = scope.launch {
+                                        while (
+                                            isActive &&
+                                            dragging == id
+                                        ) {
+                                            state.scrollBy(
+                                                direction * 14f
+                                            )
+                                            reorder(id)
+                                            delay(16L)
+                                        }
+                                    }
+                                } else if (direction == 0f) {
+                                    autoJob?.cancel()
+                                }
+                            },
+                            onDragEnd = {
+                                autoJob?.cancel()
+                                dragging = null
+                                commit(preview)
+                            },
+                            onDragCancel = {
+                                autoJob?.cancel()
+                                dragging = null
+                                preview = order
+                            }
+                        )
                     }
             ) {
-                CategoryChip(
-                    text = section.title,
-                    active = true,
+                CategoryLabel(
+                    title = section.title,
+                    selected = selected == id,
                     c = c,
-                    icon = section.icon,
-                    tint = section.tint ?: c.icon
-                ) {}
+                    icon = {
+                        XmoIcon(
+                            icon = section.icon,
+                            tint =
+                                if (selected == id) {
+                                    LocalXmoAccent.current
+                                } else {
+                                    c.icon
+                                },
+                            modifier = Modifier.size(16.dp)
+                        )
+                    }
+                ) {
+                    if (dragging == null) {
+                        select(id)
+                    }
+                }
             }
+        }
+
+        item(key = "add") {
+            CategoryLabel(
+                title = "Add",
+                selected = false,
+                c = c,
+                icon = {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = null,
+                        tint = c.icon,
+                        modifier = Modifier.size(17.dp)
+                    )
+                },
+                click = add
+            )
         }
     }
 }
 
 @Composable
-private fun CategoryChip(
-    text: String,
-    active: Boolean,
-    c: HomeColors,
-    icon: Int,
-    tint: Color = c.icon,
-    modifier: Modifier = Modifier,
-    onClick: () -> Unit
-) {
-    val accent = LocalXmoAccent.current
-
-    Row(
-        modifier
-            .background(
-                if (active) {
-                    accent.copy(alpha = .17f)
-                } else {
-                    c.button
-                },
-                RoundedCornerShape(18.dp)
-            )
-            .border(
-                .6.dp,
-                if (active) {
-                    accent.copy(alpha = .34f)
-                } else {
-                    c.border
-                },
-                RoundedCornerShape(18.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(
-                horizontal = 13.dp,
-                vertical = 7.dp
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
-    ) {
-        XmoIcon(
-            icon = icon,
-            tint = if (active) accent else tint,
-            modifier = Modifier.size(14.dp)
-        )
-
-        Text(
-            text = text,
-            color = if (active) accent else c.text,
-            fontFamily = XmoFont.medium,
-            fontSize = 12.sp,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-    }
-}
-
-@Composable
-private fun FixedCategoryChip(
-    text: String,
-    active: Boolean,
+private fun CategoryLabel(
+    title: String,
+    selected: Boolean,
     c: HomeColors,
     icon: @Composable () -> Unit,
-    onClick: () -> Unit
+    click: () -> Unit
 ) {
-    val accent = LocalXmoAccent.current
-
     Row(
         Modifier
-            .background(
-                if (active) {
-                    accent.copy(alpha = .17f)
-                } else {
-                    c.button
-                },
-                RoundedCornerShape(18.dp)
-            )
-            .border(
-                .6.dp,
-                if (active) {
-                    accent.copy(alpha = .34f)
-                } else {
-                    c.border
-                },
-                RoundedCornerShape(18.dp)
-            )
-            .clickable(onClick = onClick)
-            .padding(
-                horizontal = 13.dp,
-                vertical = 7.dp
-            ),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+            .height(48.dp)
+            .clickable(onClick = click),
+        verticalAlignment =
+            Alignment.CenterVertically,
+        horizontalArrangement =
+            Arrangement.spacedBy(6.dp)
     ) {
         icon()
 
         Text(
-            text = text,
-            color = if (active) accent else c.text,
+            text = title,
+            color =
+                if (selected) {
+                    LocalXmoAccent.current
+                } else {
+                    c.text
+                },
             fontFamily = XmoFont.medium,
-            fontSize = 12.sp
+            fontSize = 12.sp,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
