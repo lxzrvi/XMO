@@ -11,16 +11,6 @@ import com.xmo.music.data.XmoProfile
 import com.xmo.music.player.PlaybackState
 import dev.chrisbanes.haze.HazeState
 
-/*
- * =============================================================
- * APP RENDER STATE
- * =============================================================
- *
- * Immutable snapshot consumed by XmoAppContent.
- *
- * Persistence ownership remains outside the rendering layer.
- * Playback engine ownership also remains outside Compose UI.
- */
 internal data class XmoAppUiState(
     val playback: PlaybackState,
     val theme: XmoTheme,
@@ -33,6 +23,9 @@ internal data class XmoAppUiState(
     val resumeOnHeadphones: Boolean,
 
     val songs: List<Song>,
+    val playbackQueue: List<Song>,
+    val currentSong: Song?,
+
     val order: List<String>,
     val categories: List<UserCategory>,
     val likedSongIds: Set<Long>,
@@ -53,14 +46,6 @@ internal data class XmoAppUiState(
     val playingSourceIsCategory: Boolean
 )
 
-/*
- * =============================================================
- * APP ACTIONS
- * =============================================================
- *
- * Rendering code receives only commands. XmoAppContent does not
- * directly own Store, MediaController, XmoPlayer or persistence.
- */
 internal class XmoAppActions(
     val requestAudioPermission: () -> Unit,
     val refreshLibrary: () -> Unit,
@@ -100,42 +85,28 @@ internal class XmoAppActions(
     val changeResumeOnHeadphones:
         (Boolean) -> Unit,
 
-    /*
-     * MiniPlayer
-     */
     val openNowPlayingFromMini: () -> Unit,
-
     val closePlaybackFromMini: () -> Unit,
 
     val togglePlay: () -> Unit,
-
     val miniPrevious: () -> Unit,
-
     val next: () -> Unit,
 
-    /*
-     * Now Playing
-     */
     val nowPlayingOpened: () -> Unit,
-
     val refreshPosition: () -> Unit,
 
     val previous: () -> Unit,
-
     val previousItem: () -> Unit,
 
     val playQueueIndex: (Int) -> Unit,
-
     val seekTo: (Long) -> Unit,
 
     val toggleCurrentLike: () -> Unit,
 
     val toggleShuffle: () -> Unit,
-
     val cycleRepeat: () -> Unit,
 
     val setSleepTimer: (Long) -> Unit,
-
     val cancelSleepTimer: () -> Unit,
 
     val saveLyricsUri: (String?) -> Unit,
