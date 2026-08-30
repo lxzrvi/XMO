@@ -10,21 +10,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.icons.lucide.Clock3
-import com.composables.icons.lucide.Info
-import com.composables.icons.lucide.ListMusic
-import com.composables.icons.lucide.Lucide
+import com.xmo.music.XmoTheme
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.XmoFont
 
@@ -39,6 +36,7 @@ internal fun PlayerInfo(
     colors: HomeColors,
     accent: Color,
     softButton: Color,
+    theme: XmoTheme,
     toggleLike: () -> Unit,
     openCategories: () -> Unit,
     openSleep: () -> Unit,
@@ -46,13 +44,21 @@ internal fun PlayerInfo(
     openDetails: () -> Unit,
     openArtist: () -> Unit
 ) {
+    val inactiveHeart =
+        when (theme) {
+            XmoTheme.Light ->
+                Color(0xFF202126)
+
+            XmoTheme.Dark,
+            XmoTheme.Amoled ->
+                Color.White
+        }
+
     Box(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(
-                    104.dp
-                )
+                .height(104.dp)
     ) {
         Row(
             modifier =
@@ -73,25 +79,24 @@ internal fun PlayerInfo(
                 onClick =
                     toggleLike
             ) {
+                /*
+                 * Always filled:
+                 * inactive = neutral/white
+                 * liked = XMO accent red
+                 */
                 FilledHeart(
-                    filled =
-                        liked,
+                    filled = true,
                     color =
-                        if (
-                            liked
-                        ) {
+                        if (liked) {
                             accent
                         } else {
-                            colors.icon
+                            inactiveHeart
                         }
                 )
             }
 
             Spacer(
-                modifier =
-                    Modifier.width(
-                        7.dp
-                    )
+                Modifier.width(7.dp)
             )
 
             PremiumCircle(
@@ -105,9 +110,7 @@ internal fun PlayerInfo(
                     filled =
                         inCategory,
                     color =
-                        if (
-                            inCategory
-                        ) {
+                        if (inCategory) {
                             accent
                         } else {
                             colors.icon
@@ -146,12 +149,8 @@ internal fun PlayerInfo(
                 onClick =
                     openQueue
             ) {
-                Icon(
-                    imageVector =
-                        Lucide.ListMusic,
-                    contentDescription =
-                        "Queue",
-                    tint =
+                PremiumQueueIcon(
+                    color =
                         colors.icon,
                     modifier =
                         Modifier.size(
@@ -165,12 +164,8 @@ internal fun PlayerInfo(
                 onClick =
                     openDetails
             ) {
-                Icon(
-                    imageVector =
-                        Lucide.Info,
-                    contentDescription =
-                        "Song details",
-                    tint =
+                PremiumInfoIcon(
+                    color =
                         colors.icon,
                     modifier =
                         Modifier.size(
@@ -242,8 +237,7 @@ private fun SleepRingButton(
     onClick: () -> Unit
 ) {
     val active =
-        remainingMs >
-            0L
+        remainingMs > 0L
 
     val progress =
         if (
@@ -252,10 +246,8 @@ private fun SleepRingButton(
             totalMs > 0L
         ) {
             (
-                remainingMs
-                    .toFloat() /
-                    totalMs
-                        .toFloat()
+                remainingMs.toFloat() /
+                    totalMs.toFloat()
                 )
                 .coerceIn(
                     0f,
@@ -278,38 +270,25 @@ private fun SleepRingButton(
             onClick =
                 onClick
         ) {
-            Icon(
-                imageVector =
-                    Lucide.Clock3,
-                contentDescription =
-                    "Sleep timer",
-                tint =
-                    if (
-                        active
-                    ) {
+            PremiumClockIcon(
+                color =
+                    if (active) {
                         accent
                     } else {
                         colors.icon
                     },
                 modifier =
                     Modifier.size(
-                        18.dp
+                        19.dp
                     )
             )
         }
 
-        /*
-         * No made-up percentage. Ring only exists when the
-         * original timer duration is actually known.
-         */
-        if (
-            progress != null
-        ) {
+        if (progress != null) {
             Canvas(
-                modifier =
-                    Modifier.size(
-                        32.dp
-                    )
+                Modifier.size(
+                    32.dp
+                )
             ) {
                 drawArc(
                     color =
@@ -317,20 +296,184 @@ private fun SleepRingButton(
                     startAngle =
                         -90f,
                     sweepAngle =
-                        360f *
-                            progress,
+                        360f * progress,
                     useCenter =
                         false,
                     style =
                         Stroke(
                             width =
-                                1.5.dp
-                                    .toPx(),
+                                1.5.dp.toPx(),
                             cap =
                                 StrokeCap.Round
                         )
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PremiumClockIcon(
+    color: Color,
+    modifier: Modifier
+) {
+    Canvas(modifier) {
+        val stroke =
+            size.minDimension * .095f
+
+        drawCircle(
+            color = color,
+            radius =
+                size.minDimension * .31f,
+            center = center,
+            style =
+                Stroke(
+                    width = stroke
+                )
+        )
+
+        drawLine(
+            color = color,
+            start = center,
+            end =
+                Offset(
+                    center.x,
+                    size.height * .31f
+                ),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+
+        drawLine(
+            color = color,
+            start = center,
+            end =
+                Offset(
+                    size.width * .64f,
+                    size.height * .57f
+                ),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+@Composable
+private fun PremiumQueueIcon(
+    color: Color,
+    modifier: Modifier
+) {
+    Canvas(modifier) {
+        val stroke =
+            size.minDimension * .11f
+
+        val ys =
+            listOf(
+                .31f,
+                .50f,
+                .69f
+            )
+
+        ys.forEachIndexed {
+                index,
+                value ->
+
+            drawLine(
+                color = color,
+                start =
+                    Offset(
+                        size.width * .22f,
+                        size.height * value
+                    ),
+                end =
+                    Offset(
+                        size.width *
+                            if (index == 1) {
+                                .73f
+                            } else {
+                                .63f
+                            },
+                        size.height * value
+                    ),
+                strokeWidth = stroke,
+                cap = StrokeCap.Round
+            )
+        }
+
+        drawCircle(
+            color = color,
+            radius =
+                size.minDimension * .075f,
+            center =
+                Offset(
+                    size.width * .75f,
+                    size.height * .68f
+                )
+        )
+
+        drawLine(
+            color = color,
+            start =
+                Offset(
+                    size.width * .81f,
+                    size.height * .30f
+                ),
+            end =
+                Offset(
+                    size.width * .81f,
+                    size.height * .67f
+                ),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
+    }
+}
+
+@Composable
+private fun PremiumInfoIcon(
+    color: Color,
+    modifier: Modifier
+) {
+    Canvas(modifier) {
+        val stroke =
+            size.minDimension * .095f
+
+        drawCircle(
+            color = color,
+            radius =
+                size.minDimension * .31f,
+            center = center,
+            style =
+                Stroke(
+                    width = stroke
+                )
+        )
+
+        drawCircle(
+            color = color,
+            radius =
+                size.minDimension * .055f,
+            center =
+                Offset(
+                    center.x,
+                    size.height * .35f
+                )
+        )
+
+        drawLine(
+            color = color,
+            start =
+                Offset(
+                    center.x,
+                    size.height * .49f
+                ),
+            end =
+                Offset(
+                    center.x,
+                    size.height * .67f
+                ),
+            strokeWidth = stroke,
+            cap = StrokeCap.Round
+        )
     }
 }
