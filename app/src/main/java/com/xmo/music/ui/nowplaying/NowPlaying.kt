@@ -28,6 +28,8 @@ import com.xmo.music.ui.homeColors
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.layout.onSizeChanged
 
 @Composable
 fun NowPlaying(
