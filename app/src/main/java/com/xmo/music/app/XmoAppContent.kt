@@ -208,13 +208,11 @@ internal fun XmoAppContent(
 
                 if (!state.profileOpen) {
                     NavBar(
-                        selected =
-                            state.tab,
-                        theme =
-                            state.theme,
-                        click =
-                            actions.selectTab
-                    )
+                        selected = state.tab,
+                        theme = state.theme
+                    ) {
+                        actions.selectTab(it)
+                    }
                 }
 
                 /*
