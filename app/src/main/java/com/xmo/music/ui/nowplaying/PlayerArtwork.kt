@@ -18,11 +18,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -69,15 +70,9 @@ internal fun PlayerArtwork(
 
     var rawDragX by
         remember {
-            mutableFloatStateOf(
-                0f
-            )
+            mutableFloatStateOf(0f)
         }
 
-    /*
-     * Refresh neighbor metadata only while Media3 and visual
-     * current are still the same song.
-     */
     LaunchedEffect(
         currentId,
         currentIndex,
@@ -86,38 +81,25 @@ internal fun PlayerArtwork(
         next
     ) {
         carousel.initializeIfEmpty(
-            id =
-                currentId,
-            index =
-                currentIndex,
-            current =
-                current,
-            previous =
-                previous,
-            next =
-                next
+            id = currentId,
+            index = currentIndex,
+            current = current,
+            previous = previous,
+            next = next
         )
 
         carousel.updateIdleWindow(
-            id =
-                currentId,
-            index =
-                currentIndex,
-            current =
-                current,
-            previous =
-                previous,
-            next =
-                next
+            id = currentId,
+            index = currentIndex,
+            current = current,
+            previous = previous,
+            next = next
         )
     }
 
     /*
-     * =========================================================
-     * REAL MEDIA3 SONG CONFIRMATION
-     * =========================================================
+     * Real Media3 confirmation.
      */
-
     LaunchedEffect(
         currentId
     ) {
@@ -127,56 +109,32 @@ internal fun PlayerArtwork(
         if (
             currentId == null ||
             oldId == null ||
-            currentId ==
-            oldId
+            currentId == oldId
         ) {
             return@LaunchedEffect
         }
 
-        val pageWidth =
+        val pageDistance =
             carousel.width
-                .coerceAtLeast(
-                    1f
-                )
+                .coerceAtLeast(1f)
 
-        /*
-         * MANUAL SWIPE CONFIRMED
-         *
-         * The destination cover already reached the center.
-         */
         if (
-            carousel.manualDirection !=
-            0 &&
-            carousel.manualSongId ==
-            oldId
+            carousel.manualDirection != 0 &&
+            carousel.manualSongId == oldId
         ) {
             carousel.finishManual(
-                id =
-                    currentId,
-                index =
-                    currentIndex,
-                current =
-                    current,
-                previous =
-                    previous,
-                next =
-                    next
+                id = currentId,
+                index = currentIndex,
+                current = current,
+                previous = previous,
+                next = next
             )
 
-            /*
-             * PlayerColors commits destination at the page edge.
-             * This reset therefore cannot expose old song color.
-             */
-            carousel.x.snapTo(
-                0f
-            )
+            carousel.x.snapTo(0f)
 
             return@LaunchedEffect
         }
 
-        /*
-         * NATURAL / TRANSPORT BUTTON / EXTERNAL CHANGE
-         */
         if (
             !carousel.transactionActive
         ) {
@@ -195,140 +153,99 @@ internal fun PlayerArtwork(
                 }
 
             val adjacentAvailable =
-                if (
-                    direction >
-                    0
-                ) {
-                    carousel.visualNext !=
-                        null
+                if (direction > 0) {
+                    carousel.visualNext != null
                 } else {
-                    carousel.visualPrevious !=
-                        null
+                    carousel.visualPrevious != null
                 }
 
-            if (
-                adjacentAvailable
-            ) {
+            if (adjacentAvailable) {
                 carousel.beginAutomatic(
-                    direction =
-                        direction
+                    direction
                 )
 
-                carousel.x.snapTo(
-                    0f
-                )
+                carousel.x.snapTo(0f)
 
                 carousel.x.animateTo(
                     targetValue =
-                        if (
-                            direction >
-                            0
-                        ) {
-                            -pageWidth
+                        if (direction > 0) {
+                            -pageDistance
                         } else {
-                            pageWidth
+                            pageDistance
                         },
                     animationSpec =
-                        tween(
-                            durationMillis =
-                                340
-                        )
+                        tween(340)
                 )
 
-                /*
-                 * Old neighbor is exactly centered now.
-                 */
                 carousel.finishAutomatic(
-                    id =
-                        currentId,
-                    index =
-                        currentIndex,
-                    current =
-                        current,
-                    previous =
-                        previous,
-                    next =
-                        next
+                    id = currentId,
+                    index = currentIndex,
+                    current = current,
+                    previous = previous,
+                    next = next
                 )
 
-                carousel.x.snapTo(
-                    0f
-                )
+                carousel.x.snapTo(0f)
             } else {
-                /*
-                 * Real external queue jump not represented by the
-                 * frozen adjacent window. Do not animate a fake
-                 * cover.
-                 */
                 carousel.adoptExternalWindow(
-                    id =
-                        currentId,
-                    index =
-                        currentIndex,
-                    current =
-                        current,
-                    previous =
-                        previous,
-                    next =
-                        next
+                    id = currentId,
+                    index = currentIndex,
+                    current = current,
+                    previous = previous,
+                    next = next
                 )
 
-                carousel.x.snapTo(
-                    0f
-                )
+                carousel.x.snapTo(0f)
             }
         }
     }
 
     /*
-     * =========================================================
-     * EXACT ARTWORK-SIZED HOST
-     * =========================================================
-     *
-     * The host itself is square.
-     * Artwork and small lyrics share these exact bounds.
+     * Exact artwork-sized host.
      */
-
     BoxWithConstraints(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .padding(
-                    horizontal =
-                        17.dp
+                    horizontal = 17.dp
                 )
-                .aspectRatio(
-                    1f
-                )
+                .aspectRatio(1f)
     ) {
-        /*
-         * Original carousel geometry restored:
-         * adjacent covers are one entire page apart.
-         */
-        val pageWidth =
+        val density =
+            LocalDensity.current
+
+        val gapPx =
+            with(density) {
+                18.dp.toPx()
+            }
+
+        val coverWidth =
             constraints.maxWidth
                 .toFloat()
-                .coerceAtLeast(
-                    1f
-                )
-
-        LaunchedEffect(
-            pageWidth
-        ) {
-            carousel.width =
-                pageWidth
-        }
+                .coerceAtLeast(1f)
 
         /*
-         * Artwork <-> lyrics transition has one Animatable and
-         * does not use AnimatedContent size transforms.
+         * Previous/next are now separated by an actual visual
+         * gutter instead of touching the current cover edge.
+         *
+         * This same distance drives color interpolation.
          */
+        val pageDistance =
+            coverWidth +
+                gapPx
+
+        LaunchedEffect(
+            pageDistance
+        ) {
+            carousel.width =
+                pageDistance
+        }
+
         val lyricsTransition =
             remember {
                 Animatable(
-                    if (
-                        showLyrics
-                    ) {
+                    if (showLyrics) {
                         1f
                     } else {
                         0f
@@ -341,18 +258,13 @@ internal fun PlayerArtwork(
         ) {
             lyricsTransition.animateTo(
                 targetValue =
-                    if (
-                        showLyrics
-                    ) {
+                    if (showLyrics) {
                         1f
                     } else {
                         0f
                     },
                 animationSpec =
-                    tween(
-                        durationMillis =
-                            340
-                    )
+                    tween(340)
             )
         }
 
@@ -371,11 +283,10 @@ internal fun PlayerArtwork(
                         currentId,
                         canPrevious,
                         canNext,
-                        showLyrics
+                        showLyrics,
+                        pageDistance
                     ) {
-                        if (
-                            showLyrics
-                        ) {
+                        if (showLyrics) {
                             return@pointerInput
                         }
 
@@ -388,8 +299,7 @@ internal fun PlayerArtwork(
                                     return@detectDragGestures
                                 }
 
-                                rawDragX =
-                                    0f
+                                rawDragX = 0f
                             },
 
                             onDrag = {
@@ -407,10 +317,7 @@ internal fun PlayerArtwork(
                                     drag.x
 
                                 if (
-                                    abs(
-                                        rawDragX
-                                    ) >
-                                    6f
+                                    abs(rawDragX) > 6f
                                 ) {
                                     change.consume()
 
@@ -420,16 +327,14 @@ internal fun PlayerArtwork(
 
                                     val target =
                                         when {
-                                            candidate <
-                                                0f &&
+                                            candidate < 0f &&
                                                 !canNext ->
 
                                                 carousel.x.value +
                                                     drag.x *
                                                     .14f
 
-                                            candidate >
-                                                0f &&
+                                            candidate > 0f &&
                                                 !canPrevious ->
 
                                                 carousel.x.value +
@@ -443,8 +348,8 @@ internal fun PlayerArtwork(
                                     scope.launch {
                                         carousel.x.snapTo(
                                             target.coerceIn(
-                                                -pageWidth,
-                                                pageWidth
+                                                -pageDistance,
+                                                pageDistance
                                             )
                                         )
                                     }
@@ -462,49 +367,38 @@ internal fun PlayerArtwork(
                                 scope.launch {
                                     when {
                                         carousel.x.value <=
-                                            -pageWidth *
+                                            -pageDistance *
                                             .16f &&
                                             canNext -> {
 
                                             carousel.beginManual(
-                                                direction =
-                                                    1
+                                                1
                                             )
 
                                             carousel.x.animateTo(
                                                 targetValue =
-                                                    -pageWidth,
+                                                    -pageDistance,
                                                 animationSpec =
-                                                    tween(
-                                                        durationMillis =
-                                                            250
-                                                    )
+                                                    tween(250)
                                             )
 
-                                            /*
-                                             * Real playback call.
-                                             */
                                             nextSong()
                                         }
 
                                         carousel.x.value >=
-                                            pageWidth *
+                                            pageDistance *
                                             .16f &&
                                             canPrevious -> {
 
                                             carousel.beginManual(
-                                                direction =
-                                                    -1
+                                                -1
                                             )
 
                                             carousel.x.animateTo(
                                                 targetValue =
-                                                    pageWidth,
+                                                    pageDistance,
                                                 animationSpec =
-                                                    tween(
-                                                        durationMillis =
-                                                            250
-                                                    )
+                                                    tween(250)
                                             )
 
                                             previousSong()
@@ -512,8 +406,7 @@ internal fun PlayerArtwork(
 
                                         else -> {
                                             carousel.x.animateTo(
-                                                targetValue =
-                                                    0f,
+                                                targetValue = 0f,
                                                 animationSpec =
                                                     spring(
                                                         dampingRatio =
@@ -525,8 +418,7 @@ internal fun PlayerArtwork(
                                         }
                                     }
 
-                                    rawDragX =
-                                        0f
+                                    rawDragX = 0f
                                 }
                             },
 
@@ -537,29 +429,18 @@ internal fun PlayerArtwork(
                                             .transactionActive
                                     ) {
                                         carousel.x.animateTo(
-                                            targetValue =
-                                                0f,
+                                            targetValue = 0f,
                                             animationSpec =
-                                                tween(
-                                                    durationMillis =
-                                                        180
-                                                )
+                                                tween(180)
                                         )
                                     }
 
-                                    rawDragX =
-                                        0f
+                                    rawDragX = 0f
                                 }
                             }
                         )
                     }
         ) {
-            /*
-             * =================================================
-             * ARTWORK LAYER
-             * =================================================
-             */
-
             Box(
                 modifier =
                     Modifier
@@ -574,11 +455,8 @@ internal fun PlayerArtwork(
                                     .018f *
                                     lyricsFraction
 
-                            scaleX =
-                                scale
-
-                            scaleY =
-                                scale
+                            scaleX = scale
+                            scaleY = scale
                         }
             ) {
                 ArtworkCarousel(
@@ -590,8 +468,8 @@ internal fun PlayerArtwork(
                         carousel.visualNext,
                     x =
                         carousel.x.value,
-                    width =
-                        pageWidth,
+                    pageDistance =
+                        pageDistance,
                     enabled =
                         !showLyrics,
                     toggleLyrics =
@@ -599,18 +477,9 @@ internal fun PlayerArtwork(
                 )
             }
 
-            /*
-             * =================================================
-             * SMALL LYRICS LAYER
-             * =================================================
-             *
-             * Exact same square bounds as artwork.
-             */
-
             if (
                 showLyrics ||
-                lyricsFraction >
-                .001f
+                lyricsFraction > .001f
             ) {
                 Box(
                     modifier =
@@ -625,28 +494,19 @@ internal fun PlayerArtwork(
                                         .018f *
                                         lyricsFraction
 
-                                scaleX =
-                                    scale
-
-                                scaleY =
-                                    scale
+                                scaleX = scale
+                                scaleY = scale
                             },
                     contentAlignment =
                         Alignment.Center
                 ) {
                     ArtworkLyrics(
-                        lyrics =
-                            lyrics,
-                        position =
-                            position,
-                        colors =
-                            colors,
-                        accent =
-                            accent,
-                        theme =
-                            theme,
-                        pickLyrics =
-                            pickLyrics,
+                        lyrics = lyrics,
+                        position = position,
+                        colors = colors,
+                        accent = accent,
+                        theme = theme,
+                        pickLyrics = pickLyrics,
                         fullscreenLyrics =
                             fullscreenLyrics,
                         showArtwork =
@@ -666,32 +526,29 @@ private fun ArtworkCarousel(
     previous: Uri?,
     next: Uri?,
     x: Float,
-    width: Float,
+    pageDistance: Float,
     enabled: Boolean,
     toggleLyrics: () -> Unit
 ) {
     Box(
-        modifier =
-            Modifier.fillMaxSize()
+        Modifier.fillMaxSize()
     ) {
         previous?.let {
             Cover(
-                uri =
-                    it,
+                uri = it,
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
                             translationX =
                                 x -
-                                    width
+                                    pageDistance
                         }
             )
         }
 
         Cover(
-            uri =
-                current,
+            uri = current,
             modifier =
                 Modifier
                     .fillMaxSize()
@@ -704,26 +561,22 @@ private fun ArtworkCarousel(
                             remember {
                                 MutableInteractionSource()
                             },
-                        indication =
-                            null,
-                        enabled =
-                            enabled,
-                        onClick =
-                            toggleLyrics
+                        indication = null,
+                        enabled = enabled,
+                        onClick = toggleLyrics
                     )
         )
 
         next?.let {
             Cover(
-                uri =
-                    it,
+                uri = it,
                 modifier =
                     Modifier
                         .fillMaxSize()
                         .graphicsLayer {
                             translationX =
                                 x +
-                                    width
+                                    pageDistance
                         }
             )
         }
@@ -745,34 +598,27 @@ private fun Cover(
                 )
                 .background(
                     Color.Black.copy(
-                        alpha =
-                            .06f
+                        alpha = .06f
                     )
                 )
     ) {
         AsyncImage(
-            model =
-                uri,
-            contentDescription =
-                null,
+            model = uri,
+            contentDescription = null,
             modifier =
                 Modifier.fillMaxSize(),
             contentScale =
                 ContentScale.Crop
         )
 
-        if (
-            uri == null
-        ) {
+        if (uri == null) {
             Box(
-                modifier =
-                    Modifier.fillMaxSize(),
+                Modifier.fillMaxSize(),
                 contentAlignment =
                     Alignment.Center
             ) {
                 Text(
-                    text =
-                        "XMO",
+                    text = "XMO",
                     color =
                         LocalXmoAccent.current,
                     fontFamily =
