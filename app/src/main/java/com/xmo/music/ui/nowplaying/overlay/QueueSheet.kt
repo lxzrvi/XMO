@@ -2,7 +2,6 @@ package com.xmo.music.ui.nowplaying
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
@@ -56,10 +54,6 @@ internal fun QueueSheet(
             .dp *
             .72f
 
-    /*
-     * Initial displacement is known before the first frame.
-     * This keeps the existing no-giant-sheet-flash behavior.
-     */
     val initialOffsetPx =
         with(density) {
             sheetHeight.toPx() *
@@ -71,13 +65,6 @@ internal fun QueueSheet(
         remember {
             Animatable(
                 initialOffsetPx
-            )
-        }
-
-    val backdropAlpha =
-        remember {
-            Animatable(
-                0f
             )
         }
 
@@ -104,25 +91,12 @@ internal fun QueueSheet(
         }
 
     LaunchedEffect(Unit) {
-        coroutineScope {
-            launch {
-                backdropAlpha.animateTo(
-                    targetValue = 1f,
-                    animationSpec =
-                        XmoPlayerAnimation
-                            .queueBackdropEnterSpec
-                )
-            }
-
-            launch {
-                sheetY.animateTo(
-                    targetValue = 0f,
-                    animationSpec =
-                        XmoPlayerAnimation
-                            .queueEnterSpec
-                )
-            }
-        }
+        sheetY.animateTo(
+            targetValue = 0f,
+            animationSpec =
+                XmoPlayerAnimation
+                    .queueEnterSpec
+        )
     }
 
     suspend fun closeSheet() {
@@ -132,26 +106,13 @@ internal fun QueueSheet(
 
         closing = true
 
-        coroutineScope {
-            launch {
-                backdropAlpha.animateTo(
-                    targetValue = 0f,
-                    animationSpec =
-                        XmoPlayerAnimation
-                            .queueBackdropExitSpec
-                )
-            }
-
-            launch {
-                sheetY.animateTo(
-                    targetValue =
-                        sheetHeightPx,
-                    animationSpec =
-                        XmoPlayerAnimation
-                            .queueExitSpec
-                )
-            }
-        }
+        sheetY.animateTo(
+            targetValue =
+                sheetHeightPx,
+            animationSpec =
+                XmoPlayerAnimation
+                    .queueExitSpec
+        )
 
         dismiss()
     }
@@ -170,17 +131,16 @@ internal fun QueueSheet(
         modifier =
             Modifier.fillMaxSize()
     ) {
+        /*
+         * Transparent hit target.
+         *
+         * Outside tap still dismisses the queue, but there is no
+         * black/dim backdrop.
+         */
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Color.Black.copy(
-                            alpha =
-                                .14f *
-                                    backdropAlpha.value
-                        )
-                    )
                     .simpleTap {
                         scope.launch {
                             closeSheet()
@@ -214,88 +174,105 @@ internal fun QueueSheet(
                             topEnd = 30.dp
                         )
                     )
-                    .background(
-                        colors.surface
+                    .then(
+                        Modifier
                     )
         ) {
-            QueueHandle(
-                colors = colors,
+            /*
+             * Keep the existing queue surface color.
+             */
+            Box(
                 modifier =
                     Modifier
-                        .fillMaxWidth()
-                        .height(38.dp)
-                        .pointerInput(
-                            sheetHeightPx
-                        ) {
-                            detectDragGestures(
-                                onDrag = {
-                                        change,
-                                        amount ->
+                        .fillMaxSize()
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                ) {
+                    QueueHandle(
+                        colors = colors,
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(38.dp)
+                                .pointerInput(
+                                    sheetHeightPx
+                                ) {
+                                    detectDragGestures(
+                                        onDrag = {
+                                                change,
+                                                amount ->
 
-                                    if (
-                                        amount.y > 0f ||
-                                        sheetY.value > 0f
-                                    ) {
-                                        change.consume()
+                                            if (
+                                                amount.y > 0f ||
+                                                sheetY.value > 0f
+                                            ) {
+                                                change.consume()
 
-                                        scope.launch {
-                                            sheetY.snapTo(
-                                                (
-                                                    sheetY.value +
-                                                        amount.y
+                                                scope.launch {
+                                                    sheetY.snapTo(
+                                                        (
+                                                            sheetY.value +
+                                                                amount.y
+                                                            )
+                                                            .coerceIn(
+                                                                0f,
+                                                                sheetHeightPx
+                                                            )
                                                     )
-                                                    .coerceIn(
-                                                        0f,
-                                                        sheetHeightPx
+                                                }
+                                            }
+                                        },
+
+                                        onDragEnd = {
+                                            scope.launch {
+                                                if (
+                                                    sheetY.value >
+                                                    sheetHeightPx *
+                                                        XmoPlayerAnimation
+                                                            .queueDismissThreshold
+                                                ) {
+                                                    closeSheet()
+                                                } else {
+                                                    sheetY.animateTo(
+                                                        targetValue = 0f,
+                                                        animationSpec =
+                                                            XmoPlayerAnimation
+                                                                .queueSettleSpec
                                                     )
-                                            )
+                                                }
+                                            }
+                                        },
+
+                                        onDragCancel = {
+                                            scope.launch {
+                                                sheetY.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec =
+                                                        XmoPlayerAnimation
+                                                            .queueSettleSpec
+                                                )
+                                            }
                                         }
-                                    }
-                                },
-                                onDragEnd = {
-                                    scope.launch {
-                                        if (
-                                            sheetY.value >
-                                            sheetHeightPx *
-                                                XmoPlayerAnimation
-                                                    .queueDismissThreshold
-                                        ) {
-                                            closeSheet()
-                                        } else {
-                                            sheetY.animateTo(
-                                                targetValue = 0f,
-                                                animationSpec =
-                                                    XmoPlayerAnimation
-                                                        .queueSettleSpec
-                                            )
-                                        }
-                                    }
-                                },
-                                onDragCancel = {
-                                    scope.launch {
-                                        sheetY.animateTo(
-                                            targetValue = 0f,
-                                            animationSpec =
-                                                XmoPlayerAnimation
-                                                    .queueSettleSpec
-                                        )
-                                    }
+                                    )
                                 }
-                            )
-                        }
-            )
+                    )
 
-            QueueContent(
-                queue = queue,
-                currentSongId =
-                    currentSongId,
-                colors = colors,
-                playIndex =
-                    playIndex,
-                openMenu = {
-                    menuIndex = it
+                    QueueContent(
+                        queue = queue,
+                        currentSongId =
+                            currentSongId,
+                        colors = colors,
+                        playIndex =
+                            playIndex,
+                        openMenu = {
+                            menuIndex = it
+                        }
+                    )
                 }
-            )
+            }
         }
 
         menuIndex?.let { index ->
