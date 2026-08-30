@@ -40,6 +40,7 @@ import com.xmo.music.data.Library
 import com.xmo.music.data.RecentPlay
 import com.xmo.music.data.Song
 import com.xmo.music.data.UserCategory
+import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.XmoFont
 import dev.chrisbanes.haze.HazeState
 import kotlinx.coroutines.launch
@@ -56,40 +57,28 @@ fun Home(
     likedSongIds: Set<Long>,
     recentPlays: List<RecentPlay>,
     scanning: Boolean,
+    playback: PlaybackState,
     refresh: () -> Unit,
     openProfile: () -> Unit,
     saveOrder: (List<String>) -> Unit,
     saveCategories: (List<UserCategory>) -> Unit,
     toggleLike: (Song) -> Unit,
+    playNext: (Song) -> Unit,
+    removeRecent: (Song) -> Unit,
     setSongInCategory: (Song, String, Boolean) -> Unit,
     onPlaySong: (Song, String, Boolean, List<Song>) -> Unit
 ) {
     val c = homeColors(theme)
+    val top = homeTopColors(theme)
     val scope = rememberCoroutineScope()
     val listState = rememberLazyListState()
 
     val fixedSections = remember {
         listOf(
-            HomeSectionModel(
-                "songs",
-                "All Songs",
-                R.drawable.ic_xmo_songs
-            ),
-            HomeSectionModel(
-                "albums",
-                "Albums",
-                R.drawable.ic_xmo_album
-            ),
-            HomeSectionModel(
-                "liked",
-                "Liked Songs",
-                R.drawable.ic_xmo_heart
-            ),
-            HomeSectionModel(
-                "artists",
-                "Artists",
-                R.drawable.ic_xmo_artist
-            )
+            HomeSectionModel("songs", "All Songs", R.drawable.ic_xmo_songs),
+            HomeSectionModel("albums", "Albums", R.drawable.ic_xmo_album),
+            HomeSectionModel("liked", "Liked Songs", R.drawable.ic_xmo_heart),
+            HomeSectionModel("artists", "Artists", R.drawable.ic_xmo_artist)
         )
     }
 
@@ -102,50 +91,31 @@ fun Home(
         )
     }
 
-    val customColors = remember {
-        listOf(
-            Color(0xFFFFC107),
-            Color(0xFFAF52DE),
-            Color(0xFF00AEEF),
-            Color(0xFFFF7043)
-        )
-    }
-
     val customSections = remember(categories) {
         categories.map {
-            val index =
-                Math.floorMod(
-                    it.icon,
-                    customIcons.size
-                )
-
             HomeSectionModel(
                 id = it.id,
                 title = it.name,
-                icon = customIcons[index],
-                tint = customColors[index]
+                icon = customIcons[
+                    Math.floorMod(
+                        it.icon,
+                        customIcons.size
+                    )
+                ]
             )
         }
     }
 
     val sectionMap =
-        remember(
-            fixedSections,
-            customSections
-        ) {
+        remember(fixedSections, customSections) {
             (fixedSections + customSections)
                 .associateBy { it.id }
         }
 
     val resolvedOrder =
-        remember(
-            order,
-            sectionMap
-        ) {
+        remember(order, sectionMap) {
             (
-                order.filter {
-                    sectionMap.containsKey(it)
-                } +
+                order.filter(sectionMap::containsKey) +
                     sectionMap.keys.filterNot {
                         it in order
                     }
@@ -171,32 +141,22 @@ fun Home(
     }
 
     val likedSongs =
-        remember(
-            songs,
-            likedSongIds
-        ) {
+        remember(songs, likedSongIds) {
             songs.filter {
                 it.id in likedSongIds
             }
         }
 
     val recentSongs =
-        remember(
-            songs,
-            recentPlays
-        ) {
-            val songsById =
-                songs.associateBy {
-                    it.id
-                }
+        remember(songs, recentPlays) {
+            val byId =
+                songs.associateBy { it.id }
 
             recentPlays
                 .mapNotNull {
-                    songsById[it.songId]
+                    byId[it.songId]
                 }
-                .distinctBy {
-                    it.id
-                }
+                .distinctBy { it.id }
                 .take(12)
         }
 
@@ -220,6 +180,10 @@ fun Home(
         mutableStateOf<Song?>(null)
     }
 
+    var optionsFromRecent by remember {
+        mutableStateOf(false)
+    }
+
     var layer by remember {
         mutableStateOf<HomeLayer?>(null)
     }
@@ -236,14 +200,12 @@ fun Home(
             val position =
                 currentOrder.indexOf(id)
 
-            if (position < 0) {
-                return@launch
+            if (position >= 0) {
+                listState.animateScrollToItem(
+                    index = position + 3,
+                    scrollOffset = -dockHeight
+                )
             }
-
-            listState.animateScrollToItem(
-                index = position + 3,
-                scrollOffset = -dockHeight
-            )
         }
     }
 
@@ -254,28 +216,31 @@ fun Home(
     ) {
         LazyColumn(
             state = listState,
-            modifier = Modifier
-                .fillMaxSize()
-                .windowInsetsPadding(
-                    WindowInsets.statusBars
-                ),
+            modifier = Modifier.fillMaxSize(),
             contentPadding =
-                PaddingValues(
-                    bottom = 620.dp
-                )
+                PaddingValues(bottom = 620.dp)
         ) {
-            item(key = "header") {
-                HomeHeader(
-                    c = c,
-                    theme = theme,
-                    refresh = {
-                        layer = HomeLayer.Scanner
-                    },
-                    openMenu = {
-                        layer = HomeLayer.Menu
-                    },
-                    openProfile = openProfile
-                )
+            item(key = "top") {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .background(top.background)
+                        .windowInsetsPadding(
+                            WindowInsets.statusBars
+                        )
+                ) {
+                    HomeHeader(
+                        c = c,
+                        theme = theme,
+                        refresh = {
+                            layer = HomeLayer.Scanner
+                        },
+                        openMenu = {
+                            layer = HomeLayer.Menu
+                        },
+                        openProfile = openProfile
+                    )
+                }
             }
 
             stickyHeader(
@@ -284,8 +249,7 @@ fun Home(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .background(c.bg)
-                        .padding(vertical = 4.dp)
+                        .background(top.background)
                         .onSizeChanged {
                             dockHeight = it.height
                         }
@@ -314,8 +278,8 @@ fun Home(
                     Modifier
                         .fillMaxWidth()
                         .padding(
-                            top = 16.dp,
-                            bottom = 24.dp
+                            top = 10.dp,
+                            bottom = 18.dp
                         )
                 ) {
                     SectionTitle(
@@ -330,6 +294,8 @@ fun Home(
                         c = c
                     )
 
+                    Spacer(Modifier.height(4.dp))
+
                     if (recentSongs.isEmpty()) {
                         HomeEmpty(
                             "Nothing played yet",
@@ -339,6 +305,7 @@ fun Home(
                         HomeRecentlyPlayed(
                             songs = recentSongs,
                             c = c,
+                            playback = playback,
                             play = {
                                 onPlaySong(
                                     it,
@@ -348,6 +315,7 @@ fun Home(
                                 )
                             },
                             options = {
+                                optionsFromRecent = true
                                 optionsSong = it
                             }
                         )
@@ -363,14 +331,18 @@ fun Home(
             ) { id ->
                 val section =
                     sectionMap[id]
+                        ?: return@items
 
-                if (section != null) {
-                    val customCategory =
-                        categories.firstOrNull {
-                            it.id == id
-                        }
+                val customCategory =
+                    categories.firstOrNull {
+                        it.id == id
+                    }
 
-                    val categorySongs =
+                val categorySongs =
+                    remember(
+                        customCategory,
+                        songs
+                    ) {
                         if (customCategory == null) {
                             emptyList()
                         } else {
@@ -378,157 +350,153 @@ fun Home(
                                 it.id in customCategory.songIds
                             }
                         }
+                    }
 
-                    Column(
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            top = 10.dp,
+                            bottom = 18.dp
+                        )
+                ) {
+                    Row(
                         Modifier
                             .fillMaxWidth()
-                            .padding(
-                                top = 16.dp,
-                                bottom = 24.dp
-                            )
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment =
+                            Alignment.CenterVertically
                     ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp),
-                            verticalAlignment =
-                                Alignment.CenterVertically
+                        SectionTitle(
+                            title = section.title,
+                            subtitle =
+                                when (id) {
+                                    "songs" ->
+                                        "${songs.size} songs"
+                                    "albums" ->
+                                        "${albums.size} albums"
+                                    "liked" ->
+                                        "${likedSongs.size} favorites"
+                                    "artists" ->
+                                        "${artists.size} artists"
+                                    else ->
+                                        "${categorySongs.size} songs"
+                                },
+                            icon = section.icon,
+                            c = c,
+                            modifier =
+                                Modifier.weight(1f)
+                        )
+
+                        if (
+                            id == "liked" ||
+                            customCategory != null
                         ) {
-                            SectionTitle(
-                                title = section.title,
-                                subtitle =
-                                    when (id) {
-                                        "songs" ->
-                                            "${songs.size} songs"
-
-                                        "albums" ->
-                                            "${albums.size} albums"
-
-                                        "liked" ->
-                                            "${likedSongs.size} favorites"
-
-                                        "artists" ->
-                                            "${artists.size} artists"
-
-                                        else ->
-                                            "${categorySongs.size} songs"
-                                    },
-                                icon = section.icon,
-                                c = c,
-                                modifier =
-                                    Modifier.weight(1f)
-                            )
-
-                            if (
-                                id != "songs" &&
-                                id != "albums" &&
-                                id != "artists"
-                            ) {
-                                HomeCircleAdd {
-                                    layer =
-                                        HomeLayer.SongList(
-                                            title = section.title,
-                                            source = section.title,
-                                            category =
-                                                id !in setOf(
-                                                    "songs",
-                                                    "albums",
-                                                    "liked",
-                                                    "artists"
-                                                ),
-                                            songs =
-                                                if (id == "liked") {
-                                                    likedSongs
-                                                } else {
-                                                    categorySongs
-                                                }
-                                        )
-                                }
+                            HomeCircleAdd {
+                                layer =
+                                    HomeLayer.SongList(
+                                        title = section.title,
+                                        source = section.title,
+                                        category =
+                                            customCategory != null,
+                                        songs =
+                                            if (id == "liked") {
+                                                likedSongs
+                                            } else {
+                                                categorySongs
+                                            }
+                                    )
                             }
                         }
+                    }
 
-                        when (id) {
-                            "songs" -> {
-                                HomeAllSongs(
-                                    songs = songs,
-                                    allowed = allowed,
-                                    c = c,
-                                    theme = theme,
-                                    play = {
-                                        onPlaySong(
-                                            it,
-                                            "All Songs",
-                                            false,
-                                            songs
+                    Spacer(Modifier.height(5.dp))
+
+                    when (id) {
+                        "songs" -> {
+                            HomeAllSongs(
+                                songs = songs,
+                                allowed = allowed,
+                                c = c,
+                                theme = theme,
+                                play = {
+                                    onPlaySong(
+                                        it,
+                                        "All Songs",
+                                        false,
+                                        songs
+                                    )
+                                },
+                                options = {
+                                    optionsFromRecent = false
+                                    optionsSong = it
+                                }
+                            )
+                        }
+
+                        "albums" -> {
+                            HomeAlbums(
+                                albums = albums,
+                                c = c,
+                                open = { album ->
+                                    layer =
+                                        HomeLayer.SongList(
+                                            title = album.name,
+                                            source = album.name,
+                                            category = false,
+                                            songs = album.songs
                                         )
-                                    },
-                                    options = {
-                                        optionsSong = it
-                                    }
-                                )
-                            }
+                                }
+                            )
+                        }
 
-                            "albums" -> {
-                                HomeAlbums(
-                                    albums = albums,
-                                    c = c,
-                                    open = { album ->
-                                        layer =
-                                            HomeLayer.SongList(
-                                                title = album.name,
-                                                source = album.name,
-                                                category = false,
-                                                songs = album.songs
-                                            )
-                                    }
-                                )
-                            }
+                        "liked" -> {
+                            HomeCompactSongs(
+                                songs = likedSongs,
+                                empty =
+                                    "No liked songs yet",
+                                c = c,
+                                play = {
+                                    onPlaySong(
+                                        it,
+                                        "Liked Songs",
+                                        false,
+                                        likedSongs
+                                    )
+                                },
+                                options = {
+                                    optionsFromRecent = false
+                                    optionsSong = it
+                                }
+                            )
+                        }
 
-                            "liked" -> {
-                                HomeCompactSongs(
-                                    songs = likedSongs,
-                                    empty = "No liked songs yet",
-                                    c = c,
-                                    play = {
-                                        onPlaySong(
-                                            it,
-                                            "Liked Songs",
-                                            false,
-                                            likedSongs
-                                        )
-                                    },
-                                    options = {
-                                        optionsSong = it
-                                    }
-                                )
-                            }
+                        "artists" -> {
+                            HomeArtists(
+                                songs = songs,
+                                c = c
+                            )
+                        }
 
-                            "artists" -> {
-                                HomeArtists(
-                                    songs = songs,
-                                    c = c
-                                )
-                            }
-
-                            else -> {
-                                HomeCompactSongs(
-                                    songs = categorySongs,
-                                    empty =
-                                        "No songs in this category",
-                                    c = c,
-                                    play = {
-                                        onPlaySong(
-                                            it,
-                                            section.title,
-                                            true,
-                                            categorySongs
-                                        )
-                                    },
-                                    options = {
-                                        optionsSong = it
-                                    }
-                                )
-                            }
+                        else -> {
+                            HomeCompactSongs(
+                                songs = categorySongs,
+                                empty =
+                                    "No songs in this category",
+                                c = c,
+                                play = {
+                                    onPlaySong(
+                                        it,
+                                        section.title,
+                                        true,
+                                        categorySongs
+                                    )
+                                },
+                                options = {
+                                    optionsFromRecent = false
+                                    optionsSong = it
+                                }
+                            )
                         }
                     }
                 }
@@ -542,9 +510,7 @@ fun Home(
                     horizontalAlignment =
                         Alignment.CenterHorizontally
                 ) {
-                    Spacer(
-                        Modifier.weight(1f)
-                    )
+                    Spacer(Modifier.weight(1f))
 
                     Text(
                         text = "XMO",
@@ -554,22 +520,21 @@ fun Home(
                     )
 
                     Text(
-                        text = "lxzrvi • copyright © 2026",
+                        text =
+                            "lxzrvi • copyright © 2026",
                         color = c.sub,
                         fontFamily = XmoFont.normal,
                         fontSize = 9.sp
                     )
 
-                    Spacer(
-                        Modifier.weight(1f)
-                    )
+                    Spacer(Modifier.weight(1f))
                 }
             }
         }
     }
 
     if (addCategory) {
-        HomeDialog(
+        XmoBox(
             title = "New category",
             c = c,
             dismiss = {
@@ -618,15 +583,12 @@ fun Home(
                                 fontSize = 13.sp
                             )
                         }
-
                         field()
                     }
                 }
             )
 
-            Spacer(
-                Modifier.height(14.dp)
-            )
+            Spacer(Modifier.height(14.dp))
 
             HomeDialogAction(
                 text = "Add Category",
@@ -644,16 +606,17 @@ fun Home(
                             id =
                                 "cat_${UUID.randomUUID()}",
                             name = name,
-                            icon =
-                                categories.size % 4
+                            icon = categories.size % 4
                         )
 
-                    val nextOrder =
+                    val next =
                         currentOrder + category.id
 
-                    currentOrder = nextOrder
-                    saveCategories(categories + category)
-                    saveOrder(nextOrder)
+                    currentOrder = next
+                    saveCategories(
+                        categories + category
+                    )
+                    saveOrder(next)
                     newCategoryName = ""
                     addCategory = false
                 }
@@ -662,27 +625,23 @@ fun Home(
     }
 
     optionsSong?.let { song ->
-        HomeSongOptions(
+        XmoSongList(
             song = song,
-            liked =
-                song.id in likedSongIds,
-            categories = categories,
+            liked = song.id in likedSongIds,
+            recent = optionsFromRecent,
             c = c,
             dismiss = {
                 optionsSong = null
+                optionsFromRecent = false
             },
             toggleLike = {
                 toggleLike(song)
             },
-            setCategory = {
-                    categoryId,
-                    added ->
-
-                setSongInCategory(
-                    song,
-                    categoryId,
-                    added
-                )
+            playNext = {
+                playNext(song)
+            },
+            removeRecent = {
+                removeRecent(song)
             }
         )
     }
@@ -714,8 +673,7 @@ fun Home(
                             )
                     },
                     scanner = {
-                        layer =
-                            HomeLayer.Scanner
+                        layer = HomeLayer.Scanner
                     }
                 )
             }
@@ -743,6 +701,7 @@ fun Home(
                     },
                     play = onPlaySong,
                     options = {
+                        optionsFromRecent = false
                         optionsSong = it
                     }
                 )
