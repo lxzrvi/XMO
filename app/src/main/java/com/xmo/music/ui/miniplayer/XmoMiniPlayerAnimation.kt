@@ -1,7 +1,7 @@
 package com.xmo.music.ui.miniplayer
 
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import kotlin.math.abs
@@ -15,17 +15,26 @@ internal enum class XmoMiniAxis {
 
 internal object XmoMiniPlayerAnimation {
 
-    const val axisThresholdPx = 9f
-    const val horizontalThresholdPx = 48f
+    const val axisThresholdPx =
+        9f
 
-    const val openThresholdPx = -46f
-    const val closeThresholdPx = 44f
+    const val horizontalThresholdPx =
+        48f
+
+    const val openThresholdPx =
+        -46f
+
+    const val closeThresholdPx =
+        44f
 
     fun horizontalResistance(
         value: Float
     ): Float {
-        val free = 76f
-        val distance = abs(value)
+        val free =
+            76f
+
+        val distance =
+            abs(value)
 
         if (distance <= free) {
             return value
@@ -33,15 +42,18 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             free +
-                (distance - free) *
+                (
+                    distance -
+                        free
+                    ) *
                 .07f
             ) *
             sign(value)
     }
 
     /*
-     * Upward movement is deliberately allowed farther than the
-     * old MiniPlayer before resistance becomes strong.
+     * Upward swipe can travel a little farther before strong
+     * resistance starts.
      */
     fun verticalResistance(
         value: Float
@@ -62,12 +74,19 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             free +
-                (distance - free) *
+                (
+                    distance -
+                        free
+                    ) *
                 .075f
             ) *
             sign(value)
     }
 
+    /*
+     * Return from Now Playing still rises naturally from behind
+     * the NavBar.
+     */
     val riseSpec: AnimationSpec<Float>
         get() =
             spring(
@@ -82,6 +101,9 @@ internal object XmoMiniPlayerAnimation {
                 stiffness = 470f
             )
 
+    /*
+     * Only a rejected/short vertical swipe uses this.
+     */
     val verticalReturnSpec: AnimationSpec<Float>
         get() =
             spring(
@@ -90,21 +112,25 @@ internal object XmoMiniPlayerAnimation {
             )
 
     /*
-     * Successful open/close never returns to rest first.
-     * Animation begins from the current dragged Y position and
-     * continues directly below the viewport.
+     * Successful tap / swipe-up:
+     *
+     * direct constant-speed downward exit.
+     * No spring and no ease-in/ease-out.
      */
     val openExitSpec: AnimationSpec<Float>
         get() =
             tween(
-                durationMillis = 245,
-                easing = FastOutSlowInEasing
+                durationMillis = 175,
+                easing = LinearEasing
             )
 
+    /*
+     * Successful swipe-down close uses the same direct motion.
+     */
     val closeExitSpec: AnimationSpec<Float>
         get() =
             tween(
-                durationMillis = 245,
-                easing = FastOutSlowInEasing
+                durationMillis = 175,
+                easing = LinearEasing
             )
 }
