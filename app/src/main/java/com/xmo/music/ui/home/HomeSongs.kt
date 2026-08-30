@@ -3,7 +3,6 @@ package com.xmo.music.ui.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -26,55 +25,25 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
+import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
-
-@Composable
-internal fun HomeCompactSongs(
-    songs: List<Song>,
-    empty: String,
-    c: HomeColors,
-    play: (Song) -> Unit,
-    options: (Song) -> Unit
-) {
-    if (songs.isEmpty()) {
-        HomeEmpty(empty, c)
-        return
-    }
-
-    Column(
-        Modifier.padding(horizontal = 10.dp),
-        verticalArrangement = Arrangement.spacedBy(7.dp)
-    ) {
-        songs.take(8).forEach { song ->
-            HomeSongRow(
-                song = song,
-                c = c,
-                play = {
-                    play(song)
-                },
-                options = {
-                    options(song)
-                }
-            )
-        }
-    }
-}
 
 @Composable
 internal fun HomeSongRow(
     song: Song,
     c: HomeColors,
+    playing: Boolean = false,
     play: () -> Unit,
     options: () -> Unit
 ) {
     Row(
         Modifier
             .fillMaxWidth()
-            .height(58.dp)
+            .height(60.dp)
             .clip(RoundedCornerShape(13.dp))
             .background(c.surface)
             .border(
-                .6.dp,
+                .5.dp,
                 c.border,
                 RoundedCornerShape(13.dp)
             )
@@ -83,13 +52,14 @@ internal fun HomeSongRow(
                 onLongClick = options
             )
             .padding(5.dp),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment =
+            Alignment.CenterVertically
     ) {
         AsyncImage(
             model = song.artwork,
             contentDescription = null,
             modifier = Modifier
-                .size(48.dp)
+                .size(50.dp)
                 .clip(RoundedCornerShape(9.dp))
                 .background(c.button),
             contentScale = ContentScale.Crop
@@ -102,7 +72,12 @@ internal fun HomeSongRow(
         ) {
             Text(
                 text = song.title,
-                color = c.text,
+                color =
+                    if (playing) {
+                        LocalXmoAccent.current
+                    } else {
+                        c.text
+                    },
                 fontFamily = XmoFont.bold,
                 fontSize = 11.sp,
                 maxLines = 1,
@@ -110,8 +85,19 @@ internal fun HomeSongRow(
             )
 
             Text(
-                text = song.artist,
-                color = c.sub,
+                text =
+                    if (playing) {
+                        "Playing • ${song.artist}"
+                    } else {
+                        song.artist
+                    },
+                color =
+                    if (playing) {
+                        LocalXmoAccent.current
+                            .copy(alpha = .8f)
+                    } else {
+                        c.sub
+                    },
                 fontFamily = XmoFont.normal,
                 fontSize = 9.sp,
                 maxLines = 1,
@@ -125,7 +111,7 @@ internal fun HomeSongRow(
         ) {
             Icon(
                 imageVector = Icons.Rounded.MoreHoriz,
-                contentDescription = "Song options",
+                contentDescription = "Options",
                 tint = c.sub,
                 modifier = Modifier.size(19.dp)
             )
