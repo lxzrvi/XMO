@@ -8,6 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Repeat
+import androidx.compose.material.icons.rounded.RepeatOne
+import androidx.compose.material.icons.rounded.Shuffle
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,49 +45,43 @@ internal fun PlayerControls(
             Arrangement.Center
     ) {
         BarePlayerButton(
-            size =
-                45.dp,
+            size = 45.dp,
             onClick =
                 toggleShuffle
         ) {
-            XmoShuffleIcon(
-                color =
-                    if (
-                        shuffleEnabled
-                    ) {
+            Icon(
+                imageVector =
+                    Icons.Rounded.Shuffle,
+                contentDescription =
+                    "Shuffle",
+                tint =
+                    if (shuffleEnabled) {
                         accent
                     } else {
                         foreground
                     },
                 modifier =
                     Modifier.size(
-                        24.dp
+                        26.dp
                     )
             )
         }
 
         Spacer(
-            modifier =
-                Modifier.size(
-                    12.dp
-                )
+            Modifier.size(12.dp)
         )
 
         BarePlayerButton(
-            size =
-                47.dp,
+            size = 47.dp,
             enabled =
                 hasPrevious,
-            onClick =
-                previous
+            onClick = previous
         ) {
             XmoPreviousIcon(
                 color =
                     foreground.copy(
                         alpha =
-                            if (
-                                hasPrevious
-                            ) {
+                            if (hasPrevious) {
                                 1f
                             } else {
                                 .28f
@@ -96,36 +95,27 @@ internal fun PlayerControls(
         }
 
         Spacer(
-            modifier =
-                Modifier.size(
-                    4.dp
-                )
+            Modifier.size(4.dp)
         )
 
         BarePlayerButton(
-            size =
-                68.dp,
+            size = 68.dp,
             onClick =
                 togglePlay
         ) {
             Box(
-                modifier =
-                    Modifier
-                        .size(
-                            58.dp
-                        )
-                        .background(
-                            color =
-                                playBackground,
-                            shape =
-                                CircleShape
-                        ),
+                Modifier
+                    .size(58.dp)
+                    .background(
+                        color =
+                            playBackground,
+                        shape =
+                            CircleShape
+                    ),
                 contentAlignment =
                     Alignment.Center
             ) {
-                if (
-                    isPlaying
-                ) {
+                if (isPlaying) {
                     XmoPauseIcon(
                         color =
                             foreground,
@@ -148,27 +138,20 @@ internal fun PlayerControls(
         }
 
         Spacer(
-            modifier =
-                Modifier.size(
-                    4.dp
-                )
+            Modifier.size(4.dp)
         )
 
         BarePlayerButton(
-            size =
-                47.dp,
+            size = 47.dp,
             enabled =
                 hasNext,
-            onClick =
-                next
+            onClick = next
         ) {
             XmoNextIcon(
                 color =
                     foreground.copy(
                         alpha =
-                            if (
-                                hasNext
-                            ) {
+                            if (hasNext) {
                                 1f
                             } else {
                                 .28f
@@ -182,23 +165,36 @@ internal fun PlayerControls(
         }
 
         Spacer(
-            modifier =
-                Modifier.size(
-                    12.dp
-                )
+            Modifier.size(12.dp)
         )
 
         BarePlayerButton(
-            size =
-                45.dp,
+            size = 45.dp,
             onClick =
                 cycleRepeat
         ) {
-            XmoRepeatIcon(
-                repeatOne =
-                    repeatMode ==
-                        Player.REPEAT_MODE_ONE,
-                color =
+            Icon(
+                imageVector =
+                    if (
+                        repeatMode ==
+                        Player.REPEAT_MODE_ONE
+                    ) {
+                        Icons.Rounded.RepeatOne
+                    } else {
+                        Icons.Rounded.Repeat
+                    },
+                contentDescription =
+                    when (repeatMode) {
+                        Player.REPEAT_MODE_ONE ->
+                            "Repeat one"
+
+                        Player.REPEAT_MODE_ALL ->
+                            "Repeat all"
+
+                        else ->
+                            "Repeat off"
+                    },
+                tint =
                     if (
                         repeatMode ==
                         Player.REPEAT_MODE_OFF
@@ -209,7 +205,7 @@ internal fun PlayerControls(
                     },
                 modifier =
                     Modifier.size(
-                        25.dp
+                        27.dp
                     )
             )
         }
