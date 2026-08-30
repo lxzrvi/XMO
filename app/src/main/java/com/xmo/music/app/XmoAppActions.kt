@@ -1,12 +1,12 @@
 package com.xmo.music.app
 
 import android.content.Context
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
 import com.xmo.music.data.Store
 import com.xmo.music.data.UserCategory
 import com.xmo.music.player.XmoPlayer
 import java.util.UUID
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 internal fun buildXmoAppActions(
     context: Context,
@@ -90,11 +90,11 @@ internal fun buildXmoAppActions(
                     }
             )
 
-        val categories =
+        val nextCategories =
             state.categories +
                 category
 
-        val order =
+        val nextOrder =
             (
                 state.order +
                     category.id
@@ -102,20 +102,20 @@ internal fun buildXmoAppActions(
                 .distinct()
 
         state.categories =
-            categories
+            nextCategories
 
         state.order =
-            order
+            nextOrder
 
         scope.launch {
             Store.saveCategories(
                 context,
-                categories
+                nextCategories
             )
 
             Store.saveOrder(
                 context,
-                order
+                nextOrder
             )
         }
 
@@ -191,14 +191,16 @@ internal fun buildXmoAppActions(
 
         /*
          * =====================================================
-         * GLOBAL SONG OPENING POLICY
+         * GLOBAL SONG SELECTION
          * =====================================================
          *
-         * Home / Search / category / anywhere:
+         * Song row tap never forces Now Playing.
          *
-         * play song
-         * -> MiniPlayer
-         * -> user decides when to open Now Playing
+         * No active MiniPlayer:
+         * song starts -> MiniPlayer rises from below.
+         *
+         * Existing MiniPlayer:
+         * song changes in-place; whole card does not re-enter.
          */
         playSong = {
                 song,
@@ -213,6 +215,16 @@ internal fun buildXmoAppActions(
                 }
 
             if (index >= 0) {
+                val hadPlayback =
+                    player.state
+                        .value
+                        .currentSongId !=
+                        null
+
+                val miniWasVisible =
+                    state.miniVisible &&
+                        !state.showNowPlaying
+
                 state.playingSource =
                     source
 
@@ -224,11 +236,20 @@ internal fun buildXmoAppActions(
                     index
                 )
 
-                /*
-                 * Never force Now Playing from a song-row tap.
-                 */
                 state.showNowPlaying =
                     false
+
+                /*
+                 * Trigger bottom-rise only when we're genuinely
+                 * introducing MiniPlayer rather than changing a
+                 * song inside an already-visible one.
+                 */
+                if (
+                    !hadPlayback ||
+                    !miniWasVisible
+                ) {
+                    state.miniRiseKey++
+                }
 
                 state.miniVisible =
                     true
@@ -243,15 +264,31 @@ internal fun buildXmoAppActions(
             )
         },
 
+        /*
+         * MiniPlayer preview can show a Song that has not yet
+         * been committed to Media3, so Like must target its real
+         * previewed ID instead of playback.currentSongId.
+         */
+        toggleSongLikeById = {
+            songId ->
+
+            toggleLike(
+                songId
+            )
+        },
+
         setSongInCategory = {
                 song,
                 categoryId,
                 added ->
 
             updateCategoryMembership(
-                songId = song.id,
-                categoryId = categoryId,
-                added = added
+                songId =
+                    song.id,
+                categoryId =
+                    categoryId,
+                added =
+                    added
             )
         },
 
@@ -327,10 +364,6 @@ internal fun buildXmoAppActions(
          */
 
         openNowPlayingFromMini = {
-            /*
-             * XmoMiniPlayer has already completed its downward
-             * disappearance before this callback fires.
-             */
             state.miniVisible =
                 false
 
@@ -352,37 +385,10 @@ internal fun buildXmoAppActions(
             player.togglePlayPause()
         },
 
-        miniPrevious = {
-            player.previousItem()
-        },
-
-        next = {
-            player.next()
-        },
-
         /*
-         * =====================================================
-         * NOW PLAYING
-         * =====================================================
+         * The MiniPlayer preview commits exactly one final queue
+         * index after rapid-swiping stops.
          */
-
-        nowPlayingOpened = {
-            state.miniVisible =
-                false
-        },
-
-        refreshPosition = {
-            player.refreshPosition()
-        },
-
-        previous = {
-            player.previous()
-        },
-
-        previousItem = {
-            player.previousItem()
-        },
-
         playQueueIndex = {
             index ->
 
@@ -393,14 +399,37 @@ internal fun buildXmoAppActions(
                 index in
                 queue.indices
             ) {
-                /*
-                 * Required real queue callback behavior.
-                 */
                 player.play(
                     queue,
                     index
                 )
             }
+        },
+
+        /*
+         * These remain real immediate Now Playing transport
+         * actions. MiniPlayer no longer calls them for horizontal
+         * preview swipes.
+         */
+        next = {
+            player.next()
+        },
+
+        previous = {
+            player.previous()
+        },
+
+        previousItem = {
+            player.previousItem()
+        },
+
+        nowPlayingOpened = {
+            state.miniVisible =
+                false
+        },
+
+        refreshPosition = {
+            player.refreshPosition()
         },
 
         seekTo = {
@@ -460,9 +489,12 @@ internal fun buildXmoAppActions(
 
             currentSong()?.let {
                 updateCategoryMembership(
-                    songId = it.id,
-                    categoryId = categoryId,
-                    added = added
+                    songId =
+                        it.id,
+                    categoryId =
+                        categoryId,
+                    added =
+                        added
                 )
             }
         },
@@ -481,12 +513,6 @@ internal fun buildXmoAppActions(
                     .currentSongId !=
                 null
             ) {
-                /*
-                 * This key is reserved specifically for the
-                 * Now Playing -> MiniPlayer rise animation.
-                 *
-                 * Normal song changes do not touch it.
-                 */
                 state.miniRiseKey++
 
                 state.miniVisible =
