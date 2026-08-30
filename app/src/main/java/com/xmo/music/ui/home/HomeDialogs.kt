@@ -1,4 +1,4 @@
-package com.xmo.music.ui
+package com.xmo.music.ui.home
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -30,6 +30,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
+import com.xmo.music.ui.LocalXmoAccent
+import com.xmo.music.ui.XmoFont
 
 @Composable
 internal fun HomeMenuDialog(
