@@ -1,6 +1,7 @@
 package com.xmo.music.ui.miniplayer
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -108,9 +109,6 @@ internal fun XmoMiniPlayerCard(
     open: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    /*
-     * Both sides now use the same approved radius.
-     */
     val cardShape =
         RoundedCornerShape(
             15.dp
@@ -147,9 +145,6 @@ internal fun XmoMiniPlayerCard(
                 0f
             }
 
-        /*
-         * Real playback progress.
-         */
         Canvas(
             modifier =
                 Modifier
@@ -163,11 +158,9 @@ internal fun XmoMiniPlayerCard(
                 color = accent,
                 size =
                     Size(
-                        width =
-                            size.width *
-                                progress,
-                        height =
-                            size.height
+                        size.width *
+                            progress,
+                        size.height
                     )
             )
         }
@@ -185,12 +178,13 @@ internal fun XmoMiniPlayerCard(
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
-            AsyncImage(
-                model =
-                    state.artworkUri
-                        ?.let(Uri::parse),
-                contentDescription =
-                    null,
+            /*
+             * ARTWORK
+             *
+             * AnimatedContent is itself clipped to the 50dp
+             * square. Old/new artwork cannot escape the box.
+             */
+            Box(
                 modifier =
                     Modifier
                         .size(50.dp)
@@ -201,56 +195,120 @@ internal fun XmoMiniPlayerCard(
                         )
                         .background(
                             colors.button
-                        ),
-                contentScale =
-                    ContentScale.Crop
-            )
+                        )
+            ) {
+                AnimatedContent(
+                    targetState =
+                        state.artworkUri,
+                    modifier =
+                        Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        XmoMiniPlayerAnimation
+                            .artworkChange()
+                    },
+                    label =
+                        "miniArtwork"
+                ) { artworkUri ->
 
-            Column(
+                    AsyncImage(
+                        model =
+                            artworkUri
+                                ?.let(
+                                    Uri::parse
+                                ),
+                        contentDescription =
+                            null,
+                        modifier =
+                            Modifier.fillMaxSize(),
+                        contentScale =
+                            ContentScale.Crop
+                    )
+                }
+            }
+
+            /*
+             * METADATA
+             *
+             * targetState is currentSongId so a title shared by
+             * two different songs still receives the transition.
+             */
+            Box(
                 modifier =
                     Modifier
                         .weight(1f)
-                        .padding(
-                            start = 9.dp,
-                            end = 5.dp
+                        .height(50.dp)
+                        .clip(
+                            RoundedCornerShape(
+                                1.dp
+                            )
                         )
             ) {
-                Text(
-                    text =
-                        state.title,
-                    color =
-                        colors.text,
-                    fontFamily =
-                        XmoFont.bold,
-                    fontSize =
-                        12.sp,
-                    maxLines =
-                        1,
-                    overflow =
-                        TextOverflow.Ellipsis
-                )
+                AnimatedContent(
+                    targetState =
+                        MiniSongText(
+                            id =
+                                state.currentSongId,
+                            title =
+                                state.title,
+                            artist =
+                                state.artist
+                        ),
+                    modifier =
+                        Modifier.fillMaxSize(),
+                    transitionSpec = {
+                        XmoMiniPlayerAnimation
+                            .metadataChange()
+                    },
+                    label =
+                        "miniMetadata"
+                ) { metadata ->
 
-                Text(
-                    text =
-                        state.artist,
-                    color =
-                        colors.sub,
-                    fontFamily =
-                        XmoFont.normal,
-                    fontSize =
-                        9.sp,
-                    maxLines =
-                        1,
-                    overflow =
-                        TextOverflow.Ellipsis
-                )
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .padding(
+                                    start = 9.dp,
+                                    end = 5.dp
+                                ),
+                        verticalArrangement =
+                            androidx.compose.foundation.layout
+                                .Arrangement.Center
+                    ) {
+                        Text(
+                            text =
+                                metadata.title,
+                            color =
+                                colors.text,
+                            fontFamily =
+                                XmoFont.bold,
+                            fontSize =
+                                12.sp,
+                            maxLines = 1,
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+
+                        Text(
+                            text =
+                                metadata.artist,
+                            color =
+                                colors.sub,
+                            fontFamily =
+                                XmoFont.normal,
+                            fontSize =
+                                9.sp,
+                            maxLines = 1,
+                            overflow =
+                                TextOverflow.Ellipsis
+                        )
+                    }
+                }
             }
         }
 
         /*
-         * Artwork/title region.
-         *
-         * Tap only. Long press deliberately does nothing.
+         * Artwork/title tap area.
          */
         Box(
             modifier =
@@ -282,9 +340,6 @@ internal fun XmoMiniPlayerCard(
                     }
         )
 
-        /*
-         * Same neutral control family as Now Playing.
-         */
         Row(
             modifier =
                 Modifier
@@ -316,12 +371,6 @@ internal fun XmoMiniPlayerCard(
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
-            /*
-             * Filled Rounded heart:
-             *
-             * inactive -> theme foreground
-             * liked    -> XMO accent
-             */
             Box(
                 modifier =
                     Modifier
@@ -365,9 +414,6 @@ internal fun XmoMiniPlayerCard(
                 )
             }
 
-            /*
-             * Exact approved Now Playing custom transport icons.
-             */
             Box(
                 modifier =
                     Modifier
@@ -405,3 +451,9 @@ internal fun XmoMiniPlayerCard(
         }
     }
 }
+
+private data class MiniSongText(
+    val id: Long?,
+    val title: String,
+    val artist: String
+)
