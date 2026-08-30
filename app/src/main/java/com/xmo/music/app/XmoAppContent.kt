@@ -60,86 +60,87 @@ internal fun XmoAppContent(
                         state.hazeState
                     )
             ) {
-                Box(
-                    Modifier
-                        .fillMaxSize()
-                        .zIndex(0f)
+                stateHolder.SaveableStateProvider(
+                    "tab_${state.tab}"
                 ) {
-                    stateHolder.SaveableStateProvider(
-                        "tab_${state.tab}"
-                    ) {
-                        when (state.tab) {
-                            0 -> Home(
-                                songs = state.songs,
-                                allowed = state.allowed,
-                                theme = state.theme,
-                                hazeState = state.hazeState,
-                                categories = state.categories,
-                                likedSongIds =
-                                    state.likedSongIds,
-                                recentPlays =
-                                    state.recentPlays,
-                                scanning = state.scanning,
-                                playback = state.playback,
-                                modeName = state.homeMode,
-                                changeMode =
-                                    actions.saveHomeMode,
-                                refresh = {
-                                    if (state.allowed) {
-                                        actions.refreshLibrary()
-                                    } else {
-                                        actions.requestAudioPermission()
-                                    }
-                                },
-                                openProfile =
-                                    actions.openProfile,
-                                togglePlay =
-                                    actions.togglePlay,
-                                toggleLike =
-                                    actions.toggleLike,
-                                playNext =
-                                    actions.playNext,
-                                removeRecent =
-                                    actions.removeRecent,
-                                setSongInCategory =
-                                    actions.setSongInCategory,
-                                shuffleSongs =
-                                    actions.shuffleSongs,
-                                onPlaySong =
-                                    actions.playSong
-                            )
+                    when (state.tab) {
+                        0 -> Home(
+                            songs = state.songs,
+                            allowed = state.allowed,
+                            theme = state.theme,
+                            hazeState = state.hazeState,
+                            categories = state.categories,
+                            likedSongIds =
+                                state.likedSongIds,
+                            recentPlays =
+                                state.recentPlays,
+                            scanning = state.scanning,
+                            playback = state.playback,
+                            modeName = state.homeMode,
+                            changeMode =
+                                actions.saveHomeMode,
+                            refresh = {
+                                if (state.allowed) {
+                                    actions.refreshLibrary()
+                                } else {
+                                    actions.requestAudioPermission()
+                                }
+                            },
+                            openProfile =
+                                actions.openProfile,
+                            togglePlay =
+                                actions.togglePlay,
+                            toggleLike =
+                                actions.toggleLike,
+                            playNext =
+                                actions.playNext,
+                            removeRecent =
+                                actions.removeRecent,
+                            setSongInCategory =
+                                actions.setSongInCategory,
+                            saveCategories =
+                                actions.saveCategories,
+                            shuffleSongs =
+                                actions.shuffleSongs,
+                            onPlaySong =
+                                actions.playSong
+                        )
 
-                            1 -> Search(
-                                songs = state.songs,
-                                categories =
-                                    state.categories,
-                                theme = state.theme,
-                                onPlaySong =
-                                    actions.playSong
-                            )
+                        1 -> Search(
+                            songs = state.songs,
+                            categories =
+                                state.categories,
+                            theme = state.theme,
+                            onPlaySong =
+                                actions.playSong
+                        )
 
-                            else -> Settings(
-                                theme = state.theme,
-                                appearance =
-                                    state.appearance,
-                                libraryPreferences =
-                                    state.libraryPreferences,
-                                playbackPreferences =
-                                    state.playbackPreferences,
-                                resumeOnHeadphones =
-                                    state.resumeOnHeadphones,
-                                onAppearanceChanged =
-                                    actions.changeAppearance,
-                                onLibraryPreferencesChanged =
-                                    actions.changeLibraryPreferences,
-                                onPlaybackPreferencesChanged =
-                                    actions.changePlaybackPreferences,
-                                onResumeHeadphonesChanged =
-                                    actions.changeResumeOnHeadphones,
-                                rescan =
-                                    actions.refreshLibrary
-                            )
-                        }
+                        else -> Settings(
+                            theme = state.theme,
+                            appearance =
+                                state.appearance,
+                            libraryPreferences =
+                                state.libraryPreferences,
+                            playbackPreferences =
+                                state.playbackPreferences,
+                            resumeOnHeadphones =
+                                state.resumeOnHeadphones,
+                            onAppearanceChanged =
+                                actions.changeAppearance,
+                            onLibraryPreferencesChanged =
+                                actions.changeLibraryPreferences,
+                            onPlaybackPreferencesChanged =
+                                actions.changePlaybackPreferences,
+                            onResumeHeadphonesChanged =
+                                actions.changeResumeOnHeadphones,
+                            rescan = {
+                                if (state.allowed) {
+                                    actions.refreshLibrary()
+                                } else {
+                                    actions.requestAudioPermission()
+                                }
+                            }
+                        )
                     }
                 }
 
@@ -221,12 +222,10 @@ internal fun XmoAppContent(
                         NowPlaying(
                             state = state.playback,
                             theme = state.theme,
-                            source =
-                                state.playingSource,
+                            source = state.playingSource,
                             sourceIsCategory =
                                 state.playingSourceIsCategory,
-                            queue =
-                                state.playbackQueue,
+                            queue = state.playbackQueue,
                             songs = state.songs,
                             liked =
                                 id != null &&
@@ -247,7 +246,8 @@ internal fun XmoAppContent(
                                 actions.previous,
                             previousItem =
                                 actions.previousItem,
-                            next = actions.next,
+                            next =
+                                actions.next,
                             playQueueIndex =
                                 actions.playQueueIndex,
                             seekTo = actions.seekTo,
