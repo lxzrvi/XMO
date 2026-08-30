@@ -16,107 +16,54 @@ import com.xmo.music.data.XmoProfile
 
 @Stable
 internal class XmoAppState {
-
-    /*
-     * =========================================================
-     * INITIALIZATION
-     * =========================================================
-     */
-
-    var loaded by
-        mutableStateOf(false)
-
-    var setupComplete by
-        mutableStateOf(false)
-
-    var allowed by
-        mutableStateOf(false)
-
-    /*
-     * =========================================================
-     * USER / PREFERENCES
-     * =========================================================
-     */
+    var loaded by mutableStateOf(false)
+    var setupComplete by mutableStateOf(false)
+    var allowed by mutableStateOf(false)
 
     var profile by
-        mutableStateOf(
-            XmoProfile()
-        )
+        mutableStateOf(XmoProfile())
 
     var appearance by
-        mutableStateOf(
-            XmoAppearance()
-        )
+        mutableStateOf(XmoAppearance())
 
     var libraryPreferences by
-        mutableStateOf(
-            LibraryPreferences()
-        )
+        mutableStateOf(LibraryPreferences())
 
     var playbackPreferences by
-        mutableStateOf(
-            PlaybackPreferences()
-        )
+        mutableStateOf(PlaybackPreferences())
 
     var resumeOnHeadphones by
         mutableStateOf(false)
 
-    /*
-     * =========================================================
-     * LIBRARY
-     * =========================================================
-     */
-
     var songs by
-        mutableStateOf<List<Song>>(
-            emptyList()
-        )
+        mutableStateOf<List<Song>>(emptyList())
 
     var scanning by
         mutableStateOf(false)
 
     var order by
-        mutableStateOf(
-            Store.defaults
-        )
+        mutableStateOf(Store.defaults)
 
     var categories by
-        mutableStateOf<List<UserCategory>>(
-            emptyList()
-        )
+        mutableStateOf<List<UserCategory>>(emptyList())
 
     var likedSongIds by
-        mutableStateOf<Set<Long>>(
-            emptySet()
-        )
+        mutableStateOf<Set<Long>>(emptySet())
 
     var recentPlays by
-        mutableStateOf<List<RecentPlay>>(
-            emptyList()
-        )
+        mutableStateOf<List<RecentPlay>>(emptyList())
 
     var lyricsFiles by
-        mutableStateOf<Map<Long, String>>(
-            emptyMap()
-        )
+        mutableStateOf<Map<Long, String>>(emptyMap())
 
-    /*
-     * =========================================================
-     * NAVIGATION
-     * =========================================================
-     */
+    var homeMode by
+        mutableStateOf("Home")
 
     var tab by
         mutableIntStateOf(0)
 
     var profileOpen by
         mutableStateOf(false)
-
-    /*
-     * =========================================================
-     * PLAYER UI
-     * =========================================================
-     */
 
     var showNowPlaying by
         mutableStateOf(false)
@@ -128,25 +75,14 @@ internal class XmoAppState {
         mutableIntStateOf(0)
 
     var playingSource by
-        mutableStateOf(
-            "All Songs"
-        )
+        mutableStateOf("All Songs")
 
     var playingSourceIsCategory by
         mutableStateOf(false)
 
-    /*
-     * Last song written into playback history.
-     */
     var recordedSongId by
-        mutableStateOf<Long?>(
-            null
-        )
+        mutableStateOf<Long?>(null)
 
-    /*
-     * Prevent persistence effects from writing default player
-     * state before MediaController has connected.
-     */
     var playerPersistenceReady by
         mutableStateOf(false)
 }
