@@ -1,10 +1,7 @@
 package com.xmo.music.ui.nowplaying
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,7 +45,6 @@ import com.xmo.music.data.UserCategory
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -91,11 +87,8 @@ internal fun SongOptionsBox(
         reveal.animateTo(
             targetValue = 1f,
             animationSpec =
-                tween(
-                    durationMillis = 250,
-                    easing =
-                        FastOutSlowInEasing
-                )
+                XmoPlayerAnimation
+                    .overlayRevealSpec
         )
     }
 
@@ -109,11 +102,8 @@ internal fun SongOptionsBox(
         reveal.animateTo(
             targetValue = 0f,
             animationSpec =
-                tween(
-                    durationMillis = 180,
-                    easing =
-                        FastOutSlowInEasing
-                )
+                XmoPlayerAnimation
+                    .overlayHideSpec
         )
 
         close()
@@ -132,9 +122,6 @@ internal fun SongOptionsBox(
         contentAlignment =
             Alignment.Center
     ) {
-        /*
-         * Backdrop has its own animated opacity.
-         */
         Box(
             modifier =
                 Modifier
@@ -142,7 +129,8 @@ internal fun SongOptionsBox(
                     .background(
                         Color.Black.copy(
                             alpha =
-                                .30f *
+                                XmoPlayerAnimation
+                                    .overlayBackdropAlpha *
                                     progress
                         )
                     )
@@ -161,20 +149,13 @@ internal fun SongOptionsBox(
                     )
                     .fillMaxWidth()
                     .graphicsLayer {
-                        alpha =
-                            progress
-
-                        val scale =
-                            .945f +
-                                .055f *
+                        with(
+                            XmoPlayerAnimation
+                        ) {
+                            centerOverlay(
                                 progress
-
-                        scaleX = scale
-                        scaleY = scale
-
-                        translationY =
-                            (1f - progress) *
-                                24f
+                            )
+                        }
                     }
                     .clip(
                         RoundedCornerShape(
@@ -184,10 +165,6 @@ internal fun SongOptionsBox(
                     .background(
                         colors.surface
                     )
-                    /*
-                     * Consume card taps without ripple and without
-                     * closing the backdrop.
-                     */
                     .simpleTap {}
                     .padding(
                         16.dp
@@ -295,9 +272,6 @@ internal fun SongOptionsBox(
                     share
             )
 
-            /*
-             * Still intentionally disabled.
-             */
             OverlayAction(
                 icon =
                     Icons.Rounded.Delete,
@@ -333,7 +307,6 @@ internal fun SongOptionsBox(
             categories
                 .take(6)
                 .forEach { category ->
-
                     val added =
                         song?.id in
                             category.songIds
