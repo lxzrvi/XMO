@@ -2,7 +2,6 @@ package com.xmo.music.ui.miniplayer
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
@@ -13,11 +12,11 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -154,8 +153,10 @@ fun XmoMiniPlayer(
         x.snapTo(0f)
 
         /*
-         * Direct exit from the current gesture position.
-         * There is intentionally no y -> 0 reset first.
+         * Crucial difference from the old MiniPlayer:
+         *
+         * y is NOT reset to zero after an upward swipe.
+         * Release continues directly into the downward exit.
          */
         y.animateTo(
             targetValue =
@@ -205,18 +206,17 @@ fun XmoMiniPlayer(
             navigationBottom
 
     /*
-     * Normal:
-     * preserve MiniPlayer's position above the approved NavBar.
+     * Keyboard state no longer stacks IME + NavBar + 128dp.
      *
-     * Keyboard:
-     * move with the IME top and use only a small visual gap.
-     * Do NOT stack the old 128dp NavBar clearance above IME.
+     * Because this root is the full screen rather than an
+     * ime-padded screen, imeBottom itself positions the player
+     * immediately above the keyboard.
      */
     val bottomPadding =
         if (keyboardVisible) {
             with(density) {
                 imeBottom.toDp()
-            } + 8.dp
+            } + 6.dp
         } else {
             with(density) {
                 navigationBottom.toDp()
@@ -237,10 +237,8 @@ fun XmoMiniPlayer(
             Alignment.BottomCenter
     ) {
         /*
-         * No visible grab pill.
-         *
-         * The invisible gesture host is still a little taller
-         * than the card, preserving easy swipe acquisition.
+         * Invisible extended gesture host.
+         * No visible top pill/grabber.
          */
         Box(
             modifier =
@@ -351,6 +349,7 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
+
                                 axis =
                                     XmoMiniAxis.None
 
@@ -370,7 +369,8 @@ fun XmoMiniPlayer(
                                                         .horizontalThresholdPx
 
                                             x.animateTo(
-                                                targetValue = 0f,
+                                                targetValue =
+                                                    0f,
                                                 animationSpec =
                                                     XmoMiniPlayerAnimation
                                                         .horizontalReturnSpec
@@ -394,9 +394,6 @@ fun XmoMiniPlayer(
                                                 finalY <=
                                                     XmoMiniPlayerAnimation
                                                         .openThresholdPx -> {
-                                                    /*
-                                                     * No return-to-rest.
-                                                     */
                                                     openOrdered()
                                                 }
 
@@ -408,7 +405,8 @@ fun XmoMiniPlayer(
 
                                                 else -> {
                                                     y.animateTo(
-                                                        targetValue = 0f,
+                                                        targetValue =
+                                                            0f,
                                                         animationSpec =
                                                             XmoMiniPlayerAnimation
                                                                 .verticalReturnSpec
@@ -446,33 +444,12 @@ fun XmoMiniPlayer(
 
                                     rawX = 0f
                                     rawY = 0f
+
                                     axis =
                                         XmoMiniAxis.None
+
                                     moved = false
                                 }
-                            }
-                        )
-                    }
-                    /*
-                     * Long press switches the right capsule into
-                     * explicit close mode.
-                     */
-                    .pointerInput(
-                        state.currentSongId,
-                        opening,
-                        closing
-                    ) {
-                        if (
-                            opening ||
-                            closing
-                        ) {
-                            return@pointerInput
-                        }
-
-                        detectTapGestures(
-                            onLongPress = {
-                                closeMode =
-                                    !closeMode
                             }
                         )
                     }
@@ -491,6 +468,10 @@ fun XmoMiniPlayer(
                     togglePlay,
                 toggleLike =
                     toggleLike,
+                toggleCloseMode = {
+                    closeMode =
+                        !closeMode
+                },
                 close = {
                     scope.launch {
                         closeOrdered()
