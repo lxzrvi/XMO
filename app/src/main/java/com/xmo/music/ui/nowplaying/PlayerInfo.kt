@@ -1,5 +1,10 @@
 package com.xmo.music.ui.nowplaying
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +26,7 @@ import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,13 +74,6 @@ internal fun PlayerInfo(
                 .fillMaxWidth()
                 .height(120.dp)
     ) {
-        /*
-         * Only the actions move slightly upward.
-         *
-         * The title/artist below remain bottom-aligned to the
-         * exact same 120dp host, so their approved position is
-         * unchanged.
-         */
         Row(
             modifier =
                 Modifier
@@ -113,9 +112,7 @@ internal fun PlayerInfo(
                             iconColor
                         },
                     modifier =
-                        Modifier.size(
-                            21.dp
-                        )
+                        Modifier.size(21.dp)
                 )
             }
 
@@ -146,9 +143,7 @@ internal fun PlayerInfo(
                             iconColor
                         },
                     modifier =
-                        Modifier.size(
-                            21.dp
-                        )
+                        Modifier.size(21.dp)
                 )
             }
         }
@@ -173,8 +168,6 @@ internal fun PlayerInfo(
                     sleepRemainingMs,
                 totalMs =
                     sleepTotalMs,
-                colors =
-                    colors,
                 accent =
                     accent,
                 iconColor =
@@ -196,9 +189,7 @@ internal fun PlayerInfo(
                     tint =
                         iconColor,
                     modifier =
-                        Modifier.size(
-                            21.dp
-                        )
+                        Modifier.size(21.dp)
                 )
             }
 
@@ -215,9 +206,7 @@ internal fun PlayerInfo(
                     tint =
                         iconColor,
                     modifier =
-                        Modifier.size(
-                            21.dp
-                        )
+                        Modifier.size(21.dp)
                 )
             }
         }
@@ -279,7 +268,6 @@ internal fun PlayerInfo(
 private fun SleepRingButton(
     remainingMs: Long,
     totalMs: Long?,
-    colors: HomeColors,
     accent: Color,
     iconColor: Color,
     onClick: () -> Unit
@@ -305,8 +293,31 @@ private fun SleepRingButton(
             null
         }
 
+    val pulseTransition =
+        rememberInfiniteTransition(
+            label = "sleepPulse"
+        )
+
+    val pulse by
+        pulseTransition.animateFloat(
+            initialValue = .62f,
+            targetValue = 1f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation =
+                        tween(
+                            durationMillis = 900
+                        ),
+                    repeatMode =
+                        RepeatMode.Reverse
+                ),
+            label =
+                "sleepPulseAlpha"
+        )
+
     Box(
-        Modifier.size(40.dp),
+        modifier =
+            Modifier.size(40.dp),
         contentAlignment =
             Alignment.Center
     ) {
@@ -321,35 +332,66 @@ private fun SleepRingButton(
                     "Sleep timer",
                 tint =
                     if (active) {
-                        accent
+                        accent.copy(
+                            alpha = pulse
+                        )
                     } else {
                         iconColor
                     },
                 modifier =
-                    Modifier.size(
-                        21.dp
-                    )
+                    Modifier.size(21.dp)
             )
         }
 
-        if (progress != null) {
+        if (active) {
             Canvas(
-                Modifier.size(32.dp)
+                modifier =
+                    Modifier.size(32.dp)
             ) {
-                drawArc(
-                    color = accent,
-                    startAngle = -90f,
-                    sweepAngle =
-                        360f * progress,
-                    useCenter = false,
-                    style =
-                        Stroke(
-                            width =
-                                1.5.dp.toPx(),
-                            cap =
-                                StrokeCap.Round
-                        )
-                )
+                /*
+                 * Only draw real progress if the original total
+                 * duration is known. Otherwise a subtle pulsing
+                 * ring communicates active state without
+                 * inventing a percentage.
+                 */
+                if (progress != null) {
+                    drawArc(
+                        color =
+                            accent.copy(
+                                alpha =
+                                    .74f +
+                                        .26f *
+                                        pulse
+                            ),
+                        startAngle = -90f,
+                        sweepAngle =
+                            360f *
+                                progress,
+                        useCenter = false,
+                        style =
+                            Stroke(
+                                width =
+                                    1.5.dp.toPx(),
+                                cap =
+                                    StrokeCap.Round
+                            )
+                    )
+                } else {
+                    drawCircle(
+                        color =
+                            accent.copy(
+                                alpha =
+                                    .18f +
+                                        .18f *
+                                        pulse
+                            ),
+                        style =
+                            Stroke(
+                                width =
+                                    1.2.dp.toPx()
+                            )
+                    )
+                }
             }
         }
     }
