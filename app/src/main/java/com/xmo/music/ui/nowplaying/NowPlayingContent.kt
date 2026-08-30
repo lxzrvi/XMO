@@ -198,8 +198,7 @@ internal fun NowPlayingContent(
                     state.hasPrevious,
                 canNext =
                     state.hasNext,
-                carousel =
-                    carousel,
+                carousel = carousel,
                 showLyrics =
                     artworkLyrics,
                 lyrics = lyrics,
@@ -210,8 +209,7 @@ internal fun NowPlayingContent(
                 theme = theme,
                 previousSong =
                     previousItem,
-                nextSong =
-                    next,
+                nextSong = next,
                 toggleLyrics = {
                     setArtworkLyrics(
                         !artworkLyrics
@@ -312,10 +310,8 @@ internal fun NowPlayingContent(
                         )
                 ) {
                     PlayerBody(
-                        position =
-                            state.position,
-                        duration =
-                            state.duration,
+                        position = state.position,
+                        duration = state.duration,
                         isPlaying =
                             state.isPlaying,
                         hasPrevious =
@@ -348,24 +344,23 @@ internal fun NowPlayingContent(
             }
         }
 
+        /*
+         * Host has ZERO visible animation.
+         *
+         * Every child now owns exactly one motion system.
+         */
         AnimatedContent(
-            targetState =
-                overlay,
+            targetState = overlay,
             modifier =
                 Modifier.fillMaxSize(),
             transitionSpec = {
                 XmoPlayerAnimation
-                    .overlayHostTransition(
-                        opening =
-                            targetState != null &&
-                                initialState == null,
-                        closing =
-                            targetState == null
-                    )
+                    .overlayHostTransition()
             },
             label =
                 "playerOverlay"
         ) { visibleOverlay ->
+
             when (visibleOverlay) {
                 PlayerOverlay.Queue -> {
                     QueueSheet(
@@ -422,6 +417,8 @@ internal fun NowPlayingContent(
                             state
                                 .sleepTimerRemainingMs >
                                 0L,
+                        remainingMs =
+                            state.sleepTimerRemainingMs,
                         dismiss = {
                             setOverlay(null)
                         },
@@ -447,7 +444,9 @@ internal fun NowPlayingContent(
                         },
                         cancel = {
                             setSleepTotalMs(null)
+
                             cancelSleepTimer()
+
                             setOverlay(null)
 
                             setPop(
@@ -487,8 +486,7 @@ internal fun NowPlayingContent(
         }
 
         AnimatedVisibility(
-            visible =
-                fullLyrics,
+            visible = fullLyrics,
             enter =
                 XmoPlayerAnimation
                     .fullLyricsEnter,
@@ -502,10 +500,8 @@ internal fun NowPlayingContent(
                     state.position,
                 duration =
                     state.duration,
-                title =
-                    state.title,
-                artist =
-                    state.artist,
+                title = state.title,
+                artist = state.artist,
                 artwork =
                     currentSong?.artwork
                         ?: fallbackArtwork,
@@ -522,12 +518,9 @@ internal fun NowPlayingContent(
                     state.hasNext,
                 togglePlay =
                     togglePlay,
-                previous =
-                    previous,
-                next =
-                    next,
-                seekTo =
-                    seekTo,
+                previous = previous,
+                next = next,
+                seekTo = seekTo,
                 close = {
                     setFullLyrics(false)
                     setArtworkLyrics(true)
@@ -560,8 +553,7 @@ internal fun NowPlayingContent(
                 XmoPop(
                     message =
                         it.text,
-                    theme =
-                        theme
+                    theme = theme
                 )
             }
         }
