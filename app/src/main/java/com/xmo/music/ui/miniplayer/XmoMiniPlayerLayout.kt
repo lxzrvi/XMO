@@ -1,11 +1,11 @@
 package com.xmo.music.ui.miniplayer
 
-import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -32,7 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
-import com.xmo.music.player.PlaybackState
+import com.xmo.music.data.Song
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.XmoFont
 import com.xmo.music.ui.nowplaying.XmoPauseIcon
@@ -44,21 +44,15 @@ internal fun xmoMiniSurface(
     when (theme) {
         XmoTheme.Light ->
             Color(0xFFF9F9FA)
-                .copy(
-                    alpha = .98f
-                )
+                .copy(alpha = .98f)
 
         XmoTheme.Dark ->
             Color(0xFF181819)
-                .copy(
-                    alpha = .98f
-                )
+                .copy(alpha = .98f)
 
         XmoTheme.Amoled ->
             Color(0xFF080808)
-                .copy(
-                    alpha = .985f
-                )
+                .copy(alpha = .985f)
     }
 
 internal fun xmoMiniControlSurface(
@@ -80,28 +74,26 @@ internal fun xmoMiniBorder(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color.Black.copy(
-                alpha = .08f
-            )
+            Color.Black.copy(alpha = .08f)
 
         XmoTheme.Dark ->
-            Color.White.copy(
-                alpha = .105f
-            )
+            Color.White.copy(alpha = .105f)
 
         XmoTheme.Amoled ->
-            Color.White.copy(
-                alpha = .13f
-            )
+            Color.White.copy(alpha = .13f)
     }
 
 @Composable
 internal fun XmoMiniPlayerCard(
-    state: PlaybackState,
+    song: Song,
+    isPlaying: Boolean,
+    position: Long,
+    duration: Long,
     theme: XmoTheme,
     colors: HomeColors,
     accent: Color,
     liked: Boolean,
+    transitionDirection: Int,
     moved: Boolean,
     opening: Boolean,
     togglePlay: () -> Unit,
@@ -110,9 +102,7 @@ internal fun XmoMiniPlayerCard(
     modifier: Modifier = Modifier
 ) {
     val cardShape =
-        RoundedCornerShape(
-            15.dp
-        )
+        RoundedCornerShape(15.dp)
 
     Box(
         modifier =
@@ -132,10 +122,10 @@ internal fun XmoMiniPlayerCard(
                 )
     ) {
         val progress =
-            if (state.duration > 0L) {
+            if (duration > 0L) {
                 (
-                    state.position.toFloat() /
-                        state.duration.toFloat()
+                    position.toFloat() /
+                        duration.toFloat()
                     )
                     .coerceIn(
                         0f,
@@ -179,10 +169,8 @@ internal fun XmoMiniPlayerCard(
                 Alignment.CenterVertically
         ) {
             /*
-             * ARTWORK
-             *
-             * AnimatedContent is itself clipped to the 50dp
-             * square. Old/new artwork cannot escape the box.
+             * Artwork position does not move.
+             * AnimatedContent is clipped to this exact square.
              */
             Box(
                 modifier =
@@ -198,8 +186,7 @@ internal fun XmoMiniPlayerCard(
                         )
             ) {
                 AnimatedContent(
-                    targetState =
-                        state.artworkUri,
+                    targetState = song,
                     modifier =
                         Modifier.fillMaxSize(),
                     transitionSpec = {
@@ -208,14 +195,11 @@ internal fun XmoMiniPlayerCard(
                     },
                     label =
                         "miniArtwork"
-                ) { artworkUri ->
+                ) { visualSong ->
 
                     AsyncImage(
                         model =
-                            artworkUri
-                                ?.let(
-                                    Uri::parse
-                                ),
+                            visualSong.artwork,
                         contentDescription =
                             null,
                         modifier =
@@ -227,10 +211,7 @@ internal fun XmoMiniPlayerCard(
             }
 
             /*
-             * METADATA
-             *
-             * targetState is currentSongId so a title shared by
-             * two different songs still receives the transition.
+             * Metadata owns the directional transition.
              */
             Box(
                 modifier =
@@ -244,24 +225,18 @@ internal fun XmoMiniPlayerCard(
                         )
             ) {
                 AnimatedContent(
-                    targetState =
-                        MiniSongText(
-                            id =
-                                state.currentSongId,
-                            title =
-                                state.title,
-                            artist =
-                                state.artist
-                        ),
+                    targetState = song,
                     modifier =
                         Modifier.fillMaxSize(),
                     transitionSpec = {
                         XmoMiniPlayerAnimation
-                            .metadataChange()
+                            .metadataChange(
+                                transitionDirection
+                            )
                     },
                     label =
                         "miniMetadata"
-                ) { metadata ->
+                ) { visualSong ->
 
                     Column(
                         modifier =
@@ -272,12 +247,11 @@ internal fun XmoMiniPlayerCard(
                                     end = 5.dp
                                 ),
                         verticalArrangement =
-                            androidx.compose.foundation.layout
-                                .Arrangement.Center
+                            Arrangement.Center
                     ) {
                         Text(
                             text =
-                                metadata.title,
+                                visualSong.title,
                             color =
                                 colors.text,
                             fontFamily =
@@ -291,7 +265,7 @@ internal fun XmoMiniPlayerCard(
 
                         Text(
                             text =
-                                metadata.artist,
+                                visualSong.artist,
                             color =
                                 colors.sub,
                             fontFamily =
@@ -307,9 +281,6 @@ internal fun XmoMiniPlayerCard(
             }
         }
 
-        /*
-         * Artwork/title tap area.
-         */
         Box(
             modifier =
                 Modifier
@@ -318,11 +289,9 @@ internal fun XmoMiniPlayerCard(
                     )
                     .fillMaxWidth()
                     .height(58.dp)
-                    .padding(
-                        end = 94.dp
-                    )
+                    .padding(end = 94.dp)
                     .pointerInput(
-                        state.currentSongId,
+                        song.id,
                         moved,
                         opening
                     ) {
@@ -346,9 +315,7 @@ internal fun XmoMiniPlayerCard(
                     .align(
                         Alignment.CenterEnd
                     )
-                    .padding(
-                        end = 6.dp
-                    )
+                    .padding(end = 6.dp)
                     .clip(
                         RoundedCornerShape(
                             24.dp
@@ -376,7 +343,8 @@ internal fun XmoMiniPlayerCard(
                     Modifier
                         .size(38.dp)
                         .pointerInput(
-                            liked
+                            liked,
+                            song.id
                         ) {
                             detectTapGestures {
                                 toggleLike()
@@ -408,9 +376,7 @@ internal fun XmoMiniPlayerCard(
                             }
                         },
                     modifier =
-                        Modifier.size(
-                            19.dp
-                        )
+                        Modifier.size(19.dp)
                 )
             }
 
@@ -419,7 +385,7 @@ internal fun XmoMiniPlayerCard(
                     Modifier
                         .size(42.dp)
                         .pointerInput(
-                            state.isPlaying
+                            isPlaying
                         ) {
                             detectTapGestures {
                                 togglePlay()
@@ -428,32 +394,20 @@ internal fun XmoMiniPlayerCard(
                 contentAlignment =
                     Alignment.Center
             ) {
-                if (state.isPlaying) {
+                if (isPlaying) {
                     XmoPauseIcon(
-                        color =
-                            colors.text,
+                        color = colors.text,
                         modifier =
-                            Modifier.size(
-                                19.dp
-                            )
+                            Modifier.size(19.dp)
                     )
                 } else {
                     XmoPlayIcon(
-                        color =
-                            colors.text,
+                        color = colors.text,
                         modifier =
-                            Modifier.size(
-                                20.dp
-                            )
+                            Modifier.size(20.dp)
                     )
                 }
             }
         }
     }
 }
-
-private data class MiniSongText(
-    val id: Long?,
-    val title: String,
-    val artist: String
-)
