@@ -82,8 +82,30 @@ fun XmoMiniPlayer(
 
     /*
      * =========================================================
-     * RESTING POSITION / IME
+     * EQUAL VERTICAL RHYTHM
      * =========================================================
+     *
+     * NavBar:
+     *
+     * 96dp host
+     * 64dp visible bar centered inside host
+     * host bottom = 24dp
+     *
+     * Visible NavBar bottom:
+     * 24 + (96 - 64) / 2
+     * = 40dp
+     *
+     * Therefore:
+     *
+     * bottom
+     * -> 40dp gap
+     * -> NavBar 64dp
+     * -> 40dp gap
+     * -> MiniPlayer
+     *
+     * MiniPlayer visible bottom =
+     * 40 + 64 + 40
+     * = 144dp
      */
 
     val navigationBottomPx =
@@ -96,7 +118,7 @@ fun XmoMiniPlayer(
 
     val normalClearancePx =
         with(density) {
-            118.dp.toPx()
+            144.dp.toPx()
         }
 
     val normalBottomPx =
@@ -109,10 +131,6 @@ fun XmoMiniPlayer(
                 6.dp.toPx()
             }
 
-    /*
-     * MiniPlayer follows IME upward/downward but cannot go below
-     * its normal resting position while keyboard closes.
-     */
     val resolvedBottomPx =
         max(
             normalBottomPx,
@@ -126,7 +144,7 @@ fun XmoMiniPlayer(
 
     /*
      * =========================================================
-     * NOW PLAYING -> MINIPLAYER
+     * RETURN FROM NOW PLAYING
      * =========================================================
      */
 
@@ -192,17 +210,6 @@ fun XmoMiniPlayer(
             mutableStateOf(false)
         }
 
-    /*
-     * =========================================================
-     * EXIT GEOMETRY
-     * =========================================================
-     *
-     * y is translation from the MiniPlayer resting position.
-     *
-     * When translation reaches resolvedBottomPx + card height,
-     * the entire visible card has crossed the screen bottom.
-     */
-
     val cardHeightPx =
         with(density) {
             60.dp.toPx()
@@ -212,26 +219,12 @@ fun XmoMiniPlayer(
         resolvedBottomPx +
             cardHeightPx
 
-    /*
-     * Animation target is deliberately farther than the visible
-     * threshold.
-     *
-     * The spring therefore continues moving through the hidden
-     * point instead of visually settling right at the NavBar /
-     * screen boundary.
-     */
     val hiddenTarget =
         hiddenThreshold +
             with(density) {
                 110.dp.toPx()
             }
 
-    /*
-     * Wait only until the card has physically disappeared.
-     *
-     * Do NOT wait for spring.animateTo() to settle at its final
-     * invisible target.
-     */
     suspend fun awaitHidden() {
         while (
             y.value <
@@ -240,12 +233,6 @@ fun XmoMiniPlayer(
             withFrameNanos { }
         }
     }
-
-    /*
-     * =========================================================
-     * MINIPLAYER -> NOW PLAYING
-     * =========================================================
-     */
 
     suspend fun openOrdered() {
         if (
@@ -257,20 +244,11 @@ fun XmoMiniPlayer(
 
         opening = true
 
-        /*
-         * Search keyboard must not remain on Now Playing.
-         */
         keyboardController?.hide()
 
         x.snapTo(0f)
 
         coroutineScope {
-            /*
-             * Same spring speed as before.
-             *
-             * This animation may continue invisibly after the
-             * hidden threshold is crossed.
-             */
             launch {
                 y.animateTo(
                     targetValue =
@@ -281,23 +259,11 @@ fun XmoMiniPlayer(
                 )
             }
 
-            /*
-             * As soon as the entire card is below the screen,
-             * open Now Playing immediately.
-             *
-             * No bottom pause and no waiting for spring settling.
-             */
             awaitHidden()
 
             openPlayer()
         }
     }
-
-    /*
-     * =========================================================
-     * SWIPE-DOWN CLOSE
-     * =========================================================
-     */
 
     suspend fun closeOrdered() {
         if (
@@ -368,7 +334,6 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
-
                                 moved = false
                             },
 
@@ -378,11 +343,8 @@ fun XmoMiniPlayer(
 
                                 change.consume()
 
-                                rawX +=
-                                    amount.x
-
-                                rawY +=
-                                    amount.y
+                                rawX += amount.x
+                                rawY += amount.y
 
                                 if (
                                     axis ==
@@ -451,7 +413,6 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
-
                                 axis =
                                     XmoMiniAxis.None
 
@@ -520,7 +481,6 @@ fun XmoMiniPlayer(
                                         XmoMiniAxis.None -> {
                                             x.snapTo(0f)
                                             y.snapTo(0f)
-
                                             moved = false
                                         }
                                     }
@@ -545,10 +505,8 @@ fun XmoMiniPlayer(
 
                                     rawX = 0f
                                     rawY = 0f
-
                                     axis =
                                         XmoMiniAxis.None
-
                                     moved = false
                                 }
                             }
