@@ -4,13 +4,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.scrollBy
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,30 +16,18 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
-import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ArrowForwardIos
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,33 +35,7 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
-import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
-import kotlin.math.abs
-
-@Stable
-private class HomeSongScroller {
-    var click by mutableIntStateOf(0)
-        private set
-
-    var hold by mutableStateOf(false)
-        private set
-
-    fun tap() {
-        click++
-    }
-
-    fun begin() {
-        hold = true
-    }
-
-    fun stop() {
-        hold = false
-    }
-}
 
 @Composable
 internal fun HomeAllSongs(
@@ -96,134 +56,61 @@ internal fun HomeAllSongs(
         return
     }
 
-    val arrow = remember {
-        HomeSongScroller()
-    }
-
-    val grid = rememberLazyGridState()
-    val scope = rememberCoroutineScope()
-    val slots = ((songs.size + 11) / 12) * 12
-
-    LaunchedEffect(arrow.click) {
-        if (arrow.click > 0) {
-            val column = grid.firstVisibleItemIndex / 3
-            val maxColumn = slots / 3 - 1
-            val target =
-                (column + 1).coerceAtMost(maxColumn)
-
-            if (target > column) {
-                grid.animateScrollToItem(target * 3)
-            }
-        }
-    }
-
-    LaunchedEffect(arrow.hold) {
-        while (arrow.hold && isActive) {
-            if (abs(grid.scrollBy(19f)) < .1f) {
-                break
-            }
-
-            delay(16L)
-        }
-    }
-
     BoxWithConstraints(
-        Modifier
-            .fillMaxWidth()
-            .background(c.bg)
+        Modifier.fillMaxWidth()
     ) {
         val edge = 8.dp
         val gap = 8.dp
         val cardWidth =
             (maxWidth - edge * 2 - gap * 3) / 4
 
-        val gridHeight =
-            (cardWidth + 37.dp) * 3 + gap * 2
+        val cardHeight =
+            cardWidth + 37.dp
 
-        LazyHorizontalGrid(
-            rows = GridCells.Fixed(3),
-            state = grid,
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(gridHeight),
-            contentPadding = PaddingValues(horizontal = edge),
-            horizontalArrangement = Arrangement.spacedBy(gap),
-            verticalArrangement = Arrangement.spacedBy(gap)
-        ) {
-            items(
-                count = slots,
-                key = { "all_song_slot_$it" }
-            ) { slot ->
-                val page = slot / 12
-                val local = slot % 12
-                val row = local % 3
-                val column = local / 3
-                val sourceIndex =
-                    page * 12 + row * 4 + column
+        val height =
+            cardHeight * 3 +
+                gap * 2
 
-                Box(
-                    Modifier.width(cardWidth)
-                ) {
-                    songs.getOrNull(sourceIndex)?.let { song ->
-                        HomeSongTile(
-                            song = song,
-                            c = c,
-                            modifier = Modifier.width(cardWidth),
-                            onClick = {
-                                play(song)
-                            },
-                            onOptions = {
-                                options(song)
-                            }
-                        )
-                    }
-                }
-            }
-        }
+        val scroll =
+            rememberScrollState()
 
-        Box(
+        Row(
             Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 9.dp)
-                .size(32.dp)
-                .clip(CircleShape)
-                .background(
-                    LocalXmoAccent.current.copy(alpha = .18f)
-                )
-                .border(
-                    .6.dp,
-                    LocalXmoAccent.current.copy(alpha = .28f),
-                    CircleShape
-                )
-                .pointerInput(arrow) {
-                    detectTapGestures(
-                        onPress = {
-                            var held = false
-
-                            val job = scope.launch {
-                                delay(250L)
-                                held = true
-                                arrow.begin()
-                            }
-
-                            val released = tryAwaitRelease()
-                            job.cancel()
-                            arrow.stop()
-
-                            if (released && !held) {
-                                arrow.tap()
+                .fillMaxWidth()
+                .height(height)
+                .horizontalScroll(scroll)
+                .padding(horizontal = edge),
+            horizontalArrangement =
+                Arrangement.spacedBy(gap)
+        ) {
+            songs
+                .chunked(3)
+                .forEach { column ->
+                    Column(
+                        Modifier.width(cardWidth),
+                        verticalArrangement =
+                            Arrangement.spacedBy(gap)
+                    ) {
+                        column.forEach { song ->
+                            key(song.id) {
+                                HomeSongTile(
+                                    song = song,
+                                    c = c,
+                                    theme = theme,
+                                    modifier = Modifier
+                                        .width(cardWidth)
+                                        .height(cardHeight),
+                                    onClick = {
+                                        play(song)
+                                    },
+                                    onOptions = {
+                                        options(song)
+                                    }
+                                )
                             }
                         }
-                    )
-                },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Rounded.ArrowForwardIos,
-                contentDescription = "Next songs",
-                tint = LocalXmoAccent.current,
-                modifier = Modifier.size(14.dp)
-            )
+                    }
+                }
         }
     }
 }
@@ -233,10 +120,44 @@ internal fun HomeAllSongs(
 private fun HomeSongTile(
     song: Song,
     c: HomeColors,
-    modifier: Modifier = Modifier,
+    theme: XmoTheme,
+    modifier: Modifier,
     onClick: () -> Unit,
     onOptions: () -> Unit
 ) {
+    val border =
+        when (theme) {
+            XmoTheme.Light ->
+                androidx.compose.ui.graphics.Color
+                    .Black.copy(alpha = .07f)
+
+            XmoTheme.Dark ->
+                androidx.compose.ui.graphics.Color
+                    .White.copy(alpha = .065f)
+
+            XmoTheme.Amoled ->
+                androidx.compose.ui.graphics.Color
+                    .White.copy(alpha = .09f)
+        }
+
+    val surface =
+        when (theme) {
+            XmoTheme.Light ->
+                androidx.compose.ui.graphics.Color(
+                    0xFFF9F9FA
+                )
+
+            XmoTheme.Dark ->
+                androidx.compose.ui.graphics.Color(
+                    0xFF181819
+                )
+
+            XmoTheme.Amoled ->
+                androidx.compose.ui.graphics.Color(
+                    0xFF080808
+                )
+        }
+
     Column(
         modifier
             .clip(RoundedCornerShape(10.dp))
@@ -244,10 +165,10 @@ private fun HomeSongTile(
                 onClick = onClick,
                 onLongClick = onOptions
             )
-            .background(c.surface)
+            .background(surface)
             .border(
-                .6.dp,
-                c.border,
+                .45.dp,
+                border,
                 RoundedCornerShape(10.dp)
             )
             .padding(5.dp)
@@ -271,14 +192,19 @@ private fun HomeSongTile(
 
                 if (song.artwork == null) {
                     Text(
-                        text = song.title
-                            .firstOrNull()
-                            ?.uppercase()
-                            ?: "X",
-                        color = c.text.copy(alpha = .65f),
+                        text =
+                            song.title
+                                .firstOrNull()
+                                ?.uppercase()
+                                ?: "X",
+                        color =
+                            c.text.copy(alpha = .65f),
                         fontFamily = XmoFont.bold,
                         fontSize = 17.sp,
-                        modifier = Modifier.align(Alignment.Center)
+                        modifier =
+                            Modifier.align(
+                                Alignment.Center
+                            )
                     )
                 }
             }
@@ -288,7 +214,8 @@ private fun HomeSongTile(
             Modifier
                 .fillMaxWidth()
                 .padding(top = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
             Column(
                 Modifier.weight(1f)
@@ -299,7 +226,8 @@ private fun HomeSongTile(
                     fontFamily = XmoFont.bold,
                     fontSize = 10.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
 
                 Text(
@@ -308,7 +236,8 @@ private fun HomeSongTile(
                     fontFamily = XmoFont.normal,
                     fontSize = 8.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
             }
 
@@ -320,11 +249,14 @@ private fun HomeSongTile(
                         onClick = onOptions,
                         onLongClick = onOptions
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment =
+                    Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.MoreHoriz,
-                    contentDescription = "Song options",
+                    imageVector =
+                        Icons.Rounded.MoreHoriz,
+                    contentDescription =
+                        "Song options",
                     tint = c.sub,
                     modifier = Modifier.size(17.dp)
                 )
