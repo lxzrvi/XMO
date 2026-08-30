@@ -7,16 +7,15 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,9 +72,13 @@ fun XmoMiniPlayer(
             Animatable(0f)
         }
 
+    /*
+     * Enough distance that the card fully travels below the
+     * bottom UI rather than remaining partially visible.
+     */
     val exitDistance =
         with(density) {
-            160.dp.toPx()
+            240.dp.toPx()
         }
 
     val entranceY =
@@ -113,11 +116,6 @@ fun XmoMiniPlayer(
             mutableStateOf(false)
         }
 
-    var closeMode by
-        remember {
-            mutableStateOf(false)
-        }
-
     var axis by
         remember {
             mutableStateOf(
@@ -149,15 +147,14 @@ fun XmoMiniPlayer(
         }
 
         opening = true
-        closeMode = false
 
         x.snapTo(0f)
 
         /*
-         * Crucial difference from the old MiniPlayer:
+         * y is deliberately NOT reset.
          *
-         * y is NOT reset to zero after an upward swipe.
-         * Release continues directly into the downward exit.
+         * If the user released at -60px, animation begins at
+         * -60px and travels directly below the screen.
          */
         y.animateTo(
             targetValue =
@@ -179,10 +176,13 @@ fun XmoMiniPlayer(
         }
 
         closing = true
-        closeMode = false
 
         x.snapTo(0f)
 
+        /*
+         * Same rule for downward dismissal:
+         * continue from the current dragged position.
+         */
         y.animateTo(
             targetValue =
                 exitDistance,
@@ -194,35 +194,20 @@ fun XmoMiniPlayer(
         closePlayer()
     }
 
-    val imeBottom =
-        WindowInsets.ime
-            .getBottom(density)
-
+    /*
+     * No IME inset is read here.
+     *
+     * Keyboard appearance therefore does not reposition the
+     * MiniPlayer.
+     */
     val navigationBottom =
         WindowInsets.navigationBars
             .getBottom(density)
 
-    val keyboardVisible =
-        imeBottom >
-            navigationBottom
-
-    /*
-     * Keyboard state no longer stacks IME + NavBar + 128dp.
-     *
-     * Because this root is the full screen rather than an
-     * ime-padded screen, imeBottom itself positions the player
-     * immediately above the keyboard.
-     */
     val bottomPadding =
-        if (keyboardVisible) {
-            with(density) {
-                imeBottom.toDp()
-            } + 6.dp
-        } else {
-            with(density) {
-                navigationBottom.toDp()
-            } + 128.dp
-        }
+        with(density) {
+            navigationBottom.toDp()
+        } + 128.dp
 
     Box(
         modifier =
@@ -238,8 +223,8 @@ fun XmoMiniPlayer(
             Alignment.BottomCenter
     ) {
         /*
-         * Invisible extended gesture host.
-         * No visible top pill/grabber.
+         * Invisible gesture acquisition area only.
+         * No grab pill is rendered.
          */
         Box(
             modifier =
@@ -277,11 +262,8 @@ fun XmoMiniPlayer(
 
                                 change.consume()
 
-                                rawX +=
-                                    amount.x
-
-                                rawY +=
-                                    amount.y
+                                rawX += amount.x
+                                rawY += amount.y
 
                                 if (
                                     axis ==
@@ -350,7 +332,6 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
-
                                 axis =
                                     XmoMiniAxis.None
 
@@ -370,8 +351,7 @@ fun XmoMiniPlayer(
                                                         .horizontalThresholdPx
 
                                             x.animateTo(
-                                                targetValue =
-                                                    0f,
+                                                targetValue = 0f,
                                                 animationSpec =
                                                     XmoMiniPlayerAnimation
                                                         .horizontalReturnSpec
@@ -445,10 +425,8 @@ fun XmoMiniPlayer(
 
                                     rawX = 0f
                                     rawY = 0f
-
                                     axis =
                                         XmoMiniAxis.None
-
                                     moved = false
                                 }
                             }
@@ -461,25 +439,14 @@ fun XmoMiniPlayer(
                 colors = colors,
                 accent = accent,
                 liked = liked,
-                closeMode =
-                    closeMode,
                 moved = moved,
                 opening = opening,
                 togglePlay =
                     togglePlay,
                 toggleLike =
                     toggleLike,
-                toggleCloseMode = {
-                    closeMode =
-                        !closeMode
-                },
-                close = {
-                    scope.launch {
-                        closeOrdered()
-                    }
-                },
                 open = {
-                    if (!closeMode) {
+                    if (!moved) {
                         scope.launch {
                             openOrdered()
                         }
