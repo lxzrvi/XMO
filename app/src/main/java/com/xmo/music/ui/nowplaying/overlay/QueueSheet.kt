@@ -21,6 +21,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.coroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -139,30 +140,32 @@ internal fun QueueSheet(
     }
 
     suspend fun closeSheet() {
-        launch {
-            backdropAlpha.animateTo(
+        coroutineScope {
+            launch {
+                backdropAlpha.animateTo(
+                    targetValue =
+                        0f,
+                    animationSpec =
+                        tween(
+                            durationMillis =
+                                190
+                        )
+                )
+            }
+    
+            sheetY.animateTo(
                 targetValue =
-                    0f,
+                    sheetHeightPx,
                 animationSpec =
                     tween(
                         durationMillis =
-                            190
+                            280,
+                        easing =
+                            FastOutSlowInEasing
                     )
             )
         }
-
-        sheetY.animateTo(
-            targetValue =
-                sheetHeightPx,
-            animationSpec =
-                tween(
-                    durationMillis =
-                        280,
-                    easing =
-                        FastOutSlowInEasing
-                )
-        )
-
+    
         dismiss()
     }
 
