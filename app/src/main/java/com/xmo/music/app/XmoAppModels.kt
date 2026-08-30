@@ -28,6 +28,7 @@ internal data class XmoAppUiState(
     val likedSongIds: Set<Long>,
     val recentPlays: List<RecentPlay>,
     val lyricsFiles: Map<Long, String>,
+    val homeMode: String,
     val allowed: Boolean,
     val scanning: Boolean,
     val loaded: Boolean,
@@ -43,6 +44,7 @@ internal data class XmoAppUiState(
 internal class XmoAppActions(
     val requestAudioPermission: () -> Unit,
     val refreshLibrary: () -> Unit,
+    val saveHomeMode: (String) -> Unit,
     val selectTab: (Int) -> Unit,
     val openProfile: () -> Unit,
     val closeProfile: () -> Unit,
@@ -51,10 +53,16 @@ internal class XmoAppActions(
     val saveCategories: (List<UserCategory>) -> Unit,
 
     val playSong: (
-        song: Song,
-        source: String,
-        isCategory: Boolean,
-        queue: List<Song>
+        Song,
+        String,
+        Boolean,
+        List<Song>
+    ) -> Unit,
+
+    val shuffleSongs: (
+        List<Song>,
+        String,
+        Boolean
     ) -> Unit,
 
     val playNext: (Song) -> Unit,
@@ -63,15 +71,13 @@ internal class XmoAppActions(
     val toggleSongLikeById: (Long) -> Unit,
 
     val setSongInCategory: (
-        song: Song,
-        categoryId: String,
-        added: Boolean
+        Song,
+        String,
+        Boolean
     ) -> Unit,
 
-    val createCategoryForSong: (
-        name: String,
-        song: Song
-    ) -> UserCategory?,
+    val createCategoryForSong:
+        (String, Song) -> UserCategory?,
 
     val changeAppearance: (XmoAppearance) -> Unit,
     val changeLibraryPreferences:
@@ -85,7 +91,6 @@ internal class XmoAppActions(
     val closePlaybackFromMini: () -> Unit,
     val togglePlay: () -> Unit,
     val playQueueIndex: (Int) -> Unit,
-
     val next: () -> Unit,
     val previous: () -> Unit,
     val previousItem: () -> Unit,
@@ -99,10 +104,8 @@ internal class XmoAppActions(
     val cancelSleepTimer: () -> Unit,
     val saveLyricsUri: (String?) -> Unit,
 
-    val setCurrentSongInCategory: (
-        categoryId: String,
-        added: Boolean
-    ) -> Unit,
+    val setCurrentSongInCategory:
+        (String, Boolean) -> Unit,
 
     val createCategoryForCurrentSong:
         (String) -> UserCategory?,
