@@ -5,6 +5,7 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import kotlin.math.abs
+import kotlin.math.roundToInt
 import kotlin.math.sign
 
 internal enum class XmoMiniAxis {
@@ -26,6 +27,13 @@ internal object XmoMiniPlayerAnimation {
 
     const val closeThresholdPx =
         44f
+
+    /*
+     * Reference travel used for matching exit movement to the
+     * perceived pace of the Now Playing -> MiniPlayer entrance.
+     */
+    private const val referenceDurationMs =
+        360f
 
     fun horizontalResistance(
         value: Float
@@ -54,6 +62,10 @@ internal object XmoMiniPlayerAnimation {
     fun verticalResistance(
         value: Float
     ): Float {
+        /*
+         * Upward gesture gets slightly more free movement than
+         * downward dismissal.
+         */
         val free =
             if (value < 0f) {
                 66f
@@ -80,7 +92,7 @@ internal object XmoMiniPlayerAnimation {
     }
 
     /*
-     * Now Playing -> MiniPlayer entrance.
+     * Existing Now Playing -> MiniPlayer entrance character.
      */
     val riseSpec: AnimationSpec<Float>
         get() =
@@ -104,25 +116,48 @@ internal object XmoMiniPlayerAnimation {
             )
 
     /*
-     * MiniPlayer -> Now Playing / close.
+     * Exit duration follows actual distance.
      *
-     * Previous 175ms exit was too abrupt.
-     * This duration is intentionally close to the perceived
-     * speed of the MiniPlayer rise animation.
+     * Example:
      *
-     * No bounce/overshoot on disappearance.
+     * referenceDistance = normal resting -> completely hidden
+     * distance
+     *
+     * If swipe-up starts 50px above rest, it has 50px farther to
+     * travel. Duration increases proportionally instead of making
+     * the card move faster.
      */
-    val openExitSpec: AnimationSpec<Float>
-        get() =
-            tween(
-                durationMillis = 315,
-                easing = FastOutSlowInEasing
-            )
+    fun exitSpec(
+        distancePx: Float,
+        referenceDistancePx: Float
+    ): AnimationSpec<Float> {
+        val reference =
+            referenceDistancePx
+                .coerceAtLeast(1f)
 
-    val closeExitSpec: AnimationSpec<Float>
-        get() =
-            tween(
-                durationMillis = 315,
-                easing = FastOutSlowInEasing
-            )
+        val distance =
+            distancePx
+                .coerceAtLeast(1f)
+
+        val duration =
+            (
+                referenceDurationMs *
+                    (
+                        distance /
+                            reference
+                        )
+                )
+                .roundToInt()
+                .coerceIn(
+                    280,
+                    520
+                )
+
+        return tween(
+            durationMillis =
+                duration,
+            easing =
+                FastOutSlowInEasing
+        )
+    }
 }
