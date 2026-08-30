@@ -84,7 +84,6 @@ internal fun XmoAppContent(
                                     recentPlays =
                                         state.recentPlays,
                                     scanning = state.scanning,
-                                    loaded = state.loaded,
                                     refresh = {
                                         if (state.allowed) {
                                             actions.refreshLibrary()
@@ -100,10 +99,6 @@ internal fun XmoAppContent(
                                         actions.saveCategories,
                                     toggleLike =
                                         actions.toggleLike,
-                                    playNext =
-                                        actions.playNext,
-                                    removeRecent =
-                                        actions.removeRecent,
                                     setSongInCategory =
                                         actions.setSongInCategory,
                                     onPlaySong =
@@ -200,7 +195,7 @@ internal fun XmoAppContent(
                         NavBar(
                             selected = state.tab,
                             theme = state.theme,
-                            onSelect = actions.selectTab
+                            select = actions.selectTab
                         )
                     }
                 }
