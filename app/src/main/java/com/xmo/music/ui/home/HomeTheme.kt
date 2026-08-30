@@ -55,32 +55,55 @@ fun homeColors(theme: XmoTheme): HomeColors =
         )
     }
 
-internal fun homeTopColors(theme: XmoTheme): HomeTopColors =
+internal fun homeTopColors(
+    theme: XmoTheme
+): HomeTopColors =
     when (theme) {
         XmoTheme.Light -> HomeTopColors(
-            background = Color(0xFFF9F9FA),
-            border = Color.Black.copy(alpha = .085f),
-            selector = Color(0xFFEAEAEC),
-            selectorBorder = Color.Black.copy(alpha = .13f),
-            inactive = Color.Black.copy(alpha = .46f),
-            active = Color(0xFF161616)
+            background =
+                Color(0xFFF9F9FA)
+                    .copy(alpha = .965f),
+            border =
+                Color.Black.copy(alpha = .085f),
+            selector =
+                Color(0xFFEAEAEC),
+            selectorBorder =
+                Color.Black.copy(alpha = .13f),
+            inactive =
+                Color.Black.copy(alpha = .46f),
+            active =
+                Color(0xFF161616)
         )
 
         XmoTheme.Dark -> HomeTopColors(
-            background = Color(0xFF181819),
-            border = Color.White.copy(alpha = .10f),
-            selector = Color(0xFF303031),
-            selectorBorder = Color.White.copy(alpha = .155f),
-            inactive = Color.White.copy(alpha = .42f),
-            active = Color.White
+            background =
+                Color(0xFF181819)
+                    .copy(alpha = .965f),
+            border =
+                Color.White.copy(alpha = .10f),
+            selector =
+                Color(0xFF303031),
+            selectorBorder =
+                Color.White.copy(alpha = .155f),
+            inactive =
+                Color.White.copy(alpha = .42f),
+            active =
+                Color.White
         )
 
         XmoTheme.Amoled -> HomeTopColors(
-            background = Color(0xFF080808),
-            border = Color.White.copy(alpha = .13f),
-            selector = Color(0xFF292929),
-            selectorBorder = Color.White.copy(alpha = .18f),
-            inactive = Color.White.copy(alpha = .42f),
-            active = Color.White
+            background =
+                Color(0xFF080808)
+                    .copy(alpha = .975f),
+            border =
+                Color.White.copy(alpha = .13f),
+            selector =
+                Color(0xFF292929),
+            selectorBorder =
+                Color.White.copy(alpha = .18f),
+            inactive =
+                Color.White.copy(alpha = .42f),
+            active =
+                Color.White
         )
     }
