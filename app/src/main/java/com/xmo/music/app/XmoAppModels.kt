@@ -67,7 +67,6 @@ internal class XmoAppActions(
     ) -> Unit,
 
     val toggleLike: (Song) -> Unit,
-
     val toggleSongLikeById: (Long) -> Unit,
 
     val setSongInCategory: (
@@ -75,6 +74,14 @@ internal class XmoAppActions(
         categoryId: String,
         added: Boolean
     ) -> Unit,
+
+    /*
+     * Used by MiniPlayer's preview-aware category picker.
+     */
+    val createCategoryForSong: (
+        name: String,
+        song: Song
+    ) -> UserCategory?,
 
     val changeAppearance: (XmoAppearance) -> Unit,
 
@@ -87,13 +94,17 @@ internal class XmoAppActions(
     val changeResumeOnHeadphones:
         (Boolean) -> Unit,
 
+    /*
+     * MiniPlayer
+     */
     val openNowPlayingFromMini: () -> Unit,
     val closePlaybackFromMini: () -> Unit,
-
     val togglePlay: () -> Unit,
-
     val playQueueIndex: (Int) -> Unit,
 
+    /*
+     * Now Playing immediate transport
+     */
     val next: () -> Unit,
     val previous: () -> Unit,
     val previousItem: () -> Unit,
