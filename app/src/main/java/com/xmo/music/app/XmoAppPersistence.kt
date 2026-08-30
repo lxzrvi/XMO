@@ -23,20 +23,11 @@ internal class XmoAppPersistence(
             state.songs = cachedSongs
         }
 
-        state.profile =
-            Store.profile(context)
-
-        state.appearance =
-            Store.appearance(context)
-
-        state.categories =
-            Store.categories(context)
-
-        state.order =
-            Store.order(context)
-
-        state.likedSongIds =
-            Store.likedSongIds(context)
+        state.profile = Store.profile(context)
+        state.appearance = Store.appearance(context)
+        state.categories = Store.categories(context)
+        state.order = Store.order(context)
+        state.likedSongIds = Store.likedSongIds(context)
 
         state.recentPlays =
             HomeCache.filterRecent(
@@ -58,6 +49,9 @@ internal class XmoAppPersistence(
 
         state.setupComplete =
             Store.setupComplete(context)
+
+        state.homeMode =
+            HomeCache.homeMode(context)
 
         state.loaded = true
     }
@@ -106,16 +100,23 @@ internal class XmoAppPersistence(
         }
     }
 
+    fun saveHomeMode(
+        mode: String
+    ) {
+        state.homeMode = mode
+
+        HomeCache.saveHomeMode(
+            context,
+            mode
+        )
+    }
+
     fun applyPlaybackPreferences(
         player: XmoPlayer
     ) {
         player.setPlaybackParameters(
-            speed =
-                state.playbackPreferences
-                    .playbackSpeed,
-            pitch =
-                state.playbackPreferences
-                    .playbackPitch
+            state.playbackPreferences.playbackSpeed,
+            state.playbackPreferences.playbackPitch
         )
     }
 
