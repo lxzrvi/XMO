@@ -14,57 +14,29 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.graphics.GraphicsLayerScope
 
-/*
- * =============================================================
- * XMO NOW PLAYING MOTION SYSTEM
- * =============================================================
- *
- * This object owns only reusable motion definitions.
- *
- * It does NOT own:
- * - queue state
- * - queue drag state
- * - overlay state
- * - carousel state
- * - playback state
- *
- * Those remain in their responsible components.
- */
 internal object XmoPlayerAnimation {
 
     /*
      * =========================================================
-     * CENTERED OVERLAYS
+     * CENTER OVERLAYS
      * =========================================================
      *
-     * Song Options / Details / Artist:
-     *
-     * - remain centered
-     * - no vertical movement
-     * - fade + subtle center scale
-     * - no visible black backdrop
+     * Options / Details / Artist / Sleep:
+     * fade + center scale only.
      */
-
-    const val overlayBackdropAlpha =
-        0f
-
-    private const val overlayStartScale =
-        .955f
 
     val overlayRevealSpec
         get() =
             tween<Float>(
                 durationMillis = 240,
-                easing =
-                    FastOutSlowInEasing
+                easing = FastOutSlowInEasing
             )
 
     val overlayHideSpec
         get() =
             tween<Float>(
                 durationMillis = 175,
-                easing =
-                    FastOutSlowInEasing
+                easing = FastOutSlowInEasing
             )
 
     fun GraphicsLayerScope.centerOverlay(
@@ -76,67 +48,34 @@ internal object XmoPlayerAnimation {
                 1f
             )
 
-        alpha =
-            value
+        alpha = value
 
         val scale =
-            overlayStartScale +
-                (
-                    1f -
-                        overlayStartScale
-                    ) *
+            .955f +
+                .045f *
                 value
 
-        scaleX =
-            scale
-
-        scaleY =
-            scale
+        scaleX = scale
+        scaleY = scale
 
         /*
-         * Explicitly no vertical translation.
+         * Never move a center popup diagonally/vertically.
          */
-        translationY =
-            0f
+        translationX = 0f
+        translationY = 0f
     }
 
     /*
      * =========================================================
-     * QUEUE SHEET
+     * QUEUE
      * =========================================================
-     *
-     * Queue itself comes from below and leaves downward.
-     *
-     * No visible black backdrop is drawn.
      */
 
-    const val queueBackdropAlpha =
-        0f
-
-    /*
-     * Starts sufficiently below its resting point to read as a
-     * real bottom-sheet arrival instead of a tiny bounce.
-     *
-     * It is still initialized before first frame, preserving the
-     * no giant-sheet flash behavior.
-     */
     const val queueInitialOffsetFraction =
         .22f
 
     const val queueDismissThreshold =
         .12f
-
-    val queueBackdropEnterSpec
-        get() =
-            tween<Float>(
-                durationMillis = 160
-            )
-
-    val queueBackdropExitSpec
-        get() =
-            tween<Float>(
-                durationMillis = 140
-            )
 
     val queueEnterSpec
         get() =
@@ -156,8 +95,7 @@ internal object XmoPlayerAnimation {
         get() =
             tween<Float>(
                 durationMillis = 245,
-                easing =
-                    FastOutSlowInEasing
+                easing = FastOutSlowInEasing
             )
 
     /*
@@ -165,112 +103,49 @@ internal object XmoPlayerAnimation {
      * OVERLAY HOST
      * =========================================================
      *
-     * Individual cards/sheets own their real visible motion.
+     * The actual child owns ALL visible motion.
      *
-     * AnimatedContent only retains outgoing content long enough
-     * for its own exit animation to complete. Keeping host scale
-     * almost neutral prevents double-animation.
+     * This prevents:
+     * Options -> Queue getting a scale/zoom,
+     * Queue -> Details getting a diagonal cross-animation, etc.
      */
-
-    fun overlayHostTransition(
-        opening: Boolean,
-        closing: Boolean
-    ): ContentTransform {
-        return when {
-            opening -> {
-                fadeIn(
-                    animationSpec =
-                        tween(
-                            durationMillis = 135
-                        )
-                )
-                    .togetherWith(
-                        fadeOut(
-                            animationSpec =
-                                tween(
-                                    durationMillis = 90
-                                )
-                        )
-                    )
-            }
-
-            closing -> {
-                fadeIn(
-                    animationSpec =
-                        tween(
-                            durationMillis = 80
-                        )
-                )
-                    .togetherWith(
-                        fadeOut(
-                            animationSpec =
-                                tween(
-                                    durationMillis = 180
-                                )
-                        )
-                    )
-            }
-
-            else -> {
-                fadeIn(
-                    animationSpec =
-                        tween(
-                            durationMillis = 145
-                        )
-                )
-                    .togetherWith(
-                        fadeOut(
-                            animationSpec =
-                                tween(
-                                    durationMillis = 125
-                                )
-                        )
-                    )
-            }
-        }
-    }
+    fun overlayHostTransition(): ContentTransform =
+        EnterTransition.None
+            .togetherWith(
+                ExitTransition.None
+            )
 
     /*
      * =========================================================
      * FULLSCREEN LYRICS
      * =========================================================
-     *
-     * Existing approved fade + scale character retained.
      */
 
     val fullLyricsEnter: EnterTransition
         get() =
             fadeIn(
-                animationSpec =
-                    tween(
-                        durationMillis = 310
-                    )
+                tween(310)
             ) +
                 scaleIn(
                     initialScale = .94f,
                     animationSpec =
                         tween(
                             durationMillis = 390,
-                            easing =
-                                FastOutSlowInEasing
+                            easing = FastOutSlowInEasing
                         )
                 )
 
     val fullLyricsExit: ExitTransition
         get() =
             fadeOut(
-                animationSpec =
-                    tween(
-                        durationMillis = 250
-                    )
+                tween(250)
             ) +
                 scaleOut(
                     targetScale = .95f,
                     animationSpec =
                         tween(
                             durationMillis = 330,
-                            easing =
-                                FastOutSlowInEasing
+                            easing = FastOutSlowInEasing
                         )
                 )
 
@@ -278,17 +153,12 @@ internal object XmoPlayerAnimation {
      * =========================================================
      * XMO POP
      * =========================================================
-     *
-     * Pop uses center scale + fade. No toast-like vertical travel.
      */
 
     val popHostEnter: EnterTransition
         get() =
             fadeIn(
-                animationSpec =
-                    tween(
-                        durationMillis = 185
-                    )
+                tween(185)
             ) +
                 scaleIn(
                     initialScale = .94f,
@@ -302,31 +172,19 @@ internal object XmoPlayerAnimation {
     val popHostExit: ExitTransition
         get() =
             fadeOut(
-                animationSpec =
-                    tween(
-                        durationMillis = 170
-                    )
+                tween(170)
             ) +
                 scaleOut(
                     targetScale = .96f,
                     animationSpec =
-                        tween(
-                            durationMillis = 180,
-                            easing =
-                                FastOutSlowInEasing
-                        )
+                        tween(180)
                 )
 
-    /*
-     * XmoPop has its own tiny inner reveal because each new
-     * message receives a fresh composition.
-     */
     val popRevealSpec
         get() =
             tween<Float>(
                 durationMillis = 220,
-                easing =
-                    LinearOutSlowInEasing
+                easing = LinearOutSlowInEasing
             )
 
     fun GraphicsLayerScope.pop(
@@ -338,21 +196,17 @@ internal object XmoPlayerAnimation {
                 1f
             )
 
-        alpha =
-            value
+        alpha = value
 
         val scale =
             .97f +
                 .03f *
                 value
 
-        scaleX =
-            scale
+        scaleX = scale
+        scaleY = scale
 
-        scaleY =
-            scale
-
-        translationY =
-            0f
+        translationX = 0f
+        translationY = 0f
     }
 }
