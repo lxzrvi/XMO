@@ -1,12 +1,16 @@
 package com.xmo.music.ui.miniplayer
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -22,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
 import com.xmo.music.player.PlaybackState
@@ -62,6 +67,9 @@ fun XmoMiniPlayer(
     val density =
         LocalDensity.current
 
+    val keyboardController =
+        LocalSoftwareKeyboardController.current
+
     val x =
         remember {
             Animatable(0f)
@@ -73,19 +81,88 @@ fun XmoMiniPlayer(
         }
 
     /*
-     * Enough distance that the card fully travels below the
-     * bottom UI rather than remaining partially visible.
+     * =========================================================
+     * NORMAL / IME POSITION
+     * =========================================================
+     *
+     * Normal geometry remains exactly where it was.
+     *
+     * When the IME appears, only bottom placement changes.
+     * riseKey / gesture Y are not involved, preventing the old
+     * keyboard-close -> down -> rise behavior.
      */
-    val exitDistance =
+
+    val navigationBottomPx =
+        WindowInsets.navigationBars
+            .getBottom(density)
+
+    val imeBottomPx =
+        WindowInsets.ime
+            .getBottom(density)
+
+    val keyboardVisible =
+        imeBottomPx >
+            navigationBottomPx
+
+    val navigationBottomDp =
         with(density) {
-            240.dp.toPx()
+            navigationBottomPx.toDp()
+        }
+
+    val imeBottomDp =
+        with(density) {
+            imeBottomPx.toDp()
+        }
+
+    val targetBottomPadding =
+        if (keyboardVisible) {
+            /*
+             * Small gap directly above keyboard.
+             */
+            imeBottomDp +
+                6.dp
+        } else {
+            /*
+             * Existing approved normal position.
+             */
+            navigationBottomDp +
+                128.dp
+        }
+
+    val bottomPadding by
+        animateDpAsState(
+            targetValue =
+                targetBottomPadding,
+            animationSpec =
+                tween(
+                    durationMillis = 180,
+                    easing =
+                        FastOutSlowInEasing
+                ),
+            label =
+                "xmoMiniImePosition"
+        )
+
+    /*
+     * =========================================================
+     * ENTRANCE
+     * =========================================================
+     *
+     * Only used when returning from Now Playing.
+     *
+     * Keyboard opening/closing never mutates this value.
+     */
+
+    val riseDistance =
+        with(density) {
+            150.dp.toPx()
         }
 
     val entranceY =
         remember(riseKey) {
             Animatable(
                 if (riseKey > 0) {
-                    exitDistance
+                    riseDistance
                 } else {
                     0f
                 }
@@ -138,6 +215,16 @@ fun XmoMiniPlayer(
             mutableStateOf(false)
         }
 
+    /*
+     * =========================================================
+     * ORDERED OPEN
+     * =========================================================
+     *
+     * MiniPlayer only needs to pass behind the NavBar before
+     * Now Playing can begin. It does not need to travel hundreds
+     * of extra pixels below the physical screen.
+     */
+
     suspend fun openOrdered() {
         if (
             opening ||
@@ -148,24 +235,46 @@ fun XmoMiniPlayer(
 
         opening = true
 
+        /*
+         * Search keyboard must not remain over Now Playing.
+         */
+        keyboardController?.hide()
+
         x.snapTo(0f)
 
         /*
-         * y is deliberately NOT reset.
+         * Start exactly at the current dragged position.
          *
-         * If the user released at -60px, animation begins at
-         * -60px and travels directly below the screen.
+         * No y -> 0 reset.
          */
+        val hiddenBehindNavBar =
+            with(density) {
+                96.dp.toPx()
+            }
+
         y.animateTo(
             targetValue =
-                exitDistance,
+                hiddenBehindNavBar,
             animationSpec =
-                XmoMiniPlayerAnimation
-                    .openExitSpec
+                tween(
+                    durationMillis = 210,
+                    easing =
+                        FastOutSlowInEasing
+                )
         )
 
+        /*
+         * MiniPlayer is now visually behind NavBar.
+         * Start Now Playing immediately.
+         */
         openPlayer()
     }
+
+    /*
+     * =========================================================
+     * ORDERED CLOSE
+     * =========================================================
+     */
 
     suspend fun closeOrdered() {
         if (
@@ -180,12 +289,17 @@ fun XmoMiniPlayer(
         x.snapTo(0f)
 
         /*
-         * Same rule for downward dismissal:
-         * continue from the current dragged position.
+         * Real close travels farther because there will be no
+         * Now Playing surface replacing it.
          */
+        val fullExit =
+            with(density) {
+                220.dp.toPx()
+            }
+
         y.animateTo(
             targetValue =
-                exitDistance,
+                fullExit,
             animationSpec =
                 XmoMiniPlayerAnimation
                     .closeExitSpec
@@ -193,21 +307,6 @@ fun XmoMiniPlayer(
 
         closePlayer()
     }
-
-    /*
-     * No IME inset is read here.
-     *
-     * Keyboard appearance therefore does not reposition the
-     * MiniPlayer.
-     */
-    val navigationBottom =
-        WindowInsets.navigationBars
-            .getBottom(density)
-
-    val bottomPadding =
-        with(density) {
-            navigationBottom.toDp()
-        } + 128.dp
 
     Box(
         modifier =
@@ -223,8 +322,8 @@ fun XmoMiniPlayer(
             Alignment.BottomCenter
     ) {
         /*
-         * Invisible gesture acquisition area only.
-         * No grab pill is rendered.
+         * Invisible gesture acquisition area.
+         * No visual grab pill.
          */
         Box(
             modifier =
@@ -253,6 +352,7 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
+
                                 moved = false
                             },
 
@@ -262,8 +362,11 @@ fun XmoMiniPlayer(
 
                                 change.consume()
 
-                                rawX += amount.x
-                                rawY += amount.y
+                                rawX +=
+                                    amount.x
+
+                                rawY +=
+                                    amount.y
 
                                 if (
                                     axis ==
@@ -332,6 +435,7 @@ fun XmoMiniPlayer(
 
                                 rawX = 0f
                                 rawY = 0f
+
                                 axis =
                                     XmoMiniAxis.None
 
@@ -375,6 +479,11 @@ fun XmoMiniPlayer(
                                                 finalY <=
                                                     XmoMiniPlayerAnimation
                                                         .openThresholdPx -> {
+                                                    /*
+                                                     * Directly continue from
+                                                     * raised drag position to
+                                                     * hidden-behind-NavBar.
+                                                     */
                                                     openOrdered()
                                                 }
 
@@ -386,8 +495,7 @@ fun XmoMiniPlayer(
 
                                                 else -> {
                                                     y.animateTo(
-                                                        targetValue =
-                                                            0f,
+                                                        targetValue = 0f,
                                                         animationSpec =
                                                             XmoMiniPlayerAnimation
                                                                 .verticalReturnSpec
@@ -425,8 +533,10 @@ fun XmoMiniPlayer(
 
                                     rawX = 0f
                                     rawY = 0f
+
                                     axis =
                                         XmoMiniAxis.None
+
                                     moved = false
                                 }
                             }
