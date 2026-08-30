@@ -73,13 +73,14 @@ internal fun HomeAllSongs(
         return
     }
 
-    Modifier
-        .fillMaxWidth()
-        .height(330.dp)
-    ) {
-        val gap = 7.dp
-
-        LazyHorizontalGrid(
+    BoxWithConstraints(
+            Modifier
+                .fillMaxWidth()
+                .height(330.dp)
+        ) {
+            val gap = 7.dp
+        
+            LazyHorizontalGrid(
             rows = GridCells.Fixed(3),
             state = rememberLazyGridState(),
             modifier = Modifier.fillMaxSize(),
