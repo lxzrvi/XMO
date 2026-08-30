@@ -21,7 +21,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import kotlinx.coroutines.coroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,9 +29,11 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.xmo.music.data.Song
 import com.xmo.music.ui.HomeColors
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 
 @Composable
@@ -46,10 +47,34 @@ internal fun QueueSheet(
     val scope =
         rememberCoroutineScope()
 
+    val configuration =
+        LocalConfiguration.current
+
+    val density =
+        LocalDensity.current
+
+    val sheetHeight =
+        configuration
+            .screenHeightDp
+            .dp *
+            .72f
+
+    /*
+     * Known from configuration on first composition, so Queue
+     * begins below its final resting position immediately.
+     *
+     * It never draws as a giant fully-open sheet for one frame.
+     */
+    val initialOffsetPx =
+        with(density) {
+            sheetHeight.toPx() *
+                .16f
+        }
+
     val sheetY =
         remember {
             Animatable(
-                0f
+                initialOffsetPx
             )
         }
 
@@ -63,7 +88,10 @@ internal fun QueueSheet(
     var sheetHeightPx by
         remember {
             mutableFloatStateOf(
-                1f
+                with(density) {
+                    sheetHeight.toPx()
+                }
+                .coerceAtLeast(1f)
             )
         }
 
@@ -74,98 +102,57 @@ internal fun QueueSheet(
             )
         }
 
-    var entranceDone by
-        remember {
-            mutableStateOf(
-                false
-            )
-        }
-
-    val sheetHeight =
-        LocalConfiguration
-            .current
-            .screenHeightDp
-            .dp *
-            .72f
-
-    /*
-     * Entrance starts only after real sheet height is measured.
-     */
-    LaunchedEffect(
-        sheetHeightPx,
-        entranceDone
-    ) {
-        if (
-            sheetHeightPx <= 1f ||
-            entranceDone
-        ) {
-            return@LaunchedEffect
-        }
-
-        entranceDone =
-            true
-
-        sheetY.snapTo(
-            sheetHeightPx *
-                .18f
-        )
-
-        backdropAlpha.snapTo(
-            0f
-        )
-
-        launch {
-            backdropAlpha.animateTo(
-                targetValue =
-                    1f,
-                animationSpec =
-                    tween(
-                        durationMillis =
-                            240
-                    )
-            )
-        }
-
-        sheetY.animateTo(
-            targetValue =
-                0f,
-            animationSpec =
-                spring(
-                    dampingRatio =
-                        .88f,
-                    stiffness =
-                        360f
+    LaunchedEffect(Unit) {
+        coroutineScope {
+            launch {
+                backdropAlpha.animateTo(
+                    targetValue = 1f,
+                    animationSpec =
+                        tween(
+                            durationMillis = 230
+                        )
                 )
-        )
+            }
+
+            launch {
+                sheetY.animateTo(
+                    targetValue = 0f,
+                    animationSpec =
+                        spring(
+                            dampingRatio = .88f,
+                            stiffness = 360f
+                        )
+                )
+            }
+        }
     }
 
     suspend fun closeSheet() {
         coroutineScope {
             launch {
                 backdropAlpha.animateTo(
-                    targetValue =
-                        0f,
+                    targetValue = 0f,
                     animationSpec =
                         tween(
-                            durationMillis =
-                                190
+                            durationMillis = 180
                         )
                 )
             }
-    
-            sheetY.animateTo(
-                targetValue =
-                    sheetHeightPx,
-                animationSpec =
-                    tween(
-                        durationMillis =
-                            280,
-                        easing =
-                            FastOutSlowInEasing
-                    )
-            )
+
+            launch {
+                sheetY.animateTo(
+                    targetValue =
+                        sheetHeightPx,
+                    animationSpec =
+                        tween(
+                            durationMillis = 270,
+                            easing =
+                                FastOutSlowInEasing
+                        )
+                )
+            }
         }
-    
+
         dismiss()
     }
 
@@ -173,8 +160,7 @@ internal fun QueueSheet(
         if (
             menuIndex != null
         ) {
-            menuIndex =
-                null
+            menuIndex = null
         } else {
             scope.launch {
                 closeSheet()
@@ -217,9 +203,7 @@ internal fun QueueSheet(
                         sheetHeightPx =
                             it.height
                                 .toFloat()
-                                .coerceAtLeast(
-                                    1f
-                                )
+                                .coerceAtLeast(1f)
                     }
                     .graphicsLayer {
                         translationY =
@@ -227,10 +211,8 @@ internal fun QueueSheet(
                     }
                     .clip(
                         RoundedCornerShape(
-                            topStart =
-                                30.dp,
-                            topEnd =
-                                30.dp
+                            topStart = 30.dp,
+                            topEnd = 30.dp
                         )
                     )
                     .background(
@@ -238,14 +220,11 @@ internal fun QueueSheet(
                     )
         ) {
             QueueHandle(
-                colors =
-                    colors,
+                colors = colors,
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(
-                            38.dp
-                        )
+                        .height(38.dp)
                         .pointerInput(
                             sheetHeightPx
                         ) {
@@ -255,10 +234,8 @@ internal fun QueueSheet(
                                         amount ->
 
                                     if (
-                                        amount.y >
-                                        0f ||
-                                        sheetY.value >
-                                        0f
+                                        amount.y > 0f ||
+                                        sheetY.value > 0f
                                     ) {
                                         change.consume()
 
@@ -287,8 +264,7 @@ internal fun QueueSheet(
                                             closeSheet()
                                         } else {
                                             sheetY.animateTo(
-                                                targetValue =
-                                                    0f,
+                                                targetValue = 0f,
                                                 animationSpec =
                                                     spring(
                                                         dampingRatio =
@@ -304,8 +280,7 @@ internal fun QueueSheet(
                                 onDragCancel = {
                                     scope.launch {
                                         sheetY.animateTo(
-                                            targetValue =
-                                                0f,
+                                            targetValue = 0f,
                                             animationSpec =
                                                 spring(
                                                     dampingRatio =
@@ -321,46 +296,34 @@ internal fun QueueSheet(
             )
 
             QueueContent(
-                queue =
-                    queue,
+                queue = queue,
                 currentSongId =
                     currentSongId,
-                colors =
-                    colors,
+                colors = colors,
                 playIndex =
                     playIndex,
                 openMenu = {
-                    menuIndex =
-                        it
+                    menuIndex = it
                 }
             )
         }
 
         menuIndex?.let { index ->
             queue
-                .getOrNull(
-                    index
-                )
+                .getOrNull(index)
                 ?.let { song ->
                     QueueActionMenu(
-                        song =
-                            song,
+                        song = song,
                         active =
                             song.id ==
                                 currentSongId,
-                        colors =
-                            colors,
+                        colors = colors,
                         play = {
-                            playIndex(
-                                index
-                            )
-
-                            menuIndex =
-                                null
+                            playIndex(index)
+                            menuIndex = null
                         },
                         dismiss = {
-                            menuIndex =
-                                null
+                            menuIndex = null
                         }
                     )
                 }
