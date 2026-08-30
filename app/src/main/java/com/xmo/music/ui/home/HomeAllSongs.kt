@@ -35,6 +35,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -57,12 +58,18 @@ internal fun HomeAllSongs(
     options: (Song) -> Unit
 ) {
     if (!allowed) {
-        HomeEmpty("Music access required", c)
+        HomeEmpty(
+            "Music access required",
+            c
+        )
         return
     }
 
     if (songs.isEmpty()) {
-        HomeEmpty("No local music found", c)
+        HomeEmpty(
+            "No local music found",
+            c
+        )
         return
     }
 
@@ -72,19 +79,16 @@ internal fun HomeAllSongs(
             .weight(1f, fill = true)
     ) {
         val gap = 7.dp
-        val cardWidth =
-            (maxWidth - 16.dp - gap * 3) / 4
 
         LazyHorizontalGrid(
             rows = GridCells.Fixed(3),
             state = rememberLazyGridState(),
             modifier = Modifier.fillMaxSize(),
-            contentPadding =
-                PaddingValues(
-                    start = 8.dp,
-                    end = 8.dp,
-                    bottom = 4.dp
-                ),
+            contentPadding = PaddingValues(
+                start = 8.dp,
+                end = 8.dp,
+                bottom = 4.dp
+            ),
             horizontalArrangement =
                 Arrangement.spacedBy(gap),
             verticalArrangement =
@@ -231,7 +235,8 @@ private fun SongGridTile(
                     fontFamily = XmoFont.bold,
                     fontSize = 9.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
 
                 Text(
@@ -240,7 +245,8 @@ private fun SongGridTile(
                     fontFamily = XmoFont.normal,
                     fontSize = 7.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow =
+                        TextOverflow.Ellipsis
                 )
             }
 
@@ -251,7 +257,8 @@ private fun SongGridTile(
                         onClick = options,
                         onLongClick = options
                     ),
-                contentAlignment = Alignment.Center
+                contentAlignment =
+                    Alignment.Center
             ) {
                 Icon(
                     imageVector =
@@ -296,7 +303,8 @@ private fun PlayingWave(
                 androidx.compose.ui.graphics.Color.Black
                     .copy(alpha = .58f)
             ),
-        contentAlignment = Alignment.Center
+        contentAlignment =
+            Alignment.Center
     ) {
         Icon(
             imageVector = Icons.Rounded.GraphicEq,
@@ -304,16 +312,14 @@ private fun PlayingWave(
             tint = LocalXmoAccent.current,
             modifier = Modifier
                 .size(17.dp)
-                .then(
-                    if (active) {
-                        Modifier
-                            .graphicsLayer {
-                                scaleY = scale
-                            }
-                    } else {
-                        Modifier
-                    }
-                )
+                .graphicsLayer {
+                    scaleY =
+                        if (active) {
+                            scale
+                        } else {
+                            1f
+                        }
+                }
         )
     }
 }
