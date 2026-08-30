@@ -68,6 +68,8 @@ internal class XmoAppActions(
 
     val toggleLike: (Song) -> Unit,
 
+    val toggleSongLikeById: (Long) -> Unit,
+
     val setSongInCategory: (
         song: Song,
         categoryId: String,
@@ -89,16 +91,16 @@ internal class XmoAppActions(
     val closePlaybackFromMini: () -> Unit,
 
     val togglePlay: () -> Unit,
-    val miniPrevious: () -> Unit,
+
+    val playQueueIndex: (Int) -> Unit,
+
     val next: () -> Unit,
+    val previous: () -> Unit,
+    val previousItem: () -> Unit,
 
     val nowPlayingOpened: () -> Unit,
     val refreshPosition: () -> Unit,
 
-    val previous: () -> Unit,
-    val previousItem: () -> Unit,
-
-    val playQueueIndex: (Int) -> Unit,
     val seekTo: (Long) -> Unit,
 
     val toggleCurrentLike: () -> Unit,
