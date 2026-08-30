@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.zIndex
@@ -30,9 +29,6 @@ internal fun XmoAppContent(
     val stateHolder =
         rememberSaveableStateHolder()
 
-    /*
-     * App-level Back remains below Now Playing's own BackHandler.
-     */
     BackHandler(
         enabled =
             !state.showNowPlaying &&
@@ -73,7 +69,7 @@ internal fun XmoAppContent(
             ) {
                 /*
                  * =================================================
-                 * MAIN SCREENS
+                 * MAIN CONTENT
                  * =================================================
                  */
 
@@ -202,23 +198,13 @@ internal fun XmoAppContent(
 
                 /*
                  * =================================================
-                 * NAVBAR
+                 * MINIPLAYER
                  * =================================================
-                 */
-
-                if (!state.profileOpen) {
-                    NavBar(
-                        selected = state.tab,
-                        theme = state.theme
-                    ) {
-                        actions.selectTab(it)
-                    }
-                }
-
-                /*
-                 * =================================================
-                 * NEW XMO MINIPLAYER
-                 * =================================================
+                 *
+                 * Layer is deliberately BELOW NavBar.
+                 *
+                 * Its actual resting coordinates are unchanged.
+                 * Only visual stacking changes.
                  */
 
                 if (
@@ -231,7 +217,7 @@ internal fun XmoAppContent(
                         modifier =
                             Modifier
                                 .fillMaxSize()
-                                .zIndex(20f)
+                                .zIndex(10f)
                     ) {
                         XmoMiniPlayer(
                             state =
@@ -264,6 +250,35 @@ internal fun XmoAppContent(
                             next =
                                 actions.next
                         )
+                    }
+                }
+
+                /*
+                 * =================================================
+                 * NAVBAR
+                 * =================================================
+                 *
+                 * Geometry is unchanged.
+                 *
+                 * The wrapper only establishes that NavBar draws
+                 * above MiniPlayer during entrance/exit.
+                 */
+
+                if (!state.profileOpen) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .zIndex(20f)
+                    ) {
+                        NavBar(
+                            selected =
+                                state.tab,
+                            theme =
+                                state.theme
+                        ) {
+                            actions.selectTab(it)
+                        }
                     }
                 }
 
