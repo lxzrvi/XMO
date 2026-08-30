@@ -29,19 +29,20 @@ internal fun XmoPop(
         when (theme) {
             XmoTheme.Light ->
                 Color.White.copy(
-                    alpha = .76f
+                    alpha = .78f
                 )
 
             XmoTheme.Dark ->
                 Color(0xFF17181C)
                     .copy(
-                        alpha = .76f
+                        alpha = .80f
                     )
 
             XmoTheme.Amoled ->
-                Color.Black.copy(
-                    alpha = .78f
-                )
+                Color(0xFF101114)
+                    .copy(
+                        alpha = .84f
+                    )
         }
 
     val foreground =
@@ -70,13 +71,6 @@ internal fun XmoPop(
         )
     }
 
-    val progress =
-        reveal.value
-            .coerceIn(
-                0f,
-                1f
-            )
-
     Box(
         modifier =
             modifier
@@ -84,7 +78,9 @@ internal fun XmoPop(
                     with(
                         XmoPlayerAnimation
                     ) {
-                        pop(progress)
+                        pop(
+                            reveal.value
+                        )
                     }
                 }
                 .clip(
@@ -102,10 +98,12 @@ internal fun XmoPop(
     ) {
         Text(
             text = message,
-            color = foreground,
+            color =
+                foreground,
             fontFamily =
                 XmoFont.medium,
-            fontSize = 11.sp,
+            fontSize =
+                11.sp,
             textAlign =
                 TextAlign.Center
         )
