@@ -1,22 +1,28 @@
 package com.xmo.music.app
 
 import android.content.Context
+import com.xmo.music.data.HomeCache
 import com.xmo.music.data.Library
 import com.xmo.music.data.Store
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.player.XmoPlayer
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 internal class XmoAppPersistence(
     private val context: Context,
     private val state: XmoAppState
 ) {
-    /*
-     * =========================================================
-     * INITIAL LOAD
-     * =========================================================
-     */
-
     suspend fun loadInitial() {
+        val cachedSongs =
+            withContext(Dispatchers.IO) {
+                HomeCache.readSongs(context)
+            }
+
+        if (cachedSongs.isNotEmpty()) {
+            state.songs = cachedSongs
+        }
+
         state.profile =
             Store.profile(context)
 
@@ -33,39 +39,28 @@ internal class XmoAppPersistence(
             Store.likedSongIds(context)
 
         state.recentPlays =
-            Store.recentPlays(context)
+            HomeCache.filterRecent(
+                context,
+                Store.recentPlays(context)
+            )
 
         state.lyricsFiles =
             Store.lyricsFiles(context)
 
         state.libraryPreferences =
-            Store.libraryPreferences(
-                context
-            )
+            Store.libraryPreferences(context)
 
         state.playbackPreferences =
-            Store.playbackPreferences(
-                context
-            )
+            Store.playbackPreferences(context)
 
         state.resumeOnHeadphones =
-            Store.resumeOnHeadphones(
-                context
-            )
+            Store.resumeOnHeadphones(context)
 
         state.setupComplete =
-            Store.setupComplete(
-                context
-            )
+            Store.setupComplete(context)
 
         state.loaded = true
     }
-
-    /*
-     * =========================================================
-     * LIBRARY
-     * =========================================================
-     */
 
     suspend fun loadLibrary() {
         if (
@@ -80,45 +75,46 @@ internal class XmoAppPersistence(
 
         try {
             val result =
-                Library.songs(context)
+                withContext(Dispatchers.IO) {
+                    Library.songs(context)
+                }
 
-            state.songs =
+            val filtered =
                 if (
-                    state
-                        .libraryPreferences
+                    state.libraryPreferences
                         .ignoreShortAudio
                 ) {
                     result.filter {
                         it.duration >=
-                            state
-                                .libraryPreferences
+                            state.libraryPreferences
                                 .minimumDurationMs
                     }
                 } else {
                     result
                 }
+
+            state.songs = filtered
+
+            withContext(Dispatchers.IO) {
+                HomeCache.writeSongs(
+                    context,
+                    filtered
+                )
+            }
         } finally {
             state.scanning = false
         }
     }
-
-    /*
-     * =========================================================
-     * PLAYER PREFERENCES
-     * =========================================================
-     */
 
     fun applyPlaybackPreferences(
         player: XmoPlayer
     ) {
         player.setPlaybackParameters(
             speed =
-                state
-                    .playbackPreferences
+                state.playbackPreferences
                     .playbackSpeed,
             pitch =
-                state
-                    .playbackPreferences
+                state.playbackPreferences
                     .playbackPitch
         )
     }
@@ -127,27 +123,20 @@ internal class XmoAppPersistence(
         player: XmoPlayer
     ) {
         player.setShuffle(
-            Store.shuffleEnabled(
-                context
-            )
+            Store.shuffleEnabled(context)
         )
 
         player.setRepeatMode(
-            Store.repeatMode(
-                context
-            )
+            Store.repeatMode(context)
         )
 
-        state.playerPersistenceReady =
-            true
+        state.playerPersistenceReady = true
     }
 
     suspend fun persistPlayerModes(
         playback: PlaybackState
     ) {
-        if (
-            !state.playerPersistenceReady
-        ) {
+        if (!state.playerPersistenceReady) {
             return
         }
 
@@ -162,24 +151,19 @@ internal class XmoAppPersistence(
         )
     }
 
-    /*
-     * =========================================================
-     * RECENT PLAYBACK
-     * =========================================================
-     */
-
     suspend fun recordCurrentSong(
         songId: Long
     ) {
-        if (
-            songId ==
-            state.recordedSongId
-        ) {
+        if (songId == state.recordedSongId) {
             return
         }
 
-        state.recordedSongId =
+        state.recordedSongId = songId
+
+        HomeCache.restoreRecent(
+            context,
             songId
+        )
 
         state.recentPlays =
             Store.recordPlay(
@@ -188,16 +172,22 @@ internal class XmoAppPersistence(
             )
     }
 
-    /*
-     * =========================================================
-     * SMALL PERSISTENCE OPERATIONS
-     * =========================================================
-     */
+    suspend fun removeRecent(
+        songId: Long
+    ) {
+        HomeCache.removeRecent(
+            context,
+            songId
+        )
+
+        state.recentPlays =
+            state.recentPlays.filterNot {
+                it.songId == songId
+            }
+    }
 
     suspend fun reloadLyricsFiles() {
         state.lyricsFiles =
-            Store.lyricsFiles(
-                context
-            )
+            Store.lyricsFiles(context)
     }
 }
