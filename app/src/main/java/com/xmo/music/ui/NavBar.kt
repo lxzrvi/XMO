@@ -37,17 +37,10 @@ import com.xmo.music.XmoTheme
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
-private val BarW =
-    246.dp
-
-private val BarH =
-    64.dp
-
-private val RestW =
-    78.dp
-
-private val RestH =
-    56.dp
+private val BarW = 246.dp
+private val BarH = 64.dp
+private val RestW = 78.dp
+private val RestH = 56.dp
 
 @Composable
 fun BoxScope.NavBar(
@@ -79,9 +72,6 @@ fun BoxScope.NavBar(
         }
     }
 
-    /*
-     * Original approved selector physics.
-     */
     val x by
         animateFloatAsState(
             targetValue = pos,
@@ -90,8 +80,7 @@ fun BoxScope.NavBar(
                     dampingRatio = .72f,
                     stiffness = 900f
                 ),
-            label =
-                "position"
+            label = "position"
         )
 
     val grow by
@@ -107,8 +96,7 @@ fun BoxScope.NavBar(
                     dampingRatio = .78f,
                     stiffness = 850f
                 ),
-            label =
-                "grow"
+            label = "grow"
         )
 
     val barScale by
@@ -124,35 +112,22 @@ fun BoxScope.NavBar(
                     dampingRatio = .78f,
                     stiffness = 900f
                 ),
-            label =
-                "bar"
+            label = "bar"
         )
-
-    /*
-     * =========================================================
-     * PARENT MATERIAL
-     * =========================================================
-     */
 
     val parentBackground =
         when (theme) {
             XmoTheme.Light ->
                 Color(0xFFF9F9FA)
-                    .copy(
-                        alpha = .965f
-                    )
+                    .copy(alpha = .965f)
 
             XmoTheme.Dark ->
                 Color(0xFF181819)
-                    .copy(
-                        alpha = .965f
-                    )
+                    .copy(alpha = .965f)
 
             XmoTheme.Amoled ->
                 Color(0xFF080808)
-                    .copy(
-                        alpha = .975f
-                    )
+                    .copy(alpha = .975f)
         }
 
     val parentBorder =
@@ -173,36 +148,19 @@ fun BoxScope.NavBar(
                 )
         }
 
-    /*
-     * =========================================================
-     * CLEAN TRANSLUCENT SELECTOR
-     * =========================================================
-     *
-     * No reflection lines.
-     * No arcs.
-     * No fake shattered edges.
-     * No Haze.
-     */
-
     val selector =
         when (theme) {
             XmoTheme.Light ->
                 Color(0xFFEAEAEC)
-                    .copy(
-                        alpha = .62f
-                    )
+                    .copy(alpha = .62f)
 
             XmoTheme.Dark ->
                 Color(0xFF303031)
-                    .copy(
-                        alpha = .58f
-                    )
+                    .copy(alpha = .58f)
 
             XmoTheme.Amoled ->
                 Color(0xFF292929)
-                    .copy(
-                        alpha = .54f
-                    )
+                    .copy(alpha = .54f)
         }
 
     val selectorBorder =
@@ -256,14 +214,6 @@ fun BoxScope.NavBar(
             )
         }
 
-    /*
-     * =========================================================
-     * ORIGINAL GESTURE MODEL
-     * =========================================================
-     *
-     * NavBar remains at the newer lower placement: 24dp.
-     */
-
     Box(
         modifier =
             Modifier
@@ -271,8 +221,14 @@ fun BoxScope.NavBar(
                     Alignment.BottomCenter
                 )
                 .navigationBarsPadding()
+                /*
+                 * 96dp host contains centered 64dp bar:
+                 * 16dp internal bottom area.
+                 *
+                 * 4 + 16 = 20dp visible bottom gap.
+                 */
                 .padding(
-                    bottom = 24.dp
+                    bottom = 4.dp
                 )
                 .size(
                     BarW,
@@ -379,13 +335,11 @@ fun BoxScope.NavBar(
                             }
 
                         velocity = 0f
-
                         pos =
                             target.toFloat()
 
                         if (
-                            target !=
-                            selected
+                            target != selected
                         ) {
                             select(target)
                         }
@@ -394,9 +348,6 @@ fun BoxScope.NavBar(
                     }
                 }
     ) {
-        /*
-         * Parent geometry unchanged.
-         */
         Box(
             modifier =
                 Modifier
@@ -461,10 +412,6 @@ fun BoxScope.NavBar(
                 0f
             }
 
-        /*
-         * Selector size, expansion, offsets and velocity physics
-         * remain exactly the approved model.
-         */
         Box(
             modifier =
                 Modifier
@@ -547,15 +494,6 @@ fun BoxScope.NavBar(
                     )
         )
 
-        /*
-         * =====================================================
-         * CONTINUOUS ICON RESPONSE
-         * =====================================================
-         *
-         * Selector leaving an icon gradually returns it to normal
-         * rather than flipping chosen state instantly.
-         */
-
         Row(
             modifier =
                 Modifier
@@ -600,10 +538,8 @@ fun BoxScope.NavBar(
 
                 val tint =
                     mixNavColor(
-                        from =
-                            inactive,
-                        to =
-                            active,
+                        from = inactive,
+                        to = active,
                         fraction =
                             proximity
                     )
