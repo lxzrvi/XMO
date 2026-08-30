@@ -1,8 +1,6 @@
 package com.xmo.music.ui.home
 
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
@@ -13,7 +11,6 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -22,7 +19,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -54,7 +50,6 @@ import com.xmo.music.data.Song
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -64,6 +59,7 @@ internal fun HomeRecentlyPlayed(
     c: HomeColors,
     playback: PlaybackState,
     play: (Song) -> Unit,
+    togglePlay: () -> Unit,
     options: (Song) -> Unit
 ) {
     if (songs.isEmpty()) return
@@ -78,62 +74,41 @@ internal fun HomeRecentlyPlayed(
 
     LaunchedEffect(state) {
         snapshotFlow {
-            val layout = state.layoutInfo
-            val center =
-                (
-                    layout.viewportStartOffset +
-                        layout.viewportEndOffset
-                    ) / 2
-
-            layout.visibleItemsInfo
-                .minByOrNull {
-                    abs(
-                        it.offset +
-                            it.size / 2 -
-                            center
-                    )
-                }
-                ?.index
-                ?: 0
+            state.firstVisibleItemIndex
         }.collect {
-            current = it
+            current = it.coerceIn(
+                0,
+                songs.lastIndex
+            )
         }
     }
 
-    BoxWithConstraints(
-        Modifier.fillMaxWidth()
+    Column(
+        Modifier.fillMaxWidth(),
+        horizontalAlignment =
+            Alignment.CenterHorizontally
     ) {
-        val cardWidth =
-            (maxWidth - 44.dp)
-                .coerceAtMost(320.dp)
-
-        val side =
-            ((maxWidth - cardWidth) / 2)
-                .coerceAtLeast(12.dp)
-
-        Column(
-            Modifier.fillMaxWidth(),
-            horizontalAlignment =
-                Alignment.CenterHorizontally
+        LazyRow(
+            state = state,
+            flingBehavior = fling,
+            contentPadding =
+                PaddingValues(horizontal = 12.dp),
+            horizontalArrangement =
+                Arrangement.spacedBy(24.dp)
         ) {
-            LazyRow(
-                state = state,
-                flingBehavior = fling,
-                contentPadding =
-                    PaddingValues(horizontal = side),
-                horizontalArrangement =
-                    Arrangement.spacedBy(12.dp)
-            ) {
-                itemsIndexed(
-                    items = songs,
-                    key = { _, song ->
-                        song.id
-                    }
-                ) { _, song ->
+            itemsIndexed(
+                items = songs,
+                key = { _, song ->
+                    song.id
+                }
+            ) { _, song ->
+                androidx.compose.foundation.layout.BoxWithConstraints(
+                    Modifier.fillParentMaxWidth()
+                ) {
                     RecentCard(
                         song = song,
                         c = c,
-                        width = cardWidth,
+                        width = maxWidth - 24.dp,
                         current =
                             playback.currentSongId ==
                                 song.id,
@@ -142,7 +117,14 @@ internal fun HomeRecentlyPlayed(
                                 song.id &&
                                 playback.isPlaying,
                         play = {
-                            play(song)
+                            if (
+                                playback.currentSongId ==
+                                song.id
+                            ) {
+                                togglePlay()
+                            } else {
+                                play(song)
+                            }
                         },
                         options = {
                             options(song)
@@ -150,48 +132,48 @@ internal fun HomeRecentlyPlayed(
                     )
                 }
             }
+        }
 
-            val dots =
-                minOf(6, songs.size)
+        val dots =
+            minOf(6, songs.size)
 
-            val active =
-                if (songs.size <= 1) {
-                    0
-                } else {
-                    (
-                        current.toFloat() /
-                            (songs.size - 1) *
-                            (dots - 1)
-                        )
-                        .roundToInt()
-                        .coerceIn(0, dots - 1)
-                }
-
-            Row(
-                Modifier.padding(top = 11.dp),
-                horizontalArrangement =
-                    Arrangement.spacedBy(6.dp)
-            ) {
-                repeat(dots) { index ->
-                    Box(
-                        Modifier
-                            .size(
-                                if (index == active) {
-                                    7.dp
-                                } else {
-                                    5.dp
-                                }
-                            )
-                            .clip(CircleShape)
-                            .background(
-                                if (index == active) {
-                                    LocalXmoAccent.current
-                                } else {
-                                    c.sub.copy(alpha = .32f)
-                                }
-                            )
+        val active =
+            if (songs.size <= 1) {
+                0
+            } else {
+                (
+                    current.toFloat() /
+                        (songs.size - 1) *
+                        (dots - 1)
                     )
-                }
+                    .roundToInt()
+                    .coerceIn(0, dots - 1)
+            }
+
+        Row(
+            Modifier.padding(top = 8.dp),
+            horizontalArrangement =
+                Arrangement.spacedBy(6.dp)
+        ) {
+            repeat(dots) { index ->
+                Box(
+                    Modifier
+                        .size(
+                            if (index == active) {
+                                7.dp
+                            } else {
+                                5.dp
+                            }
+                        )
+                        .clip(CircleShape)
+                        .background(
+                            if (index == active) {
+                                LocalXmoAccent.current
+                            } else {
+                                c.sub.copy(alpha = .30f)
+                            }
+                        )
+                )
             }
         }
     }
@@ -209,8 +191,8 @@ private fun RecentCard(
 ) {
     Box(
         Modifier
-            .width(width)
-            .height(116.dp)
+            .fillMaxWidth()
+            .height(122.dp)
             .clip(RoundedCornerShape(18.dp))
             .combinedClickable(
                 onClick = play,
@@ -218,7 +200,7 @@ private fun RecentCard(
             )
             .background(c.surface)
             .border(
-                .6.dp,
+                .5.dp,
                 c.border,
                 RoundedCornerShape(18.dp)
             )
@@ -257,81 +239,76 @@ private fun RecentCard(
                 .padding(12.dp)
         )
 
-        AnimatedContent(
-            targetState = current to playing,
-            transitionSpec = {
-                fadeIn(
-                    spring(stiffness = 700f)
-                ) togetherWith
-                    fadeOut(
-                        spring(stiffness = 700f)
-                    ) using
-                    SizeTransform(
-                        clip = false
-                    )
-            },
-            label = "recentPlaying",
-            modifier = Modifier
+        Box(
+            Modifier
                 .align(Alignment.TopEnd)
                 .padding(10.dp)
-        ) { state ->
-            val isCurrent = state.first
-            val isPlaying = state.second
-
-            if (isCurrent) {
-                Row(
-                    Modifier
-                        .height(34.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(
-                            Color.Black.copy(alpha = .56f)
+                .height(34.dp)
+                .clip(
+                    if (current) {
+                        RoundedCornerShape(18.dp)
+                    } else {
+                        CircleShape
+                    }
+                )
+                .background(
+                    Color.Black.copy(alpha = .52f)
+                )
+                .combinedClickable(
+                    onClick = play,
+                    onLongClick = options
+                )
+                .padding(
+                    horizontal =
+                        if (current) 10.dp else 7.dp
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            AnimatedContent(
+                targetState = current to playing,
+                transitionSpec = {
+                    fadeIn() togetherWith fadeOut()
+                },
+                label = "recentControl"
+            ) { value ->
+                if (value.first) {
+                    Row(
+                        verticalAlignment =
+                            Alignment.CenterVertically,
+                        horizontalArrangement =
+                            Arrangement.spacedBy(5.dp)
+                    ) {
+                        Icon(
+                            imageVector =
+                                if (value.second) {
+                                    Icons.Rounded.Pause
+                                } else {
+                                    Icons.Rounded.PlayArrow
+                                },
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
                         )
-                        .padding(horizontal = 10.dp),
-                    verticalAlignment =
-                        Alignment.CenterVertically,
-                    horizontalArrangement =
-                        Arrangement.spacedBy(5.dp)
-                ) {
-                    Icon(
-                        imageVector =
-                            if (isPlaying) {
-                                Icons.Rounded.Pause
-                            } else {
-                                Icons.Rounded.PlayArrow
-                            },
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(18.dp)
-                    )
 
-                    Text(
-                        text =
-                            if (isPlaying) {
-                                "Playing"
-                            } else {
-                                "Paused"
-                            },
-                        color = Color.White,
-                        fontFamily = XmoFont.medium,
-                        fontSize = 9.sp
-                    )
-                }
-            } else {
-                Box(
-                    Modifier
-                        .size(34.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Color.Black.copy(alpha = .46f)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
+                        Text(
+                            text =
+                                if (value.second) {
+                                    "Playing"
+                                } else {
+                                    "Paused"
+                                },
+                            color = Color.White,
+                            fontFamily = XmoFont.medium,
+                            fontSize = 9.sp
+                        )
+                    }
+                } else {
                     Icon(
                         imageVector =
                             Icons.Rounded.PlayArrow,
                         contentDescription = "Play",
                         tint = Color.White,
-                        modifier = Modifier.size(21.dp)
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
