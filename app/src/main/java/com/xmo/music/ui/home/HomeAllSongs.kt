@@ -73,10 +73,9 @@ internal fun HomeAllSongs(
         return
     }
 
-    BoxWithConstraints(
-        Modifier
-            .fillMaxWidth()
-            .weight(1f, fill = true)
+    Modifier
+        .fillMaxWidth()
+        .height(330.dp)
     ) {
         val gap = 7.dp
 
