@@ -19,8 +19,7 @@ data class PlaybackState(
     val hasPrevious: Boolean = false,
     val hasNext: Boolean = false,
     val shuffleEnabled: Boolean = false,
-    val repeatMode: Int =
-        Player.REPEAT_MODE_OFF,
+    val repeatMode: Int = Player.REPEAT_MODE_OFF,
     val playbackSpeed: Float = 1f,
     val playbackPitch: Float = 1f,
     val sleepTimerRemainingMs: Long = 0L
@@ -30,19 +29,10 @@ class XmoPlayer(
     context: Context
 ) {
     private val runtime =
-        PlayerRuntime(
-            context.applicationContext
-        )
+        PlayerRuntime(context.applicationContext)
 
     val state: StateFlow<PlaybackState>
-        get() =
-            runtime.state
-
-    /*
-     * =========================================================
-     * CONNECTION
-     * =========================================================
-     */
+        get() = runtime.state
 
     fun connect() {
         runtime.connect()
@@ -52,36 +42,23 @@ class XmoPlayer(
         runtime.release()
     }
 
-    /*
-     * =========================================================
-     * PLAYBACK
-     * =========================================================
-     */
-
     fun play(
         songs: List<Song>,
         index: Int
     ) {
-        runtime.play(
-            songs,
-            index
-        )
+        runtime.play(songs, index)
     }
 
-    fun playSong(
-        songId: Long
-    ) {
-        runtime.playSong(
-            songId
-        )
+    fun playSong(songId: Long) {
+        runtime.playSong(songId)
     }
 
-    fun playQueueIndex(
-        index: Int
-    ) {
-        runtime.playQueueIndex(
-            index
-        )
+    fun playQueueIndex(index: Int) {
+        runtime.playQueueIndex(index)
+    }
+
+    fun playNext(song: Song) {
+        runtime.playNext(song)
     }
 
     fun togglePlayPause() {
@@ -96,22 +73,12 @@ class XmoPlayer(
         runtime.pause()
     }
 
-    /*
-     * Music-player previous behavior:
-     *
-     * > 3 seconds -> restart
-     * near start   -> actual previous item
-     */
     fun previous() {
         runtime.previous(
-            restartThresholdMs =
-                3_000L
+            restartThresholdMs = 3_000L
         )
     }
 
-    /*
-     * Always asks Media3 for the actual previous queue item.
-     */
     fun previousItem() {
         runtime.previousItem()
     }
@@ -120,72 +87,33 @@ class XmoPlayer(
         runtime.next()
     }
 
-    fun seekTo(
-        position: Long
-    ) {
-        runtime.seekTo(
-            position
-        )
+    fun seekTo(position: Long) {
+        runtime.seekTo(position)
     }
 
-    fun seekBy(
-        amountMs: Long
-    ) {
-        runtime.seekBy(
-            amountMs
-        )
+    fun seekBy(amountMs: Long) {
+        runtime.seekBy(amountMs)
     }
 
-    /*
-     * =========================================================
-     * REAL CLOSE
-     * =========================================================
-     *
-     * Used by MiniPlayer X / downward dismiss.
-     *
-     * This is different from merely hiding the UI:
-     * Media3 playback is stopped, queue is cleared and
-     * currentSongId becomes null.
-     */
     fun closePlayback() {
         runtime.closePlayback()
     }
 
-    /*
-     * =========================================================
-     * SHUFFLE / REPEAT
-     * =========================================================
-     */
-
-    fun setShuffle(
-        enabled: Boolean
-    ) {
-        runtime.setShuffle(
-            enabled
-        )
+    fun setShuffle(enabled: Boolean) {
+        runtime.setShuffle(enabled)
     }
 
     fun toggleShuffle() {
         runtime.toggleShuffle()
     }
 
-    fun setRepeatMode(
-        mode: Int
-    ) {
-        runtime.setRepeatMode(
-            mode
-        )
+    fun setRepeatMode(mode: Int) {
+        runtime.setRepeatMode(mode)
     }
 
     fun cycleRepeatMode() {
         runtime.cycleRepeatMode()
     }
-
-    /*
-     * =========================================================
-     * SPEED / PITCH
-     * =========================================================
-     */
 
     fun setPlaybackParameters(
         speed: Float,
@@ -197,26 +125,12 @@ class XmoPlayer(
         )
     }
 
-    fun setPlaybackSpeed(
-        speed: Float
-    ) {
-        runtime.setPlaybackSpeed(
-            speed
-        )
+    fun setPlaybackSpeed(speed: Float) {
+        runtime.setPlaybackSpeed(speed)
     }
 
-    /*
-     * =========================================================
-     * SLEEP TIMER
-     * =========================================================
-     */
-
-    fun setSleepTimer(
-        durationMs: Long
-    ) {
-        runtime.setSleepTimer(
-            durationMs
-        )
+    fun setSleepTimer(durationMs: Long) {
+        runtime.setSleepTimer(durationMs)
     }
 
     fun cancelSleepTimer() {
@@ -225,12 +139,6 @@ class XmoPlayer(
 
     fun sleepTimerRemaining(): Long =
         runtime.sleepTimerRemaining()
-
-    /*
-     * =========================================================
-     * STATE / QUEUE
-     * =========================================================
-     */
 
     fun refreshPosition() {
         runtime.publish()
@@ -242,10 +150,6 @@ class XmoPlayer(
     fun queue(): List<Song> =
         runtime.queue()
 
-    fun queueSong(
-        index: Int
-    ): Song? =
-        runtime.queueSong(
-            index
-        )
+    fun queueSong(index: Int): Song? =
+        runtime.queueSong(index)
 }
