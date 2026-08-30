@@ -1,7 +1,7 @@
 package com.xmo.music.ui.miniplayer
 
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import kotlin.math.abs
@@ -15,23 +15,43 @@ internal enum class XmoMiniAxis {
 
 internal object XmoMiniPlayerAnimation {
 
-    const val horizontalThresholdPx =
-        48f
+    const val axisThresholdPx = 9f
+    const val horizontalThresholdPx = 48f
 
-    const val openThresholdPx =
-        -38f
-
-    const val closeThresholdPx =
-        44f
-
-    const val axisThresholdPx =
-        9f
+    const val openThresholdPx = -46f
+    const val closeThresholdPx = 44f
 
     fun horizontalResistance(
         value: Float
     ): Float {
+        val free = 76f
+        val distance = abs(value)
+
+        if (distance <= free) {
+            return value
+        }
+
+        return (
+            free +
+                (distance - free) *
+                .07f
+            ) *
+            sign(value)
+    }
+
+    /*
+     * Upward movement is deliberately allowed farther than the
+     * old MiniPlayer before resistance becomes strong.
+     */
+    fun verticalResistance(
+        value: Float
+    ): Float {
         val free =
-            76f
+            if (value < 0f) {
+                66f
+            } else {
+                44f
+            }
 
         val distance =
             abs(value)
@@ -42,47 +62,9 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             free +
-                (
-                    distance -
-                        free
-                    ) *
-                .07f
+                (distance - free) *
+                .075f
             ) *
-            sign(value)
-    }
-
-    fun verticalResistance(
-        value: Float
-    ): Float {
-        /*
-         * Both directions are allowed:
-         *
-         * up   -> open Now Playing
-         * down -> close playback
-         */
-        val free =
-            if (value < 0f) {
-                48f
-            } else {
-                42f
-            }
-
-        val distance =
-            abs(value)
-
-        if (distance <= free) {
-            return value
-        }
-
-        val resisted =
-            free +
-                (
-                    distance -
-                        free
-                    ) *
-                .065f
-
-        return resisted *
             sign(value)
     }
 
@@ -103,24 +85,26 @@ internal object XmoMiniPlayerAnimation {
     val verticalReturnSpec: AnimationSpec<Float>
         get() =
             spring(
-                dampingRatio = .82f,
-                stiffness = 450f
+                dampingRatio = .84f,
+                stiffness = 440f
             )
 
     /*
-     * Once an upward-open gesture succeeds, do not return the
-     * MiniPlayer to rest first. It leaves immediately downward,
-     * then Now Playing is allowed to appear.
+     * Successful open/close never returns to rest first.
+     * Animation begins from the current dragged Y position and
+     * continues directly below the viewport.
      */
     val openExitSpec: AnimationSpec<Float>
         get() =
             tween(
-                durationMillis = 185
+                durationMillis = 245,
+                easing = FastOutSlowInEasing
             )
 
     val closeExitSpec: AnimationSpec<Float>
         get() =
             tween(
-                durationMillis = 190
+                durationMillis = 245,
+                easing = FastOutSlowInEasing
             )
 }
