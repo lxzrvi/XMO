@@ -15,33 +15,27 @@ internal data class XmoAppUiState(
     val playback: PlaybackState,
     val theme: XmoTheme,
     val hazeState: HazeState,
-
     val profile: XmoProfile,
     val appearance: XmoAppearance,
     val libraryPreferences: LibraryPreferences,
     val playbackPreferences: PlaybackPreferences,
     val resumeOnHeadphones: Boolean,
-
     val songs: List<Song>,
     val playbackQueue: List<Song>,
     val currentSong: Song?,
-
     val order: List<String>,
     val categories: List<UserCategory>,
     val likedSongIds: Set<Long>,
     val recentPlays: List<RecentPlay>,
     val lyricsFiles: Map<Long, String>,
-
     val allowed: Boolean,
     val scanning: Boolean,
-
+    val loaded: Boolean,
     val tab: Int,
     val profileOpen: Boolean,
-
     val showNowPlaying: Boolean,
     val miniVisible: Boolean,
     val miniRiseKey: Int,
-
     val playingSource: String,
     val playingSourceIsCategory: Boolean
 )
@@ -49,13 +43,10 @@ internal data class XmoAppUiState(
 internal class XmoAppActions(
     val requestAudioPermission: () -> Unit,
     val refreshLibrary: () -> Unit,
-
     val selectTab: (Int) -> Unit,
-
     val openProfile: () -> Unit,
     val closeProfile: () -> Unit,
     val saveProfile: (XmoProfile) -> Unit,
-
     val saveOrder: (List<String>) -> Unit,
     val saveCategories: (List<UserCategory>) -> Unit,
 
@@ -66,6 +57,8 @@ internal class XmoAppActions(
         queue: List<Song>
     ) -> Unit,
 
+    val playNext: (Song) -> Unit,
+    val removeRecent: (Song) -> Unit,
     val toggleLike: (Song) -> Unit,
     val toggleSongLikeById: (Long) -> Unit,
 
@@ -75,53 +68,35 @@ internal class XmoAppActions(
         added: Boolean
     ) -> Unit,
 
-    /*
-     * Used by MiniPlayer's preview-aware category picker.
-     */
     val createCategoryForSong: (
         name: String,
         song: Song
     ) -> UserCategory?,
 
     val changeAppearance: (XmoAppearance) -> Unit,
-
     val changeLibraryPreferences:
         (LibraryPreferences) -> Unit,
-
     val changePlaybackPreferences:
         (PlaybackPreferences) -> Unit,
-
     val changeResumeOnHeadphones:
         (Boolean) -> Unit,
 
-    /*
-     * MiniPlayer
-     */
     val openNowPlayingFromMini: () -> Unit,
     val closePlaybackFromMini: () -> Unit,
     val togglePlay: () -> Unit,
     val playQueueIndex: (Int) -> Unit,
 
-    /*
-     * Now Playing immediate transport
-     */
     val next: () -> Unit,
     val previous: () -> Unit,
     val previousItem: () -> Unit,
-
     val nowPlayingOpened: () -> Unit,
     val refreshPosition: () -> Unit,
-
     val seekTo: (Long) -> Unit,
-
     val toggleCurrentLike: () -> Unit,
-
     val toggleShuffle: () -> Unit,
     val cycleRepeat: () -> Unit,
-
     val setSleepTimer: (Long) -> Unit,
     val cancelSleepTimer: () -> Unit,
-
     val saveLyricsUri: (String?) -> Unit,
 
     val setCurrentSongInCategory: (
