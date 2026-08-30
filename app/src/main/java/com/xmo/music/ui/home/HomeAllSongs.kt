@@ -1,5 +1,7 @@
 package com.xmo.music.ui.home
 
+import coil3.request.CachePolicy
+import coil3.request.ImageRequest
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
@@ -20,9 +22,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
-import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -32,11 +34,13 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -73,55 +77,103 @@ internal fun HomeAllSongs(
         return
     }
 
+    val grid =
+        rememberLazyGridState()
+
+    val slots =
+        ((songs.size + 11) / 12) * 12
+
     BoxWithConstraints(
-            Modifier
-                .fillMaxWidth()
-                .height(330.dp)
-        ) {
-            val gap = 7.dp
-        
-            LazyHorizontalGrid(
+        Modifier
+            .fillMaxWidth()
+            .height(330.dp)
+    ) {
+        val edge = 8.dp
+        val gap = 8.dp
+
+        val cardWidth =
+            (
+                maxWidth -
+                    edge * 2 -
+                    gap * 3
+                ) / 4
+
+        val gridHeight =
+            (
+                cardWidth +
+                    37.dp
+                ) * 3 +
+                gap * 2
+
+        LazyHorizontalGrid(
             rows = GridCells.Fixed(3),
-            state = rememberLazyGridState(),
-            modifier = Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(
-                start = 8.dp,
-                end = 8.dp,
-                bottom = 4.dp
-            ),
+            state = grid,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(gridHeight),
+            contentPadding =
+                PaddingValues(
+                    horizontal = edge
+                ),
             horizontalArrangement =
                 Arrangement.spacedBy(gap),
             verticalArrangement =
                 Arrangement.spacedBy(gap)
         ) {
             items(
-                items = songs,
-                key = { it.id },
-                contentType = { "song" }
-            ) { song ->
-                SongGridTile(
-                    song = song,
-                    c = c,
-                    theme = theme,
-                    playing =
-                        playback.currentSongId ==
-                            song.id,
-                    active =
-                        playback.currentSongId ==
-                            song.id &&
-                            playback.isPlaying,
-                    play = {
-                        if (
-                            playback.currentSongId !=
-                            song.id
-                        ) {
-                            play(song)
+                count = slots,
+                key = {
+                    "home_song_slot_$it"
+                },
+                contentType = {
+                    "home_song"
+                }
+            ) { slot ->
+                val page = slot / 12
+                val local = slot % 12
+                val row = local % 3
+                val column = local / 3
+
+                val sourceIndex =
+                    page * 12 +
+                        row * 4 +
+                        column
+
+                Box(
+                    Modifier.width(cardWidth)
+                ) {
+                    songs
+                        .getOrNull(sourceIndex)
+                        ?.let { song ->
+                            HomeSongTile(
+                                song = song,
+                                c = c,
+                                theme = theme,
+                                playing =
+                                    playback.currentSongId ==
+                                        song.id,
+                                active =
+                                    playback.currentSongId ==
+                                        song.id &&
+                                        playback.isPlaying,
+                                modifier =
+                                    Modifier.width(
+                                        cardWidth
+                                    ),
+                                play = {
+                                    if (
+                                        playback.currentSongId !=
+                                        song.id
+                                    ) {
+                                        play(song)
+                                    }
+                                },
+                                options = {
+                                    options(song)
+                                }
+                            )
                         }
-                    },
-                    options = {
-                        options(song)
-                    }
-                )
+                }
             }
         }
     }
@@ -129,15 +181,32 @@ internal fun HomeAllSongs(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun SongGridTile(
+private fun HomeSongTile(
     song: Song,
     c: HomeColors,
     theme: XmoTheme,
     playing: Boolean,
     active: Boolean,
+    modifier: Modifier,
     play: () -> Unit,
     options: () -> Unit
 ) {
+    val context = LocalContext.current
+
+    val imageRequest =
+        remember(song.artwork) {
+            ImageRequest.Builder(context)
+                .data(song.artwork)
+                .size(320, 320)
+                .memoryCachePolicy(
+                    CachePolicy.ENABLED
+                )
+                .diskCachePolicy(
+                    CachePolicy.ENABLED
+                )
+                .build()
+        }
+
     val surface =
         when (theme) {
             XmoTheme.Light ->
@@ -159,32 +228,34 @@ private fun SongGridTile(
     val border =
         when (theme) {
             XmoTheme.Light ->
-                androidx.compose.ui.graphics.Color.Black
-                    .copy(alpha = .065f)
+                androidx.compose.ui.graphics.Color
+                    .Black.copy(alpha = .06f)
 
             XmoTheme.Dark ->
-                androidx.compose.ui.graphics.Color.White
-                    .copy(alpha = .06f)
+                androidx.compose.ui.graphics.Color
+                    .White.copy(alpha = .06f)
 
             XmoTheme.Amoled ->
-                androidx.compose.ui.graphics.Color.White
-                    .copy(alpha = .085f)
+                androidx.compose.ui.graphics.Color
+                    .White.copy(alpha = .08f)
         }
 
     Column(
-        Modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(surface)
-            .border(
-                .4.dp,
-                border,
+        modifier
+            .clip(
                 RoundedCornerShape(10.dp)
             )
             .combinedClickable(
                 onClick = play,
                 onLongClick = options
             )
-            .padding(4.dp)
+            .background(surface)
+            .border(
+                .4.dp,
+                border,
+                RoundedCornerShape(10.dp)
+            )
+            .padding(5.dp)
     ) {
         BoxWithConstraints(
             Modifier.fillMaxWidth()
@@ -193,21 +264,43 @@ private fun SongGridTile(
                 Modifier
                     .fillMaxWidth()
                     .height(maxWidth)
-                    .clip(RoundedCornerShape(7.dp))
+                    .clip(
+                        RoundedCornerShape(6.dp)
+                    )
                     .background(c.button)
             ) {
                 AsyncImage(
-                    model = song.artwork,
-                    contentDescription = null,
+                    model = imageRequest,
+                    contentDescription = song.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
+
+                if (song.artwork == null) {
+                    Text(
+                        text =
+                            song.title
+                                .firstOrNull()
+                                ?.uppercase()
+                                ?: "X",
+                        color =
+                            c.text.copy(alpha = .60f),
+                        fontFamily = XmoFont.bold,
+                        fontSize = 17.sp,
+                        modifier =
+                            Modifier.align(
+                                Alignment.Center
+                            )
+                    )
+                }
 
                 if (playing) {
                     PlayingWave(
                         active = active,
                         modifier = Modifier
-                            .align(Alignment.BottomEnd)
+                            .align(
+                                Alignment.BottomEnd
+                            )
                             .padding(5.dp)
                     )
                 }
@@ -217,7 +310,7 @@ private fun SongGridTile(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 3.dp),
+                .padding(top = 4.dp),
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
@@ -233,7 +326,7 @@ private fun SongGridTile(
                             c.text
                         },
                     fontFamily = XmoFont.bold,
-                    fontSize = 9.sp,
+                    fontSize = 10.sp,
                     maxLines = 1,
                     overflow =
                         TextOverflow.Ellipsis
@@ -243,7 +336,7 @@ private fun SongGridTile(
                     text = song.artist,
                     color = c.sub,
                     fontFamily = XmoFont.normal,
-                    fontSize = 7.sp,
+                    fontSize = 8.sp,
                     maxLines = 1,
                     overflow =
                         TextOverflow.Ellipsis
@@ -252,7 +345,7 @@ private fun SongGridTile(
 
             Box(
                 Modifier
-                    .size(22.dp)
+                    .size(25.dp)
                     .combinedClickable(
                         onClick = options,
                         onLongClick = options
@@ -263,9 +356,10 @@ private fun SongGridTile(
                 Icon(
                     imageVector =
                         Icons.Rounded.MoreHoriz,
-                    contentDescription = "Options",
+                    contentDescription =
+                        "Song options",
                     tint = c.sub,
-                    modifier = Modifier.size(15.dp)
+                    modifier = Modifier.size(14.dp)
                 )
             }
         }
@@ -279,47 +373,35 @@ private fun PlayingWave(
 ) {
     val transition =
         rememberInfiniteTransition(
-            label = "playingWave"
+            label = "homePlaying"
         )
 
     val scale by
         transition.animateFloat(
-            initialValue = .78f,
+            initialValue = .72f,
             targetValue = 1.15f,
             animationSpec =
                 infiniteRepeatable(
-                    animation = tween(430),
+                    animation = tween(420),
                     repeatMode =
                         RepeatMode.Reverse
                 ),
-            label = "waveScale"
+            label = "homePlayingScale"
         )
 
-    Box(
-        modifier
-            .size(25.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(
-                androidx.compose.ui.graphics.Color.Black
-                    .copy(alpha = .58f)
-            ),
-        contentAlignment =
-            Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Rounded.GraphicEq,
-            contentDescription = "Playing",
-            tint = LocalXmoAccent.current,
-            modifier = Modifier
-                .size(17.dp)
-                .graphicsLayer {
-                    scaleY =
-                        if (active) {
-                            scale
-                        } else {
-                            1f
-                        }
-                }
-        )
-    }
+    Icon(
+        imageVector = Icons.Rounded.GraphicEq,
+        contentDescription = "Playing",
+        tint = LocalXmoAccent.current,
+        modifier = modifier
+            .size(20.dp)
+            .graphicsLayer {
+                scaleY =
+                    if (active) {
+                        scale
+                    } else {
+                        1f
+                    }
+            }
+    )
 }
