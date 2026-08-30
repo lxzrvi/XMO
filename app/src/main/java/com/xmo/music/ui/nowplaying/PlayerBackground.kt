@@ -15,52 +15,97 @@ internal fun PlayerBackground(
     deep: Color,
     theme: XmoTheme
 ) {
+    /*
+     * The neutral base owns overall readability.
+     * Artwork color supplies atmosphere rather than becoming the
+     * screen itself.
+     */
     val base =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFFF4F5F7)
+                Color(0xFFE9EAED)
 
             XmoTheme.Dark ->
-                Color(0xFF17181C)
+                Color(0xFF1B1C21)
 
             XmoTheme.Amoled ->
-                Color(0xFF010102)
+                Color(0xFF030304)
         }
 
-    val bright =
-        brightenSplash(
-            color = dominant,
-            amount =
-                when (theme) {
-                    XmoTheme.Light -> .19f
-                    XmoTheme.Dark -> .13f
-                    XmoTheme.Amoled -> .08f
-                }
-        )
+    /*
+     * Moderate extreme artwork colors before distributing them.
+     *
+     * Light stays colorful without becoming near-white.
+     * Dark/AMOLED retain artwork hue without creating giant
+     * luminous areas behind white controls.
+     */
+    val artwork =
+        when (theme) {
+            XmoTheme.Light ->
+                mixColor(
+                    from = dominant,
+                    to = Color(0xFF777A80),
+                    fraction = .20f
+                )
 
-    val rich =
-        mixColor(
-            from = deep,
-            to = dominant,
-            fraction = .58f
-        )
+            XmoTheme.Dark ->
+                mixColor(
+                    from = dominant,
+                    to = Color(0xFF555860),
+                    fraction = .24f
+                )
 
-    val middle =
-        mixColor(
-            from = dominant,
-            to = bright,
-            fraction = .46f
-        )
+            XmoTheme.Amoled ->
+                mixColor(
+                    from = dominant,
+                    to = Color(0xFF3E4148),
+                    fraction = .30f
+                )
+        }
+
+    val artworkDeep =
+        when (theme) {
+            XmoTheme.Light ->
+                mixColor(
+                    from = deep,
+                    to = artwork,
+                    fraction = .62f
+                )
+
+            XmoTheme.Dark ->
+                mixColor(
+                    from = deep,
+                    to = artwork,
+                    fraction = .55f
+                )
+
+            XmoTheme.Amoled ->
+                mixColor(
+                    from = deep,
+                    to = artwork,
+                    fraction = .48f
+                )
+        }
 
     val soft =
         mixColor(
-            from = bright,
-            to = Color.White,
+            from = artwork,
+            to =
+                when (theme) {
+                    XmoTheme.Light ->
+                        Color(0xFFD8DADE)
+
+                    XmoTheme.Dark ->
+                        Color(0xFF858891)
+
+                    XmoTheme.Amoled ->
+                        Color(0xFF686B73)
+                },
             fraction =
                 when (theme) {
-                    XmoTheme.Light -> .23f
-                    XmoTheme.Dark -> .08f
-                    XmoTheme.Amoled -> .035f
+                    XmoTheme.Light -> .18f
+                    XmoTheme.Dark -> .14f
+                    XmoTheme.Amoled -> .11f
                 }
         )
 
@@ -73,9 +118,9 @@ internal fun PlayerBackground(
         )
 
         /*
-         * Oversized fields deliberately extend well beyond the
-         * viewport. They read as distributed artwork light rather
-         * than individual circular gradient spots.
+         * Top artwork field.
+         *
+         * Very oversized radius prevents a visible "circle".
          */
         drawRect(
             brush =
@@ -83,26 +128,26 @@ internal fun PlayerBackground(
                     colorStops =
                         arrayOf(
                             0f to
-                                bright.copy(
+                                artwork.copy(
                                     alpha =
                                         when (theme) {
-                                            XmoTheme.Light -> .50f
-                                            XmoTheme.Dark -> .50f
-                                            XmoTheme.Amoled -> .36f
+                                            XmoTheme.Light -> .52f
+                                            XmoTheme.Dark -> .42f
+                                            XmoTheme.Amoled -> .31f
                                         }
                                 ),
-                            .38f to
-                                bright.copy(
+                            .40f to
+                                artwork.copy(
                                     alpha =
                                         when (theme) {
-                                            XmoTheme.Light -> .30f
-                                            XmoTheme.Dark -> .29f
-                                            XmoTheme.Amoled -> .20f
+                                            XmoTheme.Light -> .32f
+                                            XmoTheme.Dark -> .24f
+                                            XmoTheme.Amoled -> .17f
                                         }
                                 ),
-                            .72f to
-                                bright.copy(
-                                    alpha = .09f
+                            .76f to
+                                artwork.copy(
+                                    alpha = .08f
                                 ),
                             1f to
                                 Color.Transparent
@@ -111,34 +156,37 @@ internal fun PlayerBackground(
                         Offset(
                             x =
                                 size.width *
-                                    -.10f,
+                                    .08f,
                             y =
                                 size.height *
-                                    .05f
+                                    .04f
                         ),
                     radius =
                         size.width *
-                            1.48f
+                            1.55f
                 )
         )
 
+        /*
+         * Opposite upper field breaks uniform dominant fill.
+         */
         drawRect(
             brush =
                 Brush.radialGradient(
                     colorStops =
                         arrayOf(
                             0f to
-                                rich.copy(
+                                artworkDeep.copy(
                                     alpha =
                                         when (theme) {
-                                            XmoTheme.Light -> .38f
-                                            XmoTheme.Dark -> .43f
-                                            XmoTheme.Amoled -> .29f
+                                            XmoTheme.Light -> .36f
+                                            XmoTheme.Dark -> .35f
+                                            XmoTheme.Amoled -> .25f
                                         }
                                 ),
                             .48f to
-                                rich.copy(
-                                    alpha = .18f
+                                artworkDeep.copy(
+                                    alpha = .15f
                                 ),
                             1f to
                                 Color.Transparent
@@ -147,17 +195,21 @@ internal fun PlayerBackground(
                         Offset(
                             x =
                                 size.width *
-                                    1.13f,
+                                    1.10f,
                             y =
                                 size.height *
-                                    .25f
+                                    .29f
                         ),
                     radius =
                         size.width *
-                            1.37f
+                            1.42f
                 )
         )
 
+        /*
+         * Broad center wash carries the artwork hue between the
+         * upper artwork area and lower glass panel.
+         */
         drawRect(
             brush =
                 Brush.radialGradient(
@@ -167,18 +219,18 @@ internal fun PlayerBackground(
                                 soft.copy(
                                     alpha =
                                         when (theme) {
-                                            XmoTheme.Light -> .35f
-                                            XmoTheme.Dark -> .30f
-                                            XmoTheme.Amoled -> .20f
+                                            XmoTheme.Light -> .27f
+                                            XmoTheme.Dark -> .24f
+                                            XmoTheme.Amoled -> .16f
                                         }
                                 ),
-                            .42f to
-                                middle.copy(
+                            .52f to
+                                artwork.copy(
                                     alpha =
                                         when (theme) {
-                                            XmoTheme.Light -> .22f
-                                            XmoTheme.Dark -> .21f
-                                            XmoTheme.Amoled -> .15f
+                                            XmoTheme.Light -> .15f
+                                            XmoTheme.Dark -> .13f
+                                            XmoTheme.Amoled -> .09f
                                         }
                                 ),
                             1f to
@@ -188,20 +240,20 @@ internal fun PlayerBackground(
                         Offset(
                             x =
                                 size.width *
-                                    .43f,
+                                    .48f,
                             y =
                                 size.height *
-                                    .49f
+                                    .52f
                         ),
                     radius =
                         size.width *
-                            1.72f
+                            1.74f
                 )
         )
 
         /*
-         * Lower fields stay visible through the glass player
-         * panel so the panel does not become a flat solid block.
+         * Color remains visible through the translucent lower
+         * panel on both sides.
          */
         drawRect(
             brush =
@@ -209,17 +261,17 @@ internal fun PlayerBackground(
                     colorStops =
                         arrayOf(
                             0f to
-                                rich.copy(
+                                artworkDeep.copy(
                                     alpha =
                                         when (theme) {
-                                            XmoTheme.Light -> .34f
-                                            XmoTheme.Dark -> .37f
-                                            XmoTheme.Amoled -> .27f
+                                            XmoTheme.Light -> .30f
+                                            XmoTheme.Dark -> .28f
+                                            XmoTheme.Amoled -> .20f
                                         }
                                 ),
-                            .50f to
-                                rich.copy(
-                                    alpha = .14f
+                            .58f to
+                                artworkDeep.copy(
+                                    alpha = .10f
                                 ),
                             1f to
                                 Color.Transparent
@@ -227,11 +279,11 @@ internal fun PlayerBackground(
                     center =
                         Offset(
                             x =
-                                size.width *
-                                    -.16f,
+                                -size.width *
+                                    .12f,
                             y =
                                 size.height *
-                                    .84f
+                                    .88f
                         ),
                     radius =
                         size.width *
@@ -245,17 +297,17 @@ internal fun PlayerBackground(
                     colorStops =
                         arrayOf(
                             0f to
-                                middle.copy(
+                                artwork.copy(
                                     alpha =
                                         when (theme) {
-                                            XmoTheme.Light -> .32f
-                                            XmoTheme.Dark -> .34f
-                                            XmoTheme.Amoled -> .23f
+                                            XmoTheme.Light -> .27f
+                                            XmoTheme.Dark -> .25f
+                                            XmoTheme.Amoled -> .17f
                                         }
                                 ),
-                            .54f to
-                                middle.copy(
-                                    alpha = .13f
+                            .60f to
+                                artwork.copy(
+                                    alpha = .09f
                                 ),
                             1f to
                                 Color.Transparent
@@ -271,12 +323,13 @@ internal fun PlayerBackground(
                         ),
                     radius =
                         size.width *
-                            1.58f
+                            1.52f
                 )
         )
 
         /*
-         * Neutral veil preserves the identity of each theme.
+         * Final theme veil keeps Light/Dark/AMOLED visually
+         * distinct without hiding the artwork color.
          */
         when (theme) {
             XmoTheme.Light -> {
@@ -287,13 +340,13 @@ internal fun PlayerBackground(
                                 arrayOf(
                                     0f to
                                         Color.White.copy(
-                                            alpha = .05f
+                                            alpha = .04f
                                         ),
-                                    .50f to
+                                    .46f to
                                         Color.Transparent,
                                     1f to
                                         Color.White.copy(
-                                            alpha = .08f
+                                            alpha = .06f
                                         )
                                 )
                         )
@@ -307,14 +360,14 @@ internal fun PlayerBackground(
                             colorStops =
                                 arrayOf(
                                     0f to
-                                        Color.White.copy(
-                                            alpha = .012f
+                                        Color.Black.copy(
+                                            alpha = .025f
                                         ),
-                                    .55f to
+                                    .52f to
                                         Color.Transparent,
                                     1f to
                                         Color.Black.copy(
-                                            alpha = .05f
+                                            alpha = .075f
                                         )
                                 )
                         )
@@ -329,13 +382,13 @@ internal fun PlayerBackground(
                                 arrayOf(
                                     0f to
                                         Color.Black.copy(
-                                            alpha = .02f
+                                            alpha = .08f
                                         ),
-                                    .52f to
+                                    .45f to
                                         Color.Transparent,
                                     1f to
                                         Color.Black.copy(
-                                            alpha = .11f
+                                            alpha = .18f
                                         )
                                 )
                         )
@@ -343,31 +396,4 @@ internal fun PlayerBackground(
             }
         }
     }
-}
-
-private fun brightenSplash(
-    color: Color,
-    amount: Float
-): Color {
-    val value =
-        amount.coerceIn(
-            0f,
-            1f
-        )
-
-    return Color(
-        red =
-            color.red +
-                (1f - color.red) *
-                value,
-        green =
-            color.green +
-                (1f - color.green) *
-                value,
-        blue =
-            color.blue +
-                (1f - color.blue) *
-                value,
-        alpha = 1f
-    )
 }
