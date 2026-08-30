@@ -1,7 +1,7 @@
 package com.xmo.music.ui.miniplayer
 
 import androidx.compose.animation.core.AnimationSpec
-import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import kotlin.math.abs
@@ -51,10 +51,6 @@ internal object XmoMiniPlayerAnimation {
             sign(value)
     }
 
-    /*
-     * Upward swipe can travel a little farther before strong
-     * resistance starts.
-     */
     fun verticalResistance(
         value: Float
     ): Float {
@@ -84,8 +80,7 @@ internal object XmoMiniPlayerAnimation {
     }
 
     /*
-     * Return from Now Playing still rises naturally from behind
-     * the NavBar.
+     * Now Playing -> MiniPlayer entrance.
      */
     val riseSpec: AnimationSpec<Float>
         get() =
@@ -101,9 +96,6 @@ internal object XmoMiniPlayerAnimation {
                 stiffness = 470f
             )
 
-    /*
-     * Only a rejected/short vertical swipe uses this.
-     */
     val verticalReturnSpec: AnimationSpec<Float>
         get() =
             spring(
@@ -112,25 +104,25 @@ internal object XmoMiniPlayerAnimation {
             )
 
     /*
-     * Successful tap / swipe-up:
+     * MiniPlayer -> Now Playing / close.
      *
-     * direct constant-speed downward exit.
-     * No spring and no ease-in/ease-out.
+     * Previous 175ms exit was too abrupt.
+     * This duration is intentionally close to the perceived
+     * speed of the MiniPlayer rise animation.
+     *
+     * No bounce/overshoot on disappearance.
      */
     val openExitSpec: AnimationSpec<Float>
         get() =
             tween(
-                durationMillis = 175,
-                easing = LinearEasing
+                durationMillis = 315,
+                easing = FastOutSlowInEasing
             )
 
-    /*
-     * Successful swipe-down close uses the same direct motion.
-     */
     val closeExitSpec: AnimationSpec<Float>
         get() =
             tween(
-                durationMillis = 175,
-                easing = LinearEasing
+                durationMillis = 315,
+                easing = FastOutSlowInEasing
             )
 }
