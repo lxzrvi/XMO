@@ -80,13 +80,14 @@ fun XmoMiniPlayer(
 
     /*
      * =========================================================
-     * POSITION
+     * RESTING POSITION / IME
      * =========================================================
      *
-     * Previous normal clearance: 128dp
-     * New clearance:            123dp
+     * Previous: 123dp
+     * New:      118dp
      *
-     * MiniPlayer therefore sits only 5dp lower.
+     * Reducing bottom clearance by 5dp places MiniPlayer exactly
+     * 5dp lower while preserving its size and horizontal geometry.
      */
 
     val navigationBottomPx =
@@ -99,7 +100,7 @@ fun XmoMiniPlayer(
 
     val normalClearancePx =
         with(density) {
-            123.dp.toPx()
+            118.dp.toPx()
         }
 
     val normalBottomPx =
@@ -113,8 +114,8 @@ fun XmoMiniPlayer(
             }
 
     /*
-     * Follow keyboard upward/downward but never allow it to push
-     * MiniPlayer below its real resting line during IME close.
+     * IME may move MiniPlayer upward, but never below its normal
+     * resting line while the keyboard closes.
      */
     val resolvedBottomPx =
         max(
@@ -131,8 +132,6 @@ fun XmoMiniPlayer(
      * =========================================================
      * RETURN FROM NOW PLAYING
      * =========================================================
-     *
-     * This remains the reference motion.
      */
 
     val riseDistance =
@@ -202,15 +201,10 @@ fun XmoMiniPlayer(
      * HIDDEN TARGET
      * =========================================================
      *
-     * Card bottom starts resolvedBottomPx above screen bottom.
+     * Card is 60dp high.
      *
-     * To make a 60dp card completely disappear below the screen,
-     * travel must exceed:
-     *
-     * resolvedBottomPx + 60dp
-     *
-     * +16dp safety ensures no 1px edge remains on devices with
-     * different navigation insets.
+     * Moving by the complete resolved bottom clearance + card
+     * height + safety puts the whole MiniPlayer below viewport.
      */
 
     val cardHeightPx =
@@ -228,15 +222,6 @@ fun XmoMiniPlayer(
             cardHeightPx +
             safetyPx
 
-    /*
-     * Normal resting -> fully hidden reference distance.
-     *
-     * Used to preserve constant perceived exit pace even if user
-     * releases from a raised or stretched position.
-     */
-    val referenceExitDistance =
-        hiddenY.coerceAtLeast(1f)
-
     suspend fun openOrdered() {
         if (
             opening ||
@@ -247,37 +232,33 @@ fun XmoMiniPlayer(
 
         opening = true
 
+        /*
+         * Search keyboard must not remain over Now Playing.
+         */
         keyboardController?.hide()
 
         x.snapTo(0f)
 
         /*
-         * Never reset y.
+         * Do not return to y = 0.
          *
-         * Current swipe position -> fully hidden.
+         * Tap begins from rest.
+         * Swipe-up begins from its actual raised position.
+         *
+         * Both use the exact same spring as the reverse
+         * Now Playing -> MiniPlayer entrance.
          */
-        val distance =
-            abs(
-                hiddenY -
-                    y.value
-            )
-
         y.animateTo(
             targetValue =
                 hiddenY,
             animationSpec =
                 XmoMiniPlayerAnimation
-                    .exitSpec(
-                        distancePx =
-                            distance,
-                        referenceDistancePx =
-                            referenceExitDistance
-                    )
+                    .openExitSpec
         )
 
         /*
-         * Card is guaranteed to be completely below viewport
-         * before Now Playing becomes visible.
+         * Now Playing starts only after MiniPlayer is below the
+         * viewport.
          */
         openPlayer()
     }
@@ -294,23 +275,12 @@ fun XmoMiniPlayer(
 
         x.snapTo(0f)
 
-        val distance =
-            abs(
-                hiddenY -
-                    y.value
-            )
-
         y.animateTo(
             targetValue =
                 hiddenY,
             animationSpec =
                 XmoMiniPlayerAnimation
-                    .exitSpec(
-                        distancePx =
-                            distance,
-                        referenceDistancePx =
-                            referenceExitDistance
-                    )
+                    .closeExitSpec
         )
 
         closePlayer()
