@@ -53,8 +53,7 @@ internal fun FollowLyrics(
         lyrics.lines.isEmpty()
     ) {
         Box(
-            modifier =
-                modifier,
+            modifier = modifier,
             contentAlignment =
                 Alignment.Center
         ) {
@@ -67,17 +66,13 @@ internal fun FollowLyrics(
                 fontFamily =
                     XmoFont.medium,
                 fontSize =
-                    if (
-                        fullscreen
-                    ) {
+                    if (fullscreen) {
                         18.sp
                     } else {
                         15.sp
                     },
                 lineHeight =
-                    if (
-                        fullscreen
-                    ) {
+                    if (fullscreen) {
                         27.sp
                     } else {
                         22.sp
@@ -86,8 +81,7 @@ internal fun FollowLyrics(
                     TextAlign.Center,
                 modifier =
                     Modifier.padding(
-                        horizontal =
-                            28.dp
+                        horizontal = 28.dp
                     )
             )
         }
@@ -109,71 +103,70 @@ internal fun FollowLyrics(
 
     var viewportHeightPx by
         remember {
-            mutableIntStateOf(
-                0
-            )
+            mutableIntStateOf(0)
         }
 
     var userBrowsing by
         remember {
-            mutableStateOf(
-                false
-            )
+            mutableStateOf(false)
+        }
+
+    /*
+     * Critical:
+     * LazyListState.isScrollInProgress also becomes true while
+     * OUR automatic centering animation is running.
+     *
+     * Without this flag, auto-follow mistakes its own animation
+     * for user browsing and disables itself.
+     */
+    var autoFollowing by
+        remember {
+            mutableStateOf(false)
         }
 
     var interactionToken by
         remember {
-            mutableLongStateOf(
-                0L
-            )
+            mutableLongStateOf(0L)
         }
 
     /*
-     * User gets ~4 seconds to browse before playback-following
-     * smoothly returns.
+     * Only genuine user scrolling pauses following.
      */
     LaunchedEffect(
-        state.isScrollInProgress
+        state.isScrollInProgress,
+        autoFollowing
     ) {
         if (
-            state.isScrollInProgress
+            state.isScrollInProgress &&
+            !autoFollowing
         ) {
-            userBrowsing =
-                true
-
+            userBrowsing = true
             interactionToken++
         } else if (
-            userBrowsing
+            !state.isScrollInProgress &&
+            userBrowsing &&
+            !autoFollowing
         ) {
             val token =
                 ++interactionToken
 
-            delay(
-                4_000L
-            )
+            delay(4_000L)
 
             if (
-                token ==
-                interactionToken &&
+                token == interactionToken &&
                 !state.isScrollInProgress
             ) {
-                userBrowsing =
-                    false
+                userBrowsing = false
             }
         }
     }
 
     /*
-     * Half-viewport boundary space is derived from the ACTUAL
-     * measured viewport, not fixed 155dp / 300dp values.
-     *
-     * This is required for first and final lyric lines to be
-     * physically capable of reaching center.
+     * Real measured viewport boundary space allows first/last
+     * lyric to physically reach viewport center.
      */
     val boundarySpace =
-        with(
-            density
-        ) {
+        with(density) {
             (
                 viewportHeightPx /
                     2f
@@ -182,8 +175,7 @@ internal fun FollowLyrics(
         }
 
     LazyColumn(
-        state =
-            state,
+        state = state,
         modifier =
             modifier
                 .fillMaxSize()
@@ -193,9 +185,7 @@ internal fun FollowLyrics(
                 },
         verticalArrangement =
             Arrangement.spacedBy(
-                if (
-                    fullscreen
-                ) {
+                if (fullscreen) {
                     8.dp
                 } else {
                     5.dp
@@ -205,48 +195,35 @@ internal fun FollowLyrics(
             Alignment.CenterHorizontally
     ) {
         item(
-            key =
-                "lyricsTopBoundary"
+            key = "lyricsTopBoundary"
         ) {
             Spacer(
-                modifier =
-                    Modifier.height(
-                        boundarySpace
-                    )
+                Modifier.height(
+                    boundarySpace
+                )
             )
         }
 
         itemsIndexed(
-            items =
-                lyrics.lines,
-            key = {
-                    index,
-                    line ->
-
+            items = lyrics.lines,
+            key = { index, line ->
                 "$index:${line.timeMs}:${line.text}"
             }
-        ) {
-                index,
-                line ->
+        ) { index, line ->
 
             val selected =
                 lyrics.synced &&
-                    index ==
-                    active
+                    index == active
 
             val lineColor by
                 animateColorAsState(
                     targetValue =
-                        if (
-                            selected
-                        ) {
+                        if (selected) {
                             accent
                         } else {
                             colors.text.copy(
                                 alpha =
-                                    if (
-                                        fullscreen
-                                    ) {
+                                    if (fullscreen) {
                                         .40f
                                     } else {
                                         .36f
@@ -254,10 +231,7 @@ internal fun FollowLyrics(
                             )
                         },
                     animationSpec =
-                        tween(
-                            durationMillis =
-                                260
-                        ),
+                        tween(260),
                     label =
                         "lyricColor$index"
                 )
@@ -268,17 +242,13 @@ internal fun FollowLyrics(
                         .fillMaxWidth()
                         .padding(
                             horizontal =
-                                if (
-                                    fullscreen
-                                ) {
+                                if (fullscreen) {
                                     32.dp
                                 } else {
                                     22.dp
                                 },
                             vertical =
-                                if (
-                                    selected
-                                ) {
+                                if (selected) {
                                     10.dp
                                 } else {
                                     7.dp
@@ -287,15 +257,17 @@ internal fun FollowLyrics(
                 contentAlignment =
                     Alignment.Center
             ) {
+                /*
+                 * No graphicsLayer scale.
+                 *
+                 * Multiline active lyric's real measured height
+                 * is therefore used for exact centering.
+                 */
                 Text(
-                    text =
-                        line.text,
-                    color =
-                        lineColor,
+                    text = line.text,
+                    color = lineColor,
                     fontFamily =
-                        if (
-                            selected
-                        ) {
+                        if (selected) {
                             XmoFont.bold
                         } else {
                             XmoFont.medium
@@ -332,8 +304,7 @@ internal fun FollowLyrics(
                         },
                     textAlign =
                         TextAlign.Center,
-                    softWrap =
-                        true,
+                    softWrap = true,
                     overflow =
                         TextOverflow.Visible,
                     modifier =
@@ -343,14 +314,12 @@ internal fun FollowLyrics(
         }
 
         item(
-            key =
-                "lyricsBottomBoundary"
+            key = "lyricsBottomBoundary"
         ) {
             Spacer(
-                modifier =
-                    Modifier.height(
-                        boundarySpace
-                    )
+                Modifier.height(
+                    boundarySpace
+                )
             )
         }
     }
@@ -363,28 +332,28 @@ internal fun FollowLyrics(
     ) {
         if (
             !lyrics.synced ||
-            active <
-            0 ||
-            viewportHeightPx <=
-            0 ||
+            active < 0 ||
+            viewportHeightPx <= 0 ||
             userBrowsing
         ) {
             return@LaunchedEffect
         }
 
-        withFrameNanos { }
+        autoFollowing = true
 
-        /*
-         * +1 because LazyColumn index zero is the top boundary
-         * spacer.
-         */
-        centerLyricExactly(
-            state =
-                state,
-            lazyIndex =
-                active +
-                    1
-        )
+        try {
+            withFrameNanos { }
+
+            /*
+             * +1 = top boundary spacer.
+             */
+            centerLyricExactly(
+                state = state,
+                lazyIndex = active + 1
+            )
+        } finally {
+            autoFollowing = false
+        }
     }
 }
 
@@ -396,17 +365,12 @@ private suspend fun centerLyricExactly(
         state.layoutInfo
             .visibleItemsInfo
             .firstOrNull {
-                it.index ==
-                    lazyIndex
+                it.index == lazyIndex
             }
 
-    if (
-        target ==
-        null
-    ) {
+    if (target == null) {
         state.scrollToItem(
-            index =
-                lazyIndex
+            index = lazyIndex
         )
 
         withFrameNanos { }
@@ -415,13 +379,12 @@ private suspend fun centerLyricExactly(
             state.layoutInfo
                 .visibleItemsInfo
                 .firstOrNull {
-                    it.index ==
-                        lazyIndex
+                    it.index == lazyIndex
                 }
                 ?: return
     }
 
-    fun correction(): Float? {
+    fun measuredCorrection(): Float? {
         val layout =
             state.layoutInfo
 
@@ -429,8 +392,7 @@ private suspend fun centerLyricExactly(
             layout
                 .visibleItemsInfo
                 .firstOrNull {
-                    it.index ==
-                        lazyIndex
+                    it.index == lazyIndex
                 }
                 ?: return null
 
@@ -438,58 +400,46 @@ private suspend fun centerLyricExactly(
             (
                 layout.viewportStartOffset +
                     layout.viewportEndOffset
-                ) /
-                2f
+                ) / 2f
 
         val itemCenter =
             item.offset +
-                item.size /
-                2f
+                item.size / 2f
 
         return itemCenter -
             viewportCenter
     }
 
     val first =
-        correction()
+        measuredCorrection()
             ?: return
 
     if (
-        abs(
-            first
-        ) >
-        .5f
+        abs(first) > .5f
     ) {
         state.animateScrollBy(
-            value =
-                first,
+            value = first,
             animationSpec =
                 tween(
-                    durationMillis =
-                        420
+                    durationMillis = 390
                 )
         )
     }
 
+    /*
+     * Multiline/font measurement may settle one frame later.
+     */
     withFrameNanos { }
 
-    /*
-     * Exact final measured correction handles multiline item
-     * height and font-layout rounding.
-     */
     val final =
-        correction()
+        measuredCorrection()
             ?: return
 
     if (
-        abs(
-            final
-        ) >
-        1f
+        abs(final) > .75f
     ) {
         state.scrollBy(
-            value =
-                final
+            value = final
         )
     }
 }
