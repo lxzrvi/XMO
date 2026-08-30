@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -65,17 +66,23 @@ internal fun PlayerInfo(
         modifier =
             Modifier
                 .fillMaxWidth()
-                /*
-                 * Extra internal room compensates title position
-                 * while action row follows the higher panel top.
-                 */
                 .height(120.dp)
     ) {
+        /*
+         * Only the actions move slightly upward.
+         *
+         * The title/artist below remain bottom-aligned to the
+         * exact same 120dp host, so their approved position is
+         * unchanged.
+         */
         Row(
             modifier =
                 Modifier
                     .align(
                         Alignment.TopStart
+                    )
+                    .offset(
+                        y = (-4).dp
                     )
                     .padding(
                         start = 4.dp
@@ -154,6 +161,9 @@ internal fun PlayerInfo(
                     .align(
                         Alignment.TopEnd
                     )
+                    .offset(
+                        y = (-4).dp
+                    )
                     .padding(
                         end = 4.dp
                     )
@@ -212,10 +222,6 @@ internal fun PlayerInfo(
             }
         }
 
-        /*
-         * Title stays around the previous screen position even
-         * though the panel edge/actions moved 16dp upward.
-         */
         Column(
             modifier =
                 Modifier
