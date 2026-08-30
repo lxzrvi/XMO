@@ -1,6 +1,7 @@
 package com.xmo.music.app
 
 import android.content.Context
+import com.xmo.music.data.Song
 import com.xmo.music.data.Store
 import com.xmo.music.data.UserCategory
 import com.xmo.music.player.XmoPlayer
@@ -17,7 +18,7 @@ internal fun buildXmoAppActions(
     requestAudioPermission: () -> Unit
 ): XmoAppActions {
 
-    fun currentSong() =
+    fun currentSong(): Song? =
         state.songs
             .firstOrNull {
                 it.id ==
@@ -56,7 +57,8 @@ internal fun buildXmoAppActions(
     }
 
     fun createCategory(
-        rawName: String
+        rawName: String,
+        song: Song?
     ): UserCategory? {
         val name =
             rawName
@@ -70,9 +72,6 @@ internal fun buildXmoAppActions(
         if (name.isBlank()) {
             return null
         }
-
-        val song =
-            currentSong()
 
         val category =
             UserCategory(
@@ -190,17 +189,11 @@ internal fun buildXmoAppActions(
         },
 
         /*
-         * =====================================================
-         * GLOBAL SONG SELECTION
-         * =====================================================
+         * Any song row:
          *
-         * Song row tap never forces Now Playing.
-         *
-         * No active MiniPlayer:
-         * song starts -> MiniPlayer rises from below.
-         *
-         * Existing MiniPlayer:
-         * song changes in-place; whole card does not re-enter.
+         * start/change playback
+         * -> MiniPlayer
+         * -> no automatic Now Playing
          */
         playSong = {
                 song,
@@ -240,9 +233,11 @@ internal fun buildXmoAppActions(
                     false
 
                 /*
-                 * Trigger bottom-rise only when we're genuinely
-                 * introducing MiniPlayer rather than changing a
-                 * song inside an already-visible one.
+                 * Whole-card rise only when MiniPlayer is being
+                 * introduced/reintroduced.
+                 *
+                 * Already-visible MiniPlayer changes only its
+                 * artwork/metadata.
                  */
                 if (
                     !hadPlayback ||
@@ -264,11 +259,6 @@ internal fun buildXmoAppActions(
             )
         },
 
-        /*
-         * MiniPlayer preview can show a Song that has not yet
-         * been committed to Media3, so Like must target its real
-         * previewed ID instead of playback.currentSongId.
-         */
         toggleSongLikeById = {
             songId ->
 
@@ -289,6 +279,16 @@ internal fun buildXmoAppActions(
                     categoryId,
                 added =
                     added
+            )
+        },
+
+        createCategoryForSong = {
+                name,
+                song ->
+
+            createCategory(
+                rawName = name,
+                song = song
             )
         },
 
@@ -357,12 +357,6 @@ internal fun buildXmoAppActions(
             }
         },
 
-        /*
-         * =====================================================
-         * MINIPLAYER
-         * =====================================================
-         */
-
         openNowPlayingFromMini = {
             state.miniVisible =
                 false
@@ -386,8 +380,9 @@ internal fun buildXmoAppActions(
         },
 
         /*
-         * The MiniPlayer preview commits exactly one final queue
-         * index after rapid-swiping stops.
+         * MiniPlayer debounce commits only its final preview.
+         *
+         * Now Playing Queue also uses this same real callback.
          */
         playQueueIndex = {
             index ->
@@ -407,9 +402,7 @@ internal fun buildXmoAppActions(
         },
 
         /*
-         * These remain real immediate Now Playing transport
-         * actions. MiniPlayer no longer calls them for horizontal
-         * preview swipes.
+         * Immediate Now Playing transport controls.
          */
         next = {
             player.next()
@@ -487,20 +480,26 @@ internal fun buildXmoAppActions(
                 categoryId,
                 added ->
 
-            currentSong()?.let {
-                updateCategoryMembership(
-                    songId =
-                        it.id,
-                    categoryId =
-                        categoryId,
-                    added =
-                        added
-                )
-            }
+            currentSong()
+                ?.let {
+                    updateCategoryMembership(
+                        songId =
+                            it.id,
+                        categoryId =
+                            categoryId,
+                        added =
+                            added
+                    )
+                }
         },
 
         createCategoryForCurrentSong = {
-            createCategory(it)
+            name ->
+
+            createCategory(
+                rawName = name,
+                song = currentSong()
+            )
         },
 
         dismissNowPlaying = {
