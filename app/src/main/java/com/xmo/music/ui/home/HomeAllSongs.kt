@@ -1,30 +1,37 @@
 package com.xmo.music.ui.home
 
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyHorizontalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.key
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +42,8 @@ import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
 import com.xmo.music.data.Song
+import com.xmo.music.player.PlaybackState
+import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 
 @Composable
@@ -43,6 +52,7 @@ internal fun HomeAllSongs(
     allowed: Boolean,
     c: HomeColors,
     theme: XmoTheme,
+    playback: PlaybackState,
     play: (Song) -> Unit,
     options: (Song) -> Unit
 ) {
@@ -57,89 +67,73 @@ internal fun HomeAllSongs(
     }
 
     BoxWithConstraints(
-        Modifier.fillMaxWidth()
+        Modifier
+            .fillMaxWidth()
+            .weight(1f, fill = true)
     ) {
-        val edge = 8.dp
-        val gap = 8.dp
+        val gap = 7.dp
         val cardWidth =
-            (maxWidth - edge * 2 - gap * 3) / 4
+            (maxWidth - 16.dp - gap * 3) / 4
 
-        val cardHeight =
-            cardWidth + 37.dp
-
-        val height =
-            cardHeight * 3 +
-                gap * 2
-
-        val scroll =
-            rememberScrollState()
-
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .height(height)
-                .horizontalScroll(scroll)
-                .padding(horizontal = edge),
+        LazyHorizontalGrid(
+            rows = GridCells.Fixed(3),
+            state = rememberLazyGridState(),
+            modifier = Modifier.fillMaxSize(),
+            contentPadding =
+                PaddingValues(
+                    start = 8.dp,
+                    end = 8.dp,
+                    bottom = 4.dp
+                ),
             horizontalArrangement =
+                Arrangement.spacedBy(gap),
+            verticalArrangement =
                 Arrangement.spacedBy(gap)
         ) {
-            songs
-                .chunked(3)
-                .forEach { column ->
-                    Column(
-                        Modifier.width(cardWidth),
-                        verticalArrangement =
-                            Arrangement.spacedBy(gap)
-                    ) {
-                        column.forEach { song ->
-                            key(song.id) {
-                                HomeSongTile(
-                                    song = song,
-                                    c = c,
-                                    theme = theme,
-                                    modifier = Modifier
-                                        .width(cardWidth)
-                                        .height(cardHeight),
-                                    onClick = {
-                                        play(song)
-                                    },
-                                    onOptions = {
-                                        options(song)
-                                    }
-                                )
-                            }
+            items(
+                items = songs,
+                key = { it.id },
+                contentType = { "song" }
+            ) { song ->
+                SongGridTile(
+                    song = song,
+                    c = c,
+                    theme = theme,
+                    playing =
+                        playback.currentSongId ==
+                            song.id,
+                    active =
+                        playback.currentSongId ==
+                            song.id &&
+                            playback.isPlaying,
+                    play = {
+                        if (
+                            playback.currentSongId !=
+                            song.id
+                        ) {
+                            play(song)
                         }
+                    },
+                    options = {
+                        options(song)
                     }
-                }
+                )
+            }
         }
     }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun HomeSongTile(
+private fun SongGridTile(
     song: Song,
     c: HomeColors,
     theme: XmoTheme,
-    modifier: Modifier,
-    onClick: () -> Unit,
-    onOptions: () -> Unit
+    playing: Boolean,
+    active: Boolean,
+    play: () -> Unit,
+    options: () -> Unit
 ) {
-    val border =
-        when (theme) {
-            XmoTheme.Light ->
-                androidx.compose.ui.graphics.Color
-                    .Black.copy(alpha = .07f)
-
-            XmoTheme.Dark ->
-                androidx.compose.ui.graphics.Color
-                    .White.copy(alpha = .065f)
-
-            XmoTheme.Amoled ->
-                androidx.compose.ui.graphics.Color
-                    .White.copy(alpha = .09f)
-        }
-
     val surface =
         when (theme) {
             XmoTheme.Light ->
@@ -158,20 +152,35 @@ private fun HomeSongTile(
                 )
         }
 
+    val border =
+        when (theme) {
+            XmoTheme.Light ->
+                androidx.compose.ui.graphics.Color.Black
+                    .copy(alpha = .065f)
+
+            XmoTheme.Dark ->
+                androidx.compose.ui.graphics.Color.White
+                    .copy(alpha = .06f)
+
+            XmoTheme.Amoled ->
+                androidx.compose.ui.graphics.Color.White
+                    .copy(alpha = .085f)
+        }
+
     Column(
-        modifier
+        Modifier
             .clip(RoundedCornerShape(10.dp))
-            .combinedClickable(
-                onClick = onClick,
-                onLongClick = onOptions
-            )
             .background(surface)
             .border(
-                .45.dp,
+                .4.dp,
                 border,
                 RoundedCornerShape(10.dp)
             )
-            .padding(5.dp)
+            .combinedClickable(
+                onClick = play,
+                onLongClick = options
+            )
+            .padding(4.dp)
     ) {
         BoxWithConstraints(
             Modifier.fillMaxWidth()
@@ -185,26 +194,17 @@ private fun HomeSongTile(
             ) {
                 AsyncImage(
                     model = song.artwork,
-                    contentDescription = song.title,
+                    contentDescription = null,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Crop
                 )
 
-                if (song.artwork == null) {
-                    Text(
-                        text =
-                            song.title
-                                .firstOrNull()
-                                ?.uppercase()
-                                ?: "X",
-                        color =
-                            c.text.copy(alpha = .65f),
-                        fontFamily = XmoFont.bold,
-                        fontSize = 17.sp,
-                        modifier =
-                            Modifier.align(
-                                Alignment.Center
-                            )
+                if (playing) {
+                    PlayingWave(
+                        active = active,
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .padding(5.dp)
                     )
                 }
             }
@@ -213,7 +213,7 @@ private fun HomeSongTile(
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp),
+                .padding(top = 3.dp),
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
@@ -222,45 +222,98 @@ private fun HomeSongTile(
             ) {
                 Text(
                     text = song.title,
-                    color = c.text,
+                    color =
+                        if (playing) {
+                            LocalXmoAccent.current
+                        } else {
+                            c.text
+                        },
                     fontFamily = XmoFont.bold,
-                    fontSize = 10.sp,
+                    fontSize = 9.sp,
                     maxLines = 1,
-                    overflow =
-                        TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis
                 )
 
                 Text(
                     text = song.artist,
                     color = c.sub,
                     fontFamily = XmoFont.normal,
-                    fontSize = 8.sp,
+                    fontSize = 7.sp,
                     maxLines = 1,
-                    overflow =
-                        TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 
             Box(
                 Modifier
-                    .size(25.dp)
-                    .clip(CircleShape)
+                    .size(22.dp)
                     .combinedClickable(
-                        onClick = onOptions,
-                        onLongClick = onOptions
+                        onClick = options,
+                        onLongClick = options
                     ),
-                contentAlignment =
-                    Alignment.Center
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
                     imageVector =
                         Icons.Rounded.MoreHoriz,
-                    contentDescription =
-                        "Song options",
+                    contentDescription = "Options",
                     tint = c.sub,
-                    modifier = Modifier.size(17.dp)
+                    modifier = Modifier.size(15.dp)
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun PlayingWave(
+    active: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val transition =
+        rememberInfiniteTransition(
+            label = "playingWave"
+        )
+
+    val scale by
+        transition.animateFloat(
+            initialValue = .78f,
+            targetValue = 1.15f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(430),
+                    repeatMode =
+                        RepeatMode.Reverse
+                ),
+            label = "waveScale"
+        )
+
+    Box(
+        modifier
+            .size(25.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                androidx.compose.ui.graphics.Color.Black
+                    .copy(alpha = .58f)
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Rounded.GraphicEq,
+            contentDescription = "Playing",
+            tint = LocalXmoAccent.current,
+            modifier = Modifier
+                .size(17.dp)
+                .then(
+                    if (active) {
+                        Modifier
+                            .graphicsLayer {
+                                scaleY = scale
+                            }
+                    } else {
+                        Modifier
+                    }
+                )
+        )
     }
 }
