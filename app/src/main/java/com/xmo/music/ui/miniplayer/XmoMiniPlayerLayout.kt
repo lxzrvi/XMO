@@ -23,9 +23,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -35,7 +37,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.material3.Text
 import coil3.compose.AsyncImage
 import com.xmo.music.XmoTheme
 import com.xmo.music.player.PlaybackState
@@ -48,21 +49,15 @@ internal fun xmoMiniSurface(
     when (theme) {
         XmoTheme.Light ->
             Color(0xFFF8F8FA)
-                .copy(
-                    alpha = .97f
-                )
+                .copy(alpha = .97f)
 
         XmoTheme.Dark ->
             Color(0xFF202126)
-                .copy(
-                    alpha = .97f
-                )
+                .copy(alpha = .97f)
 
         XmoTheme.Amoled ->
             Color(0xFF090A0C)
-                .copy(
-                    alpha = .98f
-                )
+                .copy(alpha = .98f)
     }
 
 internal fun xmoMiniControlSurface(
@@ -107,11 +102,12 @@ internal fun XmoMiniPlayerCard(
     opening: Boolean,
     togglePlay: () -> Unit,
     toggleLike: () -> Unit,
+    toggleCloseMode: () -> Unit,
     close: () -> Unit,
     open: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val shape =
+    val cardShape =
         RoundedCornerShape(
             topStart = 15.dp,
             bottomStart = 15.dp,
@@ -124,18 +120,16 @@ internal fun XmoMiniPlayerCard(
             modifier
                 .fillMaxWidth()
                 .height(60.dp)
+                .clip(cardShape)
                 .background(
-                    color =
-                        xmoMiniSurface(theme),
-                    shape =
-                        shape
+                    xmoMiniSurface(theme)
                 )
                 .border(
                     width = .7.dp,
                     color =
                         xmoMiniBorder(theme),
                     shape =
-                        shape
+                        cardShape
                 )
     ) {
         val progress =
@@ -165,11 +159,9 @@ internal fun XmoMiniPlayerCard(
                 color = accent,
                 size =
                     Size(
-                        width =
-                            size.width *
-                                progress,
-                        height =
-                            size.height
+                        size.width *
+                            progress,
+                        size.height
                     )
             )
         }
@@ -195,13 +187,13 @@ internal fun XmoMiniPlayerCard(
                 modifier =
                     Modifier
                         .size(50.dp)
+                        .clip(
+                            RoundedCornerShape(
+                                11.dp
+                            )
+                        )
                         .background(
-                            color =
-                                colors.button,
-                            shape =
-                                RoundedCornerShape(
-                                    11.dp
-                                )
+                            colors.button
                         ),
                 contentScale =
                     ContentScale.Crop
@@ -247,7 +239,10 @@ internal fun XmoMiniPlayerCard(
         }
 
         /*
-         * Artwork/title tap area only.
+         * Artwork/title area owns tap + long press.
+         *
+         * Long press only changes controls into close mode.
+         * It never opens Now Playing.
          */
         Box(
             modifier =
@@ -263,7 +258,8 @@ internal fun XmoMiniPlayerCard(
                     .pointerInput(
                         state.currentSongId,
                         moved,
-                        opening
+                        opening,
+                        closeMode
                     ) {
                         if (opening) {
                             return@pointerInput
@@ -271,8 +267,16 @@ internal fun XmoMiniPlayerCard(
 
                         detectTapGestures(
                             onTap = {
-                                if (!moved) {
+                                if (
+                                    !moved &&
+                                    !closeMode
+                                ) {
                                     open()
+                                }
+                            },
+                            onLongPress = {
+                                if (!moved) {
+                                    toggleCloseMode()
                                 }
                             }
                         )
@@ -297,7 +301,7 @@ internal fun XmoMiniPlayerCard(
                     )
             },
             label =
-                "miniControls"
+                "xmoMiniControls"
         ) { showingClose ->
 
             if (showingClose) {
@@ -308,15 +312,15 @@ internal fun XmoMiniPlayerCard(
                                 end = 7.dp
                             )
                             .size(44.dp)
+                            .clip(
+                                RoundedCornerShape(
+                                    22.dp
+                                )
+                            )
                             .background(
-                                color =
-                                    xmoMiniControlSurface(
-                                        theme
-                                    ),
-                                shape =
-                                    RoundedCornerShape(
-                                        22.dp
-                                    )
+                                xmoMiniControlSurface(
+                                    theme
+                                )
                             )
                             .pointerInput(Unit) {
                                 detectTapGestures {
@@ -346,15 +350,15 @@ internal fun XmoMiniPlayerCard(
                             .padding(
                                 end = 6.dp
                             )
+                            .clip(
+                                RoundedCornerShape(
+                                    24.dp
+                                )
+                            )
                             .background(
-                                color =
-                                    xmoMiniControlSurface(
-                                        theme
-                                    ),
-                                shape =
-                                    RoundedCornerShape(
-                                        24.dp
-                                    )
+                                xmoMiniControlSurface(
+                                    theme
+                                )
                             )
                             .border(
                                 width = .6.dp,
