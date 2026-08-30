@@ -1,39 +1,37 @@
 package com.xmo.music.ui.home
 
+import android.content.Intent
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.SheetValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
@@ -61,8 +59,7 @@ internal fun XmoList(
         sheetState = sheetState,
         containerColor = c.surface,
         contentColor = c.text,
-        scrimColor =
-            androidx.compose.ui.graphics.Color.Transparent
+        scrimColor = Color.Transparent
     ) {
         Column(
             Modifier
@@ -88,57 +85,48 @@ internal fun XmoSongList(
     playNext: () -> Unit,
     removeRecent: () -> Unit
 ) {
+    val context = LocalContext.current
+
     XmoList(
         c = c,
         dismiss = dismiss
     ) {
-        Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(18.dp),
-            verticalAlignment =
-                Alignment.CenterVertically
+        Column(
+            Modifier.padding(
+                horizontal = 20.dp,
+                vertical = 10.dp
+            )
         ) {
-            AsyncImage(
-                model = song.artwork,
-                contentDescription = null,
-                modifier = Modifier.size(58.dp)
+            Text(
+                text = song.title,
+                color = c.text,
+                fontFamily = XmoFont.bold,
+                fontSize = 16.sp,
+                maxLines = 1
             )
 
-            Column(
-                Modifier
-                    .weight(1f)
-                    .padding(start = 12.dp)
-            ) {
-                Text(
-                    text = song.title,
-                    color = c.text,
-                    fontFamily = XmoFont.bold,
-                    fontSize = 14.sp,
-                    maxLines = 1
-                )
-
-                Text(
-                    text = song.artist,
-                    color = c.sub,
-                    fontFamily = XmoFont.normal,
-                    fontSize = 10.sp,
-                    maxLines = 1
-                )
-            }
+            Text(
+                text = song.artist,
+                color = c.sub,
+                fontFamily = XmoFont.normal,
+                fontSize = 10.sp,
+                maxLines = 1
+            )
         }
 
         XmoListAction(
-            title = if (liked) {
-                "Remove from Liked Songs"
-            } else {
-                "Add to Liked Songs"
-            },
-            icon = if (liked) {
-                Icons.Rounded.Favorite
-            } else {
-                Icons.Rounded.FavoriteBorder
-            },
+            title =
+                if (liked) {
+                    "Remove from Liked Songs"
+                } else {
+                    "Add to Liked Songs"
+                },
+            icon =
+                if (liked) {
+                    Icons.Rounded.Favorite
+                } else {
+                    Icons.Rounded.FavoriteBorder
+                },
             active = liked,
             c = c,
             click = toggleLike
@@ -147,23 +135,47 @@ internal fun XmoSongList(
         XmoListAction(
             title = "Play Next",
             icon = Icons.Rounded.QueueMusic,
-            c = c,
-            click = {
-                playNext()
-                dismiss()
-            }
-        )
+            c = c
+        ) {
+            playNext()
+            dismiss()
+        }
+
+        XmoListAction(
+            title = "Share",
+            icon = Icons.Rounded.Share,
+            c = c
+        ) {
+            val intent =
+                Intent(Intent.ACTION_SEND)
+                    .setType("audio/*")
+                    .putExtra(
+                        Intent.EXTRA_STREAM,
+                        song.uri
+                    )
+                    .addFlags(
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+
+            context.startActivity(
+                Intent.createChooser(
+                    intent,
+                    "Share song"
+                )
+            )
+
+            dismiss()
+        }
 
         if (recent) {
             XmoListAction(
                 title = "Remove from Recent",
                 icon = Icons.Rounded.Delete,
-                c = c,
-                click = {
-                    removeRecent()
-                    dismiss()
-                }
-            )
+                c = c
+            ) {
+                removeRecent()
+                dismiss()
+            }
         }
     }
 }
@@ -190,24 +202,27 @@ internal fun XmoListAction(
         Icon(
             imageVector = icon,
             contentDescription = null,
-            tint = if (active) {
-                LocalXmoAccent.current
-            } else {
-                c.icon
-            },
+            tint =
+                if (active) {
+                    LocalXmoAccent.current
+                } else {
+                    c.icon
+                },
             modifier = Modifier.size(20.dp)
         )
 
         Text(
             text = title,
-            color = if (active) {
-                LocalXmoAccent.current
-            } else {
-                c.text
-            },
+            color =
+                if (active) {
+                    LocalXmoAccent.current
+                } else {
+                    c.text
+                },
             fontFamily = XmoFont.medium,
             fontSize = 12.sp,
-            modifier = Modifier.padding(start = 14.dp)
+            modifier =
+                Modifier.padding(start = 14.dp)
         )
     }
 }
