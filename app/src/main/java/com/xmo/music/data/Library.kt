@@ -27,13 +27,6 @@ object Library {
                     "content://media/external/audio/albumart"
                 )
 
-            /*
-             * Keep the MediaStore query focused on columns which
-             * Android exposes reliably for local audio.
-             *
-             * Deeper codec metadata is enriched afterwards from
-             * the actual content URI.
-             */
             val projection =
                 arrayOf(
                     MediaStore.Audio.Media._ID,
@@ -165,14 +158,6 @@ object Library {
                                 id
                             )
 
-                    /*
-                     * MediaStore TRACK commonly encodes:
-                     *
-                     * disc * 1000 + track
-                     *
-                     * Example:
-                     * 2004 = disc 2, track 4.
-                     */
                     val rawTrack =
                         cursor.intOrNull(
                             trackColumn
@@ -319,12 +304,11 @@ object Library {
             }
 
             /*
-             * Reading every file deeply during every normal
-             * library scan would make startup unnecessarily
-             * expensive.
+             * Deep enrichment remains on Dispatchers.IO.
              *
-             * This pass adds metadata which MediaStore does not
-             * reliably expose while keeping all work on IO.
+             * EmbeddedMetadata additionally reads metadata that
+             * Android's MediaMetadataRetriever does not expose,
+             * including M4A/Opus embedded lyrics.
              */
             basicSongs.map { song ->
                 enrich(
@@ -334,12 +318,6 @@ object Library {
             }
         }
 
-    /*
-     * Explicit single-song metadata refresh.
-     *
-     * Useful for details/lyrics screens without triggering a
-     * complete MediaStore rescan.
-     */
     suspend fun details(
         context: Context,
         song: Song
@@ -362,11 +340,8 @@ object Library {
                     (name, tracks) ->
 
                 Artist(
-                    name =
-                        name,
-
-                    songs =
-                        tracks
+                    name = name,
+                    songs = tracks
                 )
             }
             .sortedBy {
@@ -378,10 +353,6 @@ object Library {
     ): List<Album> =
         songs
             .groupBy {
-                /*
-                 * A missing/invalid album id must not merge every
-                 * unknown album into one giant album.
-                 */
                 if (
                     it.albumId > 0L
                 ) {
@@ -439,6 +410,20 @@ object Library {
     ): Song {
         val retriever =
             MediaMetadataRetriever()
+
+        /*
+         * Read non-platform metadata independently.
+         *
+         * If parsing fails, EmbeddedMetadata returns an empty
+         * result and the song remains fully usable.
+         */
+        val embedded =
+            EmbeddedMetadata.read(
+                context = context,
+                uri = song.uri,
+                mimeType =
+                    song.metadata.mimeType
+            )
 
         return try {
             retriever.setDataSource(
@@ -521,7 +506,13 @@ object Library {
                         it > 0
                     }
 
-            val channelCount: Int? = null
+            /*
+             * MediaMetadataRetriever does not expose a reliable
+             * channel-count metadata key on the supported API
+             * range, so existing real value is preserved.
+             */
+            val channelCount: Int? =
+                null
 
             val embeddedDuration =
                 retriever
@@ -550,15 +541,6 @@ object Library {
                     )
                     .parseNumber()
 
-            /*
-             * Android's platform MediaMetadataRetriever does not
-             * expose a general ID3/Vorbis embedded-lyrics key.
-             * Therefore lyrics are not fabricated here.
-             *
-             * A real parser/local .lrc attachment layer can fill
-             * Song.embeddedLyrics later when actual lyric data
-             * exists.
-             */
             song.copy(
                 title =
                     embeddedTitle
@@ -623,14 +605,28 @@ object Library {
                             channelCount
                                 ?: song.metadata
                                     .channelCount
-                    )
+                    ),
+
+                /*
+                 * User-attached LRC is handled separately in
+                 * NowPlaying. This field represents actual audio
+                 * file metadata only.
+                 */
+                embeddedLyrics =
+                    embedded.lyrics
+                        ?: song.embeddedLyrics
             )
         } catch (_: Exception) {
             /*
-             * Broken/unsupported files remain usable through
-             * their MediaStore metadata.
+             * Even when MediaMetadataRetriever cannot parse the
+             * rest of a file, successfully extracted embedded
+             * lyrics should not be discarded.
              */
-            song
+            song.copy(
+                embeddedLyrics =
+                    embedded.lyrics
+                        ?: song.embeddedLyrics
+            )
         } finally {
             runCatching {
                 retriever.release()
@@ -641,9 +637,7 @@ object Library {
     private fun android.database.Cursor.column(
         name: String
     ): Int =
-        getColumnIndex(
-            name
-        )
+        getColumnIndex(name)
 
     private fun android.database.Cursor.stringOrNull(
         column: Int
@@ -655,9 +649,7 @@ object Library {
             return null
         }
 
-        return getString(
-            column
-        )
+        return getString(column)
     }
 
     private fun android.database.Cursor.longOrNull(
@@ -670,9 +662,7 @@ object Library {
             return null
         }
 
-        return getLong(
-            column
-        )
+        return getLong(column)
     }
 
     private fun android.database.Cursor.intOrNull(
@@ -685,9 +675,7 @@ object Library {
             return null
         }
 
-        return getInt(
-            column
-        )
+        return getInt(column)
     }
 
     private fun String?.clean(
@@ -696,8 +684,7 @@ object Library {
         meaningful()
             ?: fallback
 
-    private fun String?.meaningful():
-        String? =
+    private fun String?.meaningful(): String? =
         this
             ?.trim()
             ?.takeUnless {
@@ -712,34 +699,34 @@ object Library {
                     )
             }
 
-            private fun String?.parseNumber(): Int? {
-            val value =
-                meaningful()
-                    ?: return null
-    
-            return value
-                .substringBefore("/")
-                .trim()
-                .toIntOrNull()
-                ?.takeIf {
-                    it > 0
-                }
-        }
-    
-        private fun MediaMetadataRetriever.text(
-            key: Int
-        ): String? =
-            extractMetadata(key)
-                ?.trim()
-                ?.takeIf {
-                    it.isNotEmpty() &&
-                        !it.equals(
-                            "<unknown>",
-                            ignoreCase = true
-                        ) &&
-                        !it.equals(
-                            "unknown",
-                            ignoreCase = true
-                        )
-                }
+    private fun String?.parseNumber(): Int? {
+        val value =
+            meaningful()
+                ?: return null
+
+        return value
+            .substringBefore("/")
+            .trim()
+            .toIntOrNull()
+            ?.takeIf {
+                it > 0
+            }
     }
+
+    private fun MediaMetadataRetriever.text(
+        key: Int
+    ): String? =
+        extractMetadata(key)
+            ?.trim()
+            ?.takeIf {
+                it.isNotEmpty() &&
+                    !it.equals(
+                        "<unknown>",
+                        ignoreCase = true
+                    ) &&
+                    !it.equals(
+                        "unknown",
+                        ignoreCase = true
+                    )
+            }
+}
