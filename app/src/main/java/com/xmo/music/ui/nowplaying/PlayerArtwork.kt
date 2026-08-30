@@ -97,9 +97,6 @@ internal fun PlayerArtwork(
         )
     }
 
-    /*
-     * Real Media3 confirmation.
-     */
     LaunchedEffect(
         currentId
     ) {
@@ -135,28 +132,53 @@ internal fun PlayerArtwork(
             return@LaunchedEffect
         }
 
-        if (
-            !carousel.transactionActive
-        ) {
+        if (!carousel.transactionActive) {
+            /*
+             * Prefer the identity of the frozen adjacent artwork.
+             *
+             * This handles queue wrap:
+             * last -> first remains NEXT,
+             * first -> last remains PREVIOUS.
+             *
+             * Index comparison is only the fallback for a normal
+             * adjacent Media3 transition.
+             */
             val direction =
                 when {
-                    currentIndex <
-                        carousel.visualIndex ->
+                    current != null &&
+                        carousel.visualNext != null &&
+                        current ==
+                            carousel.visualNext ->
+                        1
+
+                    current != null &&
+                        carousel.visualPrevious != null &&
+                        current ==
+                            carousel.visualPrevious ->
                         -1
 
-                    currentIndex >
-                        carousel.visualIndex ->
+                    currentIndex ==
+                        carousel.visualIndex + 1 ->
                         1
 
+                    currentIndex ==
+                        carousel.visualIndex - 1 ->
+                        -1
+
                     else ->
-                        1
+                        0
                 }
 
             val adjacentAvailable =
-                if (direction > 0) {
-                    carousel.visualNext != null
-                } else {
-                    carousel.visualPrevious != null
+                when (direction) {
+                    1 ->
+                        carousel.visualNext != null
+
+                    -1 ->
+                        carousel.visualPrevious != null
+
+                    else ->
+                        false
                 }
 
             if (adjacentAvailable) {
@@ -200,9 +222,6 @@ internal fun PlayerArtwork(
         }
     }
 
-    /*
-     * Exact artwork-sized host.
-     */
     BoxWithConstraints(
         modifier =
             Modifier
@@ -225,12 +244,6 @@ internal fun PlayerArtwork(
                 .toFloat()
                 .coerceAtLeast(1f)
 
-        /*
-         * Previous/next are now separated by an actual visual
-         * gutter instead of touching the current cover edge.
-         *
-         * This same distance drives color interpolation.
-         */
         val pageDistance =
             coverWidth +
                 gapPx
@@ -275,10 +288,19 @@ internal fun PlayerArtwork(
                     1f
                 )
 
+        /*
+         * Shared rounded clip means the transition can never
+         * expose a thin host strip around either child.
+         */
         Box(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .clip(
+                        RoundedCornerShape(
+                            24.dp
+                        )
+                    )
                     .pointerInput(
                         currentId,
                         canPrevious,
@@ -313,8 +335,7 @@ internal fun PlayerArtwork(
                                     return@detectDragGestures
                                 }
 
-                                rawDragX +=
-                                    drag.x
+                                rawDragX += drag.x
 
                                 if (
                                     abs(rawDragX) > 6f
@@ -449,15 +470,6 @@ internal fun PlayerArtwork(
                             1f -
                                 lyricsFraction
                         )
-                        .graphicsLayer {
-                            val scale =
-                                1f -
-                                    .018f *
-                                    lyricsFraction
-
-                            scaleX = scale
-                            scaleY = scale
-                        }
             ) {
                 ArtworkCarousel(
                     current =
@@ -489,9 +501,15 @@ internal fun PlayerArtwork(
                                 lyricsFraction
                             )
                             .graphicsLayer {
+                                /*
+                                 * Lyrics still get a subtle
+                                 * arrival, but overscan slightly
+                                 * rather than becoming smaller
+                                 * than the square host.
+                                 */
                                 val scale =
-                                    .982f +
-                                        .018f *
+                                    1.006f -
+                                        .006f *
                                         lyricsFraction
 
                                 scaleX = scale
@@ -553,8 +571,7 @@ private fun ArtworkCarousel(
                 Modifier
                     .fillMaxSize()
                     .graphicsLayer {
-                        translationX =
-                            x
+                        translationX = x
                     }
                     .clickable(
                         interactionSource =
@@ -563,7 +580,8 @@ private fun ArtworkCarousel(
                             },
                         indication = null,
                         enabled = enabled,
-                        onClick = toggleLyrics
+                        onClick =
+                            toggleLyrics
                     )
         )
 
@@ -623,8 +641,7 @@ private fun Cover(
                         LocalXmoAccent.current,
                     fontFamily =
                         XmoFont.logo,
-                    fontSize =
-                        31.sp
+                    fontSize = 31.sp
                 )
             }
         }
