@@ -2,7 +2,6 @@ package com.xmo.music.ui.nowplaying
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
@@ -109,13 +108,6 @@ internal fun FollowLyrics(
             mutableLongStateOf(0L)
         }
 
-    /*
-     * Only real manual scrolling pauses follow mode.
-     *
-     * Automatic animateScrollBy also changes
-     * isScrollInProgress, so autoFollowing prevents it from
-     * incorrectly classifying its own animation as user input.
-     */
     LaunchedEffect(
         state.isScrollInProgress,
         autoFollowing
@@ -134,9 +126,7 @@ internal fun FollowLyrics(
             val token =
                 ++interactionToken
 
-            delay(
-                4_000L
-            )
+            delay(4_000L)
 
             if (
                 token == interactionToken &&
@@ -147,10 +137,6 @@ internal fun FollowLyrics(
         }
     }
 
-    /*
-     * Real measured boundary space means the first and final
-     * lyric can also physically reach the viewport center.
-     */
     val boundarySpace =
         with(density) {
             (
@@ -169,62 +155,120 @@ internal fun FollowLyrics(
                     viewportHeightPx =
                         it.height
                 }
-                /*
-                 * Force an offscreen layer because DstIn is used
-                 * below to mask the already-rendered lyrics.
-                 */
                 .graphicsLayer {
                     compositingStrategy =
                         CompositingStrategy.Offscreen
                 }
-                /*
-                 * Positional lyrics fade:
-                 *
-                 * top     -> faded
-                 * center  -> fully visible
-                 * bottom  -> faded
-                 *
-                 * This works for synced AND unsynced lyrics.
-                 * Unsynced lines are never hidden just because
-                 * they don't have an active timestamp.
-                 */
                 .drawWithContent {
                     drawContent()
+
+                    /*
+                     * Fullscreen gets a much broader edge fade.
+                     *
+                     * This gives the top/bottom the requested
+                     * soft, hazy disappearance without blurring
+                     * the centered active lyric itself.
+                     *
+                     * Small lyrics retain more usable visible
+                     * area while still getting softer edges.
+                     */
+                    val stops =
+                        if (fullscreen) {
+                            arrayOf(
+                                0.00f to
+                                    Color.Transparent,
+                                0.055f to
+                                    Color.White.copy(
+                                        alpha = .035f
+                                    ),
+                                0.12f to
+                                    Color.White.copy(
+                                        alpha = .10f
+                                    ),
+                                0.20f to
+                                    Color.White.copy(
+                                        alpha = .25f
+                                    ),
+                                0.30f to
+                                    Color.White.copy(
+                                        alpha = .54f
+                                    ),
+                                0.40f to
+                                    Color.White.copy(
+                                        alpha = .86f
+                                    ),
+                                0.46f to
+                                    Color.White,
+                                0.54f to
+                                    Color.White,
+                                0.60f to
+                                    Color.White.copy(
+                                        alpha = .86f
+                                    ),
+                                0.70f to
+                                    Color.White.copy(
+                                        alpha = .54f
+                                    ),
+                                0.80f to
+                                    Color.White.copy(
+                                        alpha = .25f
+                                    ),
+                                0.88f to
+                                    Color.White.copy(
+                                        alpha = .10f
+                                    ),
+                                0.945f to
+                                    Color.White.copy(
+                                        alpha = .035f
+                                    ),
+                                1.00f to
+                                    Color.Transparent
+                            )
+                        } else {
+                            arrayOf(
+                                0.00f to
+                                    Color.White.copy(
+                                        alpha = .025f
+                                    ),
+                                0.08f to
+                                    Color.White.copy(
+                                        alpha = .10f
+                                    ),
+                                0.18f to
+                                    Color.White.copy(
+                                        alpha = .30f
+                                    ),
+                                0.31f to
+                                    Color.White.copy(
+                                        alpha = .67f
+                                    ),
+                                0.43f to
+                                    Color.White,
+                                0.57f to
+                                    Color.White,
+                                0.69f to
+                                    Color.White.copy(
+                                        alpha = .67f
+                                    ),
+                                0.82f to
+                                    Color.White.copy(
+                                        alpha = .30f
+                                    ),
+                                0.92f to
+                                    Color.White.copy(
+                                        alpha = .10f
+                                    ),
+                                1.00f to
+                                    Color.White.copy(
+                                        alpha = .025f
+                                    )
+                            )
+                        }
 
                     drawRect(
                         brush =
                             Brush.verticalGradient(
-                                colorStops =
-                                    arrayOf(
-                                        0.00f to
-                                            Color.White.copy(
-                                                alpha = .08f
-                                            ),
-                                        0.10f to
-                                            Color.White.copy(
-                                                alpha = .20f
-                                            ),
-                                        0.25f to
-                                            Color.White.copy(
-                                                alpha = .58f
-                                            ),
-                                        0.42f to
-                                            Color.White,
-                                        0.58f to
-                                            Color.White,
-                                        0.75f to
-                                            Color.White.copy(
-                                                alpha = .58f
-                                            ),
-                                        0.90f to
-                                            Color.White.copy(
-                                                alpha = .20f
-                                            ),
-                                        1.00f to
-                                            Color.White.copy(
-                                                alpha = .08f
-                                            )
-                                    )
+                                colorStops = stops
                             ),
                         blendMode =
                             BlendMode.DstIn
@@ -262,10 +306,6 @@ internal fun FollowLyrics(
                 lyrics.synced &&
                     index == active
 
-            /*
-             * Unsynced lyrics deliberately use a stronger normal
-             * color. There is no invented active line.
-             */
             val inactiveAlpha =
                 if (!lyrics.synced) {
                     .82f
@@ -377,10 +417,6 @@ internal fun FollowLyrics(
         }
     }
 
-    /*
-     * Unsynced lyrics remain manually browsable and visible.
-     * No fake current line and no auto-follow is invented.
-     */
     LaunchedEffect(
         active,
         userBrowsing,
@@ -401,9 +437,6 @@ internal fun FollowLyrics(
         try {
             withFrameNanos { }
 
-            /*
-             * +1 because index 0 is the top boundary Spacer.
-             */
             centerLyricExactly(
                 state = state,
                 lazyIndex = active + 1
@@ -584,8 +617,7 @@ private suspend fun centerLyricExactly(
             value = first,
             animationSpec =
                 tween(
-                    durationMillis =
-                        390
+                    durationMillis = 390
                 )
         )
     }
