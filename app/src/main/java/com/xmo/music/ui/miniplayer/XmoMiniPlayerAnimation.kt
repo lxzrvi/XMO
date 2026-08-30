@@ -23,6 +23,7 @@ internal object XmoMiniPlayerAnimation {
 
     const val axisThresholdPx = 9f
     const val horizontalThresholdPx = 48f
+
     const val openThresholdPx = -46f
     const val closeThresholdPx = 44f
 
@@ -40,8 +41,10 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             free +
-                (distance - free) * .07f
-            ) * sign(value)
+                (distance - free) *
+                .07f
+            ) *
+            sign(value)
     }
 
     fun verticalResistance(
@@ -63,8 +66,10 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             free +
-                (distance - free) * .075f
-            ) * sign(value)
+                (distance - free) *
+                .075f
+            ) *
+            sign(value)
     }
 
     private val playerTransitionSpec:
@@ -76,57 +81,53 @@ internal object XmoMiniPlayerAnimation {
             )
 
     val riseSpec: AnimationSpec<Float>
-        get() = playerTransitionSpec
+        get() =
+            playerTransitionSpec
 
     val openExitSpec: AnimationSpec<Float>
-        get() = playerTransitionSpec
+        get() =
+            playerTransitionSpec
 
     val closeExitSpec: AnimationSpec<Float>
-        get() = playerTransitionSpec
+        get() =
+            playerTransitionSpec
 
-    val horizontalReturnSpec: AnimationSpec<Float>
+    val horizontalReturnSpec:
+        AnimationSpec<Float>
         get() =
             spring(
                 dampingRatio = .80f,
                 stiffness = 470f
             )
 
-    val verticalReturnSpec: AnimationSpec<Float>
+    val verticalReturnSpec:
+        AnimationSpec<Float>
         get() =
             spring(
                 dampingRatio = .84f,
                 stiffness = 440f
             )
 
-    /*
-     * Short content motion is deliberate:
-     * rapid swipes can retarget this without building a slow
-     * visual backlog.
-     */
     fun metadataChange(
         direction: Int
     ): ContentTransform {
         val normalized =
-            direction.coerceIn(-1, 1)
+            direction.coerceIn(
+                -1,
+                1
+            )
 
         if (normalized == 0) {
             return fadeIn(
-                tween(130)
+                tween(120)
             )
                 .togetherWith(
                     fadeOut(
-                        tween(110)
+                        tween(100)
                     )
                 )
         }
 
-        /*
-         * +1 = NEXT:
-         * old goes down, new comes from top.
-         *
-         * -1 = PREVIOUS:
-         * old goes up, new comes from bottom.
-         */
         val enter =
             if (normalized > 0) {
                 { height: Int ->
@@ -151,13 +152,14 @@ internal object XmoMiniPlayerAnimation {
 
         return (
             fadeIn(
-                tween(125)
+                tween(115)
             ) +
                 slideInVertically(
-                    initialOffsetY = enter,
+                    initialOffsetY =
+                        enter,
                     animationSpec =
                         tween(
-                            durationMillis = 165,
+                            durationMillis = 155,
                             easing =
                                 FastOutSlowInEasing
                         )
@@ -165,13 +167,14 @@ internal object XmoMiniPlayerAnimation {
             )
             .togetherWith(
                 fadeOut(
-                    tween(105)
+                    tween(95)
                 ) +
                     slideOutVertically(
-                        targetOffsetY = exit,
+                        targetOffsetY =
+                            exit,
                         animationSpec =
                             tween(
-                                durationMillis = 145,
+                                durationMillis = 140,
                                 easing =
                                     FastOutSlowInEasing
                             )
@@ -180,17 +183,16 @@ internal object XmoMiniPlayerAnimation {
     }
 
     /*
-     * Artwork never moves position.
-     * Only old/new cover alpha changes.
+     * Artwork remains physically fixed.
      */
     fun artworkChange():
         ContentTransform =
         fadeIn(
-            tween(145)
+            tween(135)
         )
             .togetherWith(
                 fadeOut(
-                    tween(120)
+                    tween(110)
                 )
             )
 }
