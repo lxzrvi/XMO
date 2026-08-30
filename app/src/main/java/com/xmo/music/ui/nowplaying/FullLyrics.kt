@@ -3,7 +3,6 @@ package com.xmo.music.ui.nowplaying
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -82,8 +81,7 @@ internal fun FullLyrics(
                 foregroundTarget,
             animationSpec =
                 tween(
-                    durationMillis =
-                        460
+                    durationMillis = 460
                 ),
             label =
                 "fullLyricsForeground"
@@ -115,32 +113,6 @@ internal fun FullLyrics(
                 )
         )
 
-    /*
-     * This glass sits behind only the top metadata/seek section.
-     *
-     * Lyrics can still move behind it, but become difficult to
-     * read there instead of visibly fighting with the title,
-     * artwork and controls.
-     */
-    val topGlass =
-        when (theme) {
-            XmoTheme.Light ->
-                Color.White.copy(
-                    alpha = .72f
-                )
-
-            XmoTheme.Dark ->
-                Color(0xFF15171B)
-                    .copy(
-                        alpha = .68f
-                    )
-
-            XmoTheme.Amoled ->
-                Color.Black.copy(
-                    alpha = .74f
-                )
-        }
-
     Box(
         modifier =
             Modifier.fillMaxSize()
@@ -159,8 +131,9 @@ internal fun FullLyrics(
                     .navigationBarsPadding()
         ) {
             /*
-             * Lyrics still own the complete safe-screen viewport.
-             * Top UI is overlay-only and does not shift center.
+             * Lyrics continue to own the entire safe-screen
+             * viewport. Metadata and controls are overlaid and
+             * therefore do not move the lyric center.
              */
             FollowLyrics(
                 lyrics = lyrics,
@@ -175,7 +148,11 @@ internal fun FullLyrics(
             )
 
             /*
-             * Translucent top readability layer.
+             * Top metadata / transport / seek overlay.
+             *
+             * There is intentionally NO glass/background behind
+             * this section. Artwork-derived PlayerBackground is
+             * directly visible through it.
              */
             Column(
                 modifier =
@@ -184,9 +161,6 @@ internal fun FullLyrics(
                             Alignment.TopCenter
                         )
                         .fillMaxWidth()
-                        .background(
-                            topGlass
-                        )
                         .padding(
                             bottom = 7.dp
                         )
@@ -231,10 +205,12 @@ internal fun FullLyrics(
                                 title.ifBlank {
                                     "Unknown song"
                                 },
-                            color = foreground,
+                            color =
+                                foreground,
                             fontFamily =
                                 XmoFont.bold,
-                            fontSize = 14.sp,
+                            fontSize =
+                                14.sp,
                             maxLines = 1,
                             overflow =
                                 TextOverflow.Ellipsis
@@ -251,7 +227,8 @@ internal fun FullLyrics(
                                 ),
                             fontFamily =
                                 XmoFont.medium,
-                            fontSize = 10.sp,
+                            fontSize =
+                                10.sp,
                             maxLines = 1,
                             overflow =
                                 TextOverflow.Ellipsis
@@ -291,14 +268,18 @@ internal fun FullLyrics(
                             )
                 ) {
                     RoundedSeekBar(
-                        position = position,
-                        duration = duration,
-                        active = accent,
+                        position =
+                            position,
+                        duration =
+                            duration,
+                        active =
+                            accent,
                         inactive =
                             foreground.copy(
                                 alpha = .25f
                             ),
-                        seekTo = seekTo
+                        seekTo =
+                            seekTo
                     )
 
                     Row(
@@ -318,7 +299,8 @@ internal fun FullLyrics(
                                 ),
                             fontFamily =
                                 XmoFont.medium,
-                            fontSize = 10.sp
+                            fontSize =
+                                10.sp
                         )
 
                         Text(
@@ -332,7 +314,8 @@ internal fun FullLyrics(
                                 ),
                             fontFamily =
                                 XmoFont.medium,
-                            fontSize = 10.sp
+                            fontSize =
+                                10.sp
                         )
                     }
                 }
@@ -441,7 +424,8 @@ private fun FullLyricsControls(
                     Icons.Rounded.Close,
                 contentDescription =
                     "Close fullscreen lyrics",
-                tint = foreground,
+                tint =
+                    foreground,
                 modifier =
                     Modifier.size(
                         21.dp
