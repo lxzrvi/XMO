@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -27,10 +28,12 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
 import com.xmo.music.XmoTheme
+import com.xmo.music.data.Song
 import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.homeColors
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.max
@@ -39,21 +42,32 @@ import kotlin.math.max
 fun XmoMiniPlayer(
     state: PlaybackState,
     theme: XmoTheme,
+    queue: List<Song>,
     riseKey: Int,
-    liked: Boolean,
+    likedSongIds: Set<Long>,
     openPlayer: () -> Unit,
     closePlayer: () -> Unit,
     togglePlay: () -> Unit,
-    toggleLike: () -> Unit,
-    previous: () -> Unit,
-    next: () -> Unit
+    toggleLike: (Long) -> Unit,
+    playQueueIndex: (Int) -> Unit
 ) {
     if (
-        state.currentSongId ==
-        null
+        state.currentSongId == null ||
+        queue.isEmpty()
     ) {
         return
     }
+
+    val realIndex =
+        state.currentIndex
+            .takeIf {
+                it in queue.indices
+            }
+            ?: queue.indexOfFirst {
+                it.id ==
+                    state.currentSongId
+            }
+                .coerceAtLeast(0)
 
     val colors =
         homeColors(theme)
@@ -81,31 +95,100 @@ fun XmoMiniPlayer(
         }
 
     /*
+     * Preview index is independent from Media3 until debounce
+     * commits the final destination.
+     */
+    var previewIndex by
+        remember(
+            state.currentSongId,
+            queue
+        ) {
+            mutableIntStateOf(
+                realIndex
+            )
+        }
+
+    var transitionDirection by
+        remember {
+            mutableIntStateOf(0)
+        }
+
+    var previewRevision by
+        remember {
+            mutableIntStateOf(0)
+        }
+
+    /*
+     * If Media3 confirms a committed preview, adopt its real
+     * index without creating another content transition.
+     */
+    LaunchedEffect(
+        state.currentSongId,
+        realIndex
+    ) {
+        if (
+            previewIndex ==
+            realIndex
+        ) {
+            return@LaunchedEffect
+        }
+
+        /*
+         * Do not overwrite a pending preview. Its revision effect
+         * owns the upcoming commit.
+         */
+        if (previewRevision == 0) {
+            previewIndex =
+                realIndex
+
+            transitionDirection = 0
+        }
+    }
+
+    /*
+     * One playback command after the user stops rapid swiping.
+     */
+    LaunchedEffect(
+        previewRevision
+    ) {
+        if (previewRevision <= 0) {
+            return@LaunchedEffect
+        }
+
+        val revision =
+            previewRevision
+
+        delay(
+            XmoMiniPlayerAnimation
+                .previewCommitDelayMs
+        )
+
+        if (
+            revision !=
+            previewRevision
+        ) {
+            return@LaunchedEffect
+        }
+
+        val target =
+            previewIndex
+
+        if (
+            target in queue.indices &&
+            target != realIndex
+        ) {
+            playQueueIndex(
+                target
+            )
+        }
+
+        previewRevision = 0
+    }
+
+    /*
      * =========================================================
-     * EQUAL VERTICAL RHYTHM
+     * POSITION
      * =========================================================
-     *
-     * NavBar:
-     *
-     * 96dp host
-     * 64dp visible bar centered inside host
-     * host bottom = 24dp
-     *
-     * Visible NavBar bottom:
-     * 24 + (96 - 64) / 2
-     * = 40dp
-     *
-     * Therefore:
-     *
-     * bottom
-     * -> 40dp gap
-     * -> NavBar 64dp
-     * -> 40dp gap
-     * -> MiniPlayer
-     *
-     * MiniPlayer visible bottom =
-     * 40 + 64 + 40
-     * = 144dp
      */
 
     val navigationBottomPx =
@@ -116,14 +199,11 @@ fun XmoMiniPlayer(
         WindowInsets.ime
             .getBottom(density)
 
-    val normalClearancePx =
-        with(density) {
-            144.dp.toPx()
-        }
-
     val normalBottomPx =
         navigationBottomPx +
-            normalClearancePx
+            with(density) {
+                144.dp.toPx()
+            }
 
     val keyboardBottomPx =
         imeBottomPx +
@@ -166,8 +246,7 @@ fun XmoMiniPlayer(
 
     LaunchedEffect(riseKey) {
         if (
-            entranceY.value !=
-            0f
+            entranceY.value != 0f
         ) {
             entranceY.animateTo(
                 targetValue = 0f,
@@ -210,14 +289,11 @@ fun XmoMiniPlayer(
             mutableStateOf(false)
         }
 
-    val cardHeightPx =
-        with(density) {
-            60.dp.toPx()
-        }
-
     val hiddenThreshold =
         resolvedBottomPx +
-            cardHeightPx
+            with(density) {
+                60.dp.toPx()
+            }
 
     val hiddenTarget =
         hiddenThreshold +
@@ -234,6 +310,28 @@ fun XmoMiniPlayer(
         }
     }
 
+    /*
+     * Commit currently previewed song immediately when opening.
+     *
+     * No 320ms wait should occur after the user explicitly asks
+     * for Now Playing.
+     */
+    fun commitPreviewNow() {
+        val target =
+            previewIndex
+
+        if (
+            target in queue.indices &&
+            target != realIndex
+        ) {
+            playQueueIndex(
+                target
+            )
+        }
+
+        previewRevision = 0
+    }
+
     suspend fun openOrdered() {
         if (
             opening ||
@@ -243,6 +341,8 @@ fun XmoMiniPlayer(
         }
 
         opening = true
+
+        commitPreviewNow()
 
         keyboardController?.hide()
 
@@ -275,6 +375,8 @@ fun XmoMiniPlayer(
 
         closing = true
 
+        previewRevision = 0
+
         x.snapTo(0f)
 
         coroutineScope {
@@ -293,6 +395,12 @@ fun XmoMiniPlayer(
             closePlayer()
         }
     }
+
+    val visualSong =
+        queue.getOrNull(
+            previewIndex
+        )
+            ?: return
 
     Box(
         modifier =
@@ -318,7 +426,8 @@ fun XmoMiniPlayer(
                     .pointerInput(
                         state.currentSongId,
                         opening,
-                        closing
+                        closing,
+                        queue
                     ) {
                         if (
                             opening ||
@@ -421,29 +530,60 @@ fun XmoMiniPlayer(
                                         XmoMiniAxis.Horizontal -> {
                                             y.snapTo(0f)
 
-                                            val goPrevious =
+                                            /*
+                                             * RIGHT -> LEFT = NEXT
+                                             */
+                                            val goNext =
                                                 finalX <
                                                     -XmoMiniPlayerAnimation
                                                         .horizontalThresholdPx
 
-                                            val goNext =
+                                            /*
+                                             * LEFT -> RIGHT = PREVIOUS
+                                             */
+                                            val goPrevious =
                                                 finalX >
                                                     XmoMiniPlayerAnimation
                                                         .horizontalThresholdPx
 
-                                            x.animateTo(
-                                                targetValue = 0f,
-                                                animationSpec =
-                                                    XmoMiniPlayerAnimation
-                                                        .horizontalReturnSpec
-                                            )
-
                                             when {
-                                                goPrevious ->
-                                                    previous()
+                                                goNext &&
+                                                    previewIndex <
+                                                    queue.lastIndex -> {
 
-                                                goNext ->
-                                                    next()
+                                                    transitionDirection =
+                                                        1
+
+                                                    previewIndex++
+
+                                                    previewRevision++
+                                                }
+
+                                                goPrevious &&
+                                                    previewIndex >
+                                                    0 -> {
+
+                                                    transitionDirection =
+                                                        -1
+
+                                                    previewIndex--
+
+                                                    previewRevision++
+                                                }
+                                            }
+
+                                            /*
+                                             * Visual card itself always
+                                             * returns immediately. Playback
+                                             * is not waiting on this spring.
+                                             */
+                                            launch {
+                                                x.animateTo(
+                                                    targetValue = 0f,
+                                                    animationSpec =
+                                                        XmoMiniPlayerAnimation
+                                                            .horizontalReturnSpec
+                                                )
                                             }
 
                                             moved = false
@@ -514,17 +654,45 @@ fun XmoMiniPlayer(
                     }
         ) {
             XmoMiniPlayerCard(
-                state = state,
+                song =
+                    visualSong,
+                isPlaying =
+                    state.isPlaying,
+                position =
+                    if (
+                        visualSong.id ==
+                        state.currentSongId
+                    ) {
+                        state.position
+                    } else {
+                        0L
+                    },
+                duration =
+                    if (
+                        visualSong.id ==
+                        state.currentSongId
+                    ) {
+                        state.duration
+                    } else {
+                        visualSong.duration
+                    },
                 theme = theme,
                 colors = colors,
                 accent = accent,
-                liked = liked,
+                liked =
+                    visualSong.id in
+                        likedSongIds,
+                transitionDirection =
+                    transitionDirection,
                 moved = moved,
                 opening = opening,
                 togglePlay =
                     togglePlay,
-                toggleLike =
-                    toggleLike,
+                toggleLike = {
+                    toggleLike(
+                        visualSong.id
+                    )
+                },
                 open = {
                     if (!moved) {
                         scope.launch {
