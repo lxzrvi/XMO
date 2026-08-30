@@ -1,8 +1,6 @@
 package com.xmo.music.ui.nowplaying
 
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -49,22 +47,15 @@ internal fun SongDetailsBox(
 
     val reveal =
         remember {
-            Animatable(
-                0f
-            )
+            Animatable(0f)
         }
 
     LaunchedEffect(Unit) {
         reveal.animateTo(
-            targetValue =
-                1f,
+            targetValue = 1f,
             animationSpec =
-                tween(
-                    durationMillis =
-                        250,
-                    easing =
-                        FastOutSlowInEasing
-                )
+                XmoPlayerAnimation
+                    .overlayRevealSpec
         )
     }
 
@@ -77,15 +68,10 @@ internal fun SongDetailsBox(
 
     suspend fun closeAnimated() {
         reveal.animateTo(
-            targetValue =
-                0f,
+            targetValue = 0f,
             animationSpec =
-                tween(
-                    durationMillis =
-                        180,
-                    easing =
-                        FastOutSlowInEasing
-                )
+                XmoPlayerAnimation
+                    .overlayHideSpec
         )
 
         close()
@@ -97,9 +83,6 @@ internal fun SongDetailsBox(
         contentAlignment =
             Alignment.Center
     ) {
-        /*
-         * Animated backdrop.
-         */
         Box(
             modifier =
                 Modifier
@@ -107,7 +90,8 @@ internal fun SongDetailsBox(
                     .background(
                         Color.Black.copy(
                             alpha =
-                                .28f *
+                                XmoPlayerAnimation
+                                    .overlayBackdropAlpha *
                                     progress
                         )
                     )
@@ -122,31 +106,17 @@ internal fun SongDetailsBox(
             modifier =
                 Modifier
                     .padding(
-                        horizontal =
-                            24.dp
+                        horizontal = 24.dp
                     )
                     .fillMaxWidth()
                     .graphicsLayer {
-                        alpha =
-                            progress
-
-                        val scale =
-                            .95f +
-                                .05f *
+                        with(
+                            XmoPlayerAnimation
+                        ) {
+                            centerOverlay(
                                 progress
-
-                        scaleX =
-                            scale
-
-                        scaleY =
-                            scale
-
-                        translationY =
-                            (
-                                1f -
-                                    progress
-                                ) *
-                                22f
+                            )
+                        }
                     }
                     .clip(
                         RoundedCornerShape(
@@ -156,10 +126,6 @@ internal fun SongDetailsBox(
                     .background(
                         colors.surface
                     )
-                    /*
-                     * Consume card touches so backdrop does not
-                     * close when interacting with the details.
-                     */
                     .simpleTap {}
                     .padding(
                         17.dp
@@ -172,8 +138,7 @@ internal fun SongDetailsBox(
                     Alignment.CenterVertically
             ) {
                 Text(
-                    text =
-                        "Song Details",
+                    text = "Song Details",
                     color =
                         colors.text,
                     fontFamily =
@@ -181,14 +146,11 @@ internal fun SongDetailsBox(
                     fontSize =
                         17.sp,
                     modifier =
-                        Modifier.weight(
-                            1f
-                        )
+                        Modifier.weight(1f)
                 )
 
                 PremiumCircle(
-                    size =
-                        37.dp,
+                    size = 37.dp,
                     background =
                         colors.button,
                     onClick = {
@@ -205,185 +167,132 @@ internal fun SongDetailsBox(
                         tint =
                             colors.text,
                         modifier =
-                            Modifier.size(
-                                20.dp
-                            )
+                            Modifier.size(20.dp)
                     )
                 }
             }
 
             Spacer(
                 modifier =
-                    Modifier.height(
-                        13.dp
-                    )
+                    Modifier.height(13.dp)
             )
 
             song?.let { current ->
                 DetailValue(
-                    label =
-                        "Title",
-                    value =
-                        current.title,
-                    colors =
-                        colors
+                    label = "Title",
+                    value = current.title,
+                    colors = colors
                 )
 
                 DetailValue(
-                    label =
-                        "Artist",
-                    value =
-                        current.artist,
-                    colors =
-                        colors
+                    label = "Artist",
+                    value = current.artist,
+                    colors = colors
                 )
 
                 DetailValue(
-                    label =
-                        "Album",
-                    value =
-                        album,
-                    colors =
-                        colors
+                    label = "Album",
+                    value = album,
+                    colors = colors
                 )
 
-                current.metadata
-                    ?.let { meta ->
-
-                        meta.genre?.let {
-                            DetailValue(
-                                label =
-                                    "Genre",
-                                value =
-                                    it,
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.year?.let {
-                            DetailValue(
-                                label =
-                                    "Year",
-                                value =
-                                    it.toString(),
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.trackNumber?.let {
-                            DetailValue(
-                                label =
-                                    "Track",
-                                value =
-                                    it.toString(),
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.discNumber?.let {
-                            DetailValue(
-                                label =
-                                    "Disc",
-                                value =
-                                    it.toString(),
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.composer?.let {
-                            DetailValue(
-                                label =
-                                    "Composer",
-                                value =
-                                    it,
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.writer?.let {
-                            DetailValue(
-                                label =
-                                    "Writer",
-                                value =
-                                    it,
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.bitrate?.let {
-                            DetailValue(
-                                label =
-                                    "Bitrate",
-                                value =
-                                    "${it / 1000} kbps",
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.sampleRate?.let {
-                            DetailValue(
-                                label =
-                                    "Sample rate",
-                                value =
-                                    "$it Hz",
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.channelCount?.let {
-                            DetailValue(
-                                label =
-                                    "Channels",
-                                value =
-                                    it.toString(),
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.mimeType?.let {
-                            DetailValue(
-                                label =
-                                    "Type",
-                                value =
-                                    it,
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.fileName?.let {
-                            DetailValue(
-                                label =
-                                    "File",
-                                value =
-                                    it,
-                                colors =
-                                    colors
-                            )
-                        }
-
-                        meta.sizeBytes?.let {
-                            DetailValue(
-                                label =
-                                    "Size",
-                                value =
-                                    formatBytes(
-                                        it
-                                    ),
-                                colors =
-                                    colors
-                            )
-                        }
+                current.metadata?.let { meta ->
+                    meta.genre?.let {
+                        DetailValue(
+                            "Genre",
+                            it,
+                            colors
+                        )
                     }
+
+                    meta.year?.let {
+                        DetailValue(
+                            "Year",
+                            it.toString(),
+                            colors
+                        )
+                    }
+
+                    meta.trackNumber?.let {
+                        DetailValue(
+                            "Track",
+                            it.toString(),
+                            colors
+                        )
+                    }
+
+                    meta.discNumber?.let {
+                        DetailValue(
+                            "Disc",
+                            it.toString(),
+                            colors
+                        )
+                    }
+
+                    meta.composer?.let {
+                        DetailValue(
+                            "Composer",
+                            it,
+                            colors
+                        )
+                    }
+
+                    meta.writer?.let {
+                        DetailValue(
+                            "Writer",
+                            it,
+                            colors
+                        )
+                    }
+
+                    meta.bitrate?.let {
+                        DetailValue(
+                            "Bitrate",
+                            "${it / 1000} kbps",
+                            colors
+                        )
+                    }
+
+                    meta.sampleRate?.let {
+                        DetailValue(
+                            "Sample rate",
+                            "$it Hz",
+                            colors
+                        )
+                    }
+
+                    meta.channelCount?.let {
+                        DetailValue(
+                            "Channels",
+                            it.toString(),
+                            colors
+                        )
+                    }
+
+                    meta.mimeType?.let {
+                        DetailValue(
+                            "Type",
+                            it,
+                            colors
+                        )
+                    }
+
+                    meta.fileName?.let {
+                        DetailValue(
+                            "File",
+                            it,
+                            colors
+                        )
+                    }
+
+                    meta.sizeBytes?.let {
+                        DetailValue(
+                            "Size",
+                            formatBytes(it),
+                            colors
+                        )
+                    }
+                }
             }
         }
     }
@@ -395,9 +304,7 @@ private fun DetailValue(
     value: String,
     colors: HomeColors
 ) {
-    if (
-        value.isBlank()
-    ) {
+    if (value.isBlank()) {
         return
     }
 
@@ -406,44 +313,34 @@ private fun DetailValue(
             Modifier
                 .fillMaxWidth()
                 .padding(
-                    vertical =
-                        5.dp
+                    vertical = 5.dp
                 )
     ) {
         Text(
-            text =
-                label,
+            text = label,
             color =
                 colors.text,
             fontFamily =
                 XmoFont.bold,
-            fontSize =
-                11.sp,
+            fontSize = 11.sp,
             modifier =
-                Modifier.width(
-                    92.dp
-                )
+                Modifier.width(92.dp)
         )
 
         Text(
-            text =
-                value,
+            text = value,
             color =
                 colors.sub,
             fontFamily =
                 XmoFont.normal,
-            fontSize =
-                11.sp,
-            maxLines =
-                2,
+            fontSize = 11.sp,
+            maxLines = 2,
             textAlign =
                 TextAlign.End,
             overflow =
                 TextOverflow.Ellipsis,
             modifier =
-                Modifier.weight(
-                    1f
-                )
+                Modifier.weight(1f)
         )
     }
 }
