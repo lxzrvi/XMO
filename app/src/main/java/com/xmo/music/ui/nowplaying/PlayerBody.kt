@@ -42,46 +42,74 @@ internal fun PlayerBody(
     Column(
         Modifier.fillMaxWidth()
     ) {
+        /*
+         * Active track remains XMO accent.
+         *
+         * Inactive gets a minimum visible component in addition to
+         * the theme panel border so it cannot disappear through
+         * the translucent artwork background.
+         */
         RoundedSeekBar(
-            position = position,
-            duration = duration,
-            active = accent,
-            inactive = border,
-            seekTo = seekTo
+            position =
+                position,
+            duration =
+                duration,
+            active =
+                accent,
+            inactive =
+                mixColor(
+                    from =
+                        border,
+                    to =
+                        controlForeground,
+                    fraction =
+                        .22f
+                ),
+            seekTo =
+                seekTo
         )
 
         Row(
-            Modifier
-                .fillMaxWidth()
-                .padding(
-                    horizontal = 4.dp
-                ),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(
+                        horizontal = 4.dp
+                    ),
             horizontalArrangement =
                 Arrangement.SpaceBetween
         ) {
             Text(
                 text =
-                    playerTime(position),
+                    playerTime(
+                        position
+                    ),
                 color =
                     colors.sub,
                 fontFamily =
                     XmoFont.medium,
-                fontSize = 10.sp
+                fontSize =
+                    10.sp
             )
 
             Text(
                 text =
-                    playerTime(duration),
+                    playerTime(
+                        duration
+                    ),
                 color =
                     colors.sub,
                 fontFamily =
                     XmoFont.medium,
-                fontSize = 10.sp
+                fontSize =
+                    10.sp
             )
         }
 
         Spacer(
-            Modifier.height(15.dp)
+            Modifier.height(
+                12.dp
+            )
         )
 
         PlayerControls(
@@ -114,27 +142,32 @@ internal fun PlayerBody(
         )
 
         /*
-         * More room below transport controls, while footer itself
-         * sits lower in the panel.
+         * Reduced from the old large gap so the footer remains
+         * inside the visible panel on shorter screens.
          */
         Spacer(
-            Modifier.height(28.dp)
+            Modifier.height(
+                16.dp
+            )
         )
 
         Column(
-            Modifier.fillMaxWidth(),
+            modifier =
+                Modifier.fillMaxWidth(),
             horizontalAlignment =
                 Alignment.CenterHorizontally
         ) {
             Text(
-                text = "XMO",
+                text =
+                    "XMO",
                 color =
                     colors.text.copy(
-                        alpha = .62f
+                        alpha = .68f
                     ),
                 fontFamily =
                     XmoFont.logo,
-                fontSize = 11.sp
+                fontSize =
+                    11.sp
             )
 
             Text(
@@ -142,18 +175,20 @@ internal fun PlayerBody(
                     "lxzrvi • © 2026",
                 color =
                     colors.sub.copy(
-                        alpha = .48f
+                        alpha = .52f
                     ),
                 fontFamily =
                     XmoFont.normal,
-                fontSize = 6.sp
+                fontSize =
+                    6.sp
             )
         }
 
         Spacer(
-            Modifier
-                .navigationBarsPadding()
-                .height(2.dp)
+            modifier =
+                Modifier
+                    .height(3.dp)
+                    .navigationBarsPadding()
         )
     }
 }
