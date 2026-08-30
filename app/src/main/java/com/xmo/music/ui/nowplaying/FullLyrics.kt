@@ -3,7 +3,7 @@ package com.xmo.music.ui.nowplaying
 import android.net.Uri
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,15 +16,16 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -55,19 +56,13 @@ internal fun FullLyrics(
     previous: () -> Unit,
     next: () -> Unit,
     seekTo: (Long) -> Unit,
-    close: () -> Unit
+    close: () -> Unit,
+    pickLyrics: (() -> Unit)? = null
 ) {
     val foregroundTarget =
         when (theme) {
             XmoTheme.Light ->
-                if (
-                    dominant.luminance() >
-                    .74f
-                ) {
-                    Color(0xFF15161A)
-                } else {
-                    Color(0xFF111216)
-                }
+                Color(0xFF15161A)
 
             XmoTheme.Dark,
             XmoTheme.Amoled ->
@@ -104,7 +99,7 @@ internal fun FullLyrics(
                 foreground,
             sub =
                 foreground.copy(
-                    alpha = .56f
+                    alpha = .58f
                 ),
             button =
                 foreground.copy(
@@ -120,26 +115,42 @@ internal fun FullLyrics(
                 )
         )
 
+    /*
+     * This glass sits behind only the top metadata/seek section.
+     *
+     * Lyrics can still move behind it, but become difficult to
+     * read there instead of visibly fighting with the title,
+     * artwork and controls.
+     */
+    val topGlass =
+        when (theme) {
+            XmoTheme.Light ->
+                Color.White.copy(
+                    alpha = .72f
+                )
+
+            XmoTheme.Dark ->
+                Color(0xFF15171B)
+                    .copy(
+                        alpha = .68f
+                    )
+
+            XmoTheme.Amoled ->
+                Color.Black.copy(
+                    alpha = .74f
+                )
+        }
+
     Box(
         modifier =
             Modifier.fillMaxSize()
     ) {
         PlayerBackground(
-            dominant =
-                dominant,
-            deep =
-                deep,
-            theme =
-                theme
+            dominant = dominant,
+            deep = deep,
+            theme = theme
         )
 
-        /*
-         * FollowLyrics gets the whole safe-area viewport.
-         *
-         * Header and seek controls are overlays instead of taking
-         * vertical layout space. The lyric viewport center is
-         * therefore the physical center of the safe screen.
-         */
         Box(
             modifier =
                 Modifier
@@ -147,21 +158,25 @@ internal fun FullLyrics(
                     .statusBarsPadding()
                     .navigationBarsPadding()
         ) {
+            /*
+             * Lyrics still own the complete safe-screen viewport.
+             * Top UI is overlay-only and does not shift center.
+             */
             FollowLyrics(
-                lyrics =
-                    lyrics,
-                position =
-                    position,
-                colors =
-                    lyricColors,
-                accent =
-                    accent,
-                fullscreen =
-                    true,
+                lyrics = lyrics,
+                position = position,
+                colors = lyricColors,
+                accent = accent,
+                fullscreen = true,
                 modifier =
-                    Modifier.fillMaxSize()
+                    Modifier.fillMaxSize(),
+                pickLyrics =
+                    pickLyrics
             )
 
+            /*
+             * Translucent top readability layer.
+             */
             Column(
                 modifier =
                     Modifier
@@ -169,14 +184,18 @@ internal fun FullLyrics(
                             Alignment.TopCenter
                         )
                         .fillMaxWidth()
+                        .background(
+                            topGlass
+                        )
+                        .padding(
+                            bottom = 7.dp
+                        )
             ) {
                 Row(
                     modifier =
                         Modifier
                             .fillMaxWidth()
-                            .height(
-                                70.dp
-                            )
+                            .height(70.dp)
                             .padding(
                                 start = 15.dp,
                                 end = 12.dp
@@ -185,15 +204,11 @@ internal fun FullLyrics(
                         Alignment.CenterVertically
                 ) {
                     AsyncImage(
-                        model =
-                            artwork,
-                        contentDescription =
-                            null,
+                        model = artwork,
+                        contentDescription = null,
                         modifier =
                             Modifier
-                                .size(
-                                    42.dp
-                                )
+                                .size(42.dp)
                                 .clip(
                                     RoundedCornerShape(
                                         11.dp
@@ -206,9 +221,7 @@ internal fun FullLyrics(
                     Column(
                         modifier =
                             Modifier
-                                .weight(
-                                    1f
-                                )
+                                .weight(1f)
                                 .padding(
                                     start = 10.dp
                                 )
@@ -218,12 +231,10 @@ internal fun FullLyrics(
                                 title.ifBlank {
                                     "Unknown song"
                                 },
-                            color =
-                                foreground,
+                            color = foreground,
                             fontFamily =
                                 XmoFont.bold,
-                            fontSize =
-                                14.sp,
+                            fontSize = 14.sp,
                             maxLines = 1,
                             overflow =
                                 TextOverflow.Ellipsis
@@ -240,8 +251,7 @@ internal fun FullLyrics(
                                 ),
                             fontFamily =
                                 XmoFont.medium,
-                            fontSize =
-                                10.sp,
+                            fontSize = 10.sp,
                             maxLines = 1,
                             overflow =
                                 TextOverflow.Ellipsis
@@ -277,23 +287,18 @@ internal fun FullLyrics(
                         Modifier
                             .fillMaxWidth()
                             .padding(
-                                horizontal =
-                                    17.dp
+                                horizontal = 17.dp
                             )
                 ) {
                     RoundedSeekBar(
-                        position =
-                            position,
-                        duration =
-                            duration,
-                        active =
-                            accent,
+                        position = position,
+                        duration = duration,
+                        active = accent,
                         inactive =
                             foreground.copy(
-                                alpha = .20f
+                                alpha = .25f
                             ),
-                        seekTo =
-                            seekTo
+                        seekTo = seekTo
                     )
 
                     Row(
@@ -309,12 +314,11 @@ internal fun FullLyrics(
                                 ),
                             color =
                                 foreground.copy(
-                                    alpha = .58f
+                                    alpha = .64f
                                 ),
                             fontFamily =
                                 XmoFont.medium,
-                            fontSize =
-                                10.sp
+                            fontSize = 10.sp
                         )
 
                         Text(
@@ -324,12 +328,11 @@ internal fun FullLyrics(
                                 ),
                             color =
                                 foreground.copy(
-                                    alpha = .58f
+                                    alpha = .64f
                                 ),
                             fontFamily =
                                 XmoFont.medium,
-                            fontSize =
-                                10.sp
+                            fontSize = 10.sp
                         )
                     }
                 }
@@ -359,9 +362,7 @@ private fun FullLyricsControls(
             onClick =
                 togglePlay
         ) {
-            if (
-                isPlaying
-            ) {
+            if (isPlaying) {
                 XmoPauseIcon(
                     color =
                         foreground,
@@ -393,9 +394,7 @@ private fun FullLyricsControls(
                 color =
                     foreground.copy(
                         alpha =
-                            if (
-                                canPrevious
-                            ) {
+                            if (canPrevious) {
                                 1f
                             } else {
                                 .26f
@@ -419,9 +418,7 @@ private fun FullLyricsControls(
                 color =
                     foreground.copy(
                         alpha =
-                            if (
-                                canNext
-                            ) {
+                            if (canNext) {
                                 1f
                             } else {
                                 .26f
@@ -439,75 +436,17 @@ private fun FullLyricsControls(
             onClick =
                 close
         ) {
-            SoftCloseIcon(
-                color =
-                    foreground,
+            Icon(
+                imageVector =
+                    Icons.Rounded.Close,
+                contentDescription =
+                    "Close fullscreen lyrics",
+                tint = foreground,
                 modifier =
                     Modifier.size(
-                        18.dp
+                        21.dp
                     )
             )
         }
-    }
-}
-
-@Composable
-private fun SoftCloseIcon(
-    color: Color,
-    modifier: Modifier
-) {
-    Canvas(
-        modifier =
-            modifier
-    ) {
-        val stroke =
-            size.minDimension *
-                .115f
-
-        drawLine(
-            color =
-                color,
-            start =
-                Offset(
-                    size.width *
-                        .25f,
-                    size.height *
-                        .25f
-                ),
-            end =
-                Offset(
-                    size.width *
-                        .75f,
-                    size.height *
-                        .75f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
-        )
-
-        drawLine(
-            color =
-                color,
-            start =
-                Offset(
-                    size.width *
-                        .75f,
-                    size.height *
-                        .25f
-                ),
-            end =
-                Offset(
-                    size.width *
-                        .25f,
-                    size.height *
-                        .75f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
-        )
     }
 }
