@@ -4,6 +4,16 @@ import android.net.Uri
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -124,7 +134,7 @@ internal fun NowPlayingContent(
                     RoundedCornerShape(
                         topStart =
                             (
-                                88f *
+                                56f *
                                     (
                                         playerY.value /
                                             screenHeight
@@ -136,7 +146,7 @@ internal fun NowPlayingContent(
                                 ).dp,
                         topEnd =
                             (
-                                88f *
+                                56f *
                                     (
                                         playerY.value /
                                             screenHeight
@@ -365,14 +375,68 @@ internal fun NowPlayingContent(
             modifier =
                 Modifier.fillMaxSize(),
             transitionSpec = {
-                XmoPlayerAnimation
-                    .overlayHostTransition(
-                        opening =
-                            targetState != null &&
-                                initialState == null,
-                        closing =
-                            targetState == null
+                if (
+                    targetState != null &&
+                    initialState == null
+                ) {
+                    (
+                        fadeIn(
+                            animationSpec =
+                                tween(
+                                    durationMillis = 220
+                                )
+                        ) +
+                            scaleIn(
+                                initialScale = .965f,
+                                animationSpec =
+                                    spring(
+                                        dampingRatio = .86f,
+                                        stiffness = 430f
+                                    )
+                            )
+                        )
+                        .togetherWith(
+                            fadeOut(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 130
+                                    )
+                            )
+                        )
+                } else if (
+                    targetState == null
+                ) {
+                    fadeIn(
+                        animationSpec =
+                            tween(
+                                durationMillis = 120
+                            )
                     )
+                        .togetherWith(
+                            fadeOut(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 190
+                                    )
+                            ) +
+                                scaleOut(
+                                    targetScale = .975f,
+                                    animationSpec =
+                                        tween(
+                                            durationMillis = 190
+                                        )
+                                )
+                        )
+                } else {
+                    fadeIn(
+                        tween(180)
+                    )
+                        .togetherWith(
+                            fadeOut(
+                                tween(150)
+                            )
+                        )
+                }
             },
             label =
                 "playerOverlay"
@@ -421,9 +485,8 @@ internal fun NowPlayingContent(
                         createCategory = {
                                 name ->
 
-                            createCategory(
-                                name
-                            ) != null
+                            createCategory(name) !=
+                                null
                         }
                     )
                 }
@@ -474,9 +537,12 @@ internal fun NowPlayingContent(
 
                 PlayerOverlay.Details -> {
                     SongDetailsBox(
-                        song = currentSong,
-                        album = state.album,
-                        colors = colors,
+                        song =
+                            currentSong,
+                        album =
+                            state.album,
+                        colors =
+                            colors,
                         close = {
                             setOverlay(null)
                         }
@@ -485,10 +551,12 @@ internal fun NowPlayingContent(
 
                 PlayerOverlay.Artist -> {
                     ArtistInfoBox(
-                        artist = state.artist,
+                        artist =
+                            state.artist,
                         trackCount =
                             artistTrackCount,
-                        colors = colors,
+                        colors =
+                            colors,
                         close = {
                             setOverlay(null)
                         }
@@ -499,21 +567,42 @@ internal fun NowPlayingContent(
             }
         }
 
+        /*
+         * Fullscreen lyrics transition is unchanged.
+         * FullLyrics still owns its top translucent glass behind
+         * artwork/title/seek controls.
+         */
         AnimatedVisibility(
             visible = fullLyrics,
             enter =
-                XmoPlayerAnimation
-                    .fullLyricsEnter,
+                fadeIn(
+                    tween(310)
+                ) +
+                    scaleIn(
+                        initialScale = .94f,
+                        animationSpec =
+                            tween(390)
+                    ),
             exit =
-                XmoPlayerAnimation
-                    .fullLyricsExit
+                fadeOut(
+                    tween(250)
+                ) +
+                    scaleOut(
+                        targetScale = .95f,
+                        animationSpec =
+                            tween(330)
+                    )
         ) {
             FullLyrics(
                 lyrics = lyrics,
-                position = state.position,
-                duration = state.duration,
-                title = state.title,
-                artist = state.artist,
+                position =
+                    state.position,
+                duration =
+                    state.duration,
+                title =
+                    state.title,
+                artist =
+                    state.artist,
                 artwork =
                     currentSong?.artwork
                         ?: fallbackArtwork,
@@ -557,11 +646,41 @@ internal fun NowPlayingContent(
                         top = 72.dp
                     ),
             enter =
-                XmoPlayerAnimation
-                    .popHostEnter,
+                fadeIn(
+                    tween(210)
+                ) +
+                    scaleIn(
+                        initialScale = .94f,
+                        animationSpec =
+                            tween(
+                                durationMillis = 250,
+                                easing =
+                                    FastOutSlowInEasing
+                            )
+                    ) +
+                    slideInVertically(
+                        initialOffsetY = {
+                            -it / 5
+                        },
+                        animationSpec =
+                            tween(250)
+                    ),
             exit =
-                XmoPlayerAnimation
-                    .popHostExit
+                fadeOut(
+                    tween(190)
+                ) +
+                    scaleOut(
+                        targetScale = .96f,
+                        animationSpec =
+                            tween(190)
+                    ) +
+                    slideOutVertically(
+                        targetOffsetY = {
+                            -it / 7
+                        },
+                        animationSpec =
+                            tween(190)
+                    )
         ) {
             pop?.let {
                 XmoPop(
