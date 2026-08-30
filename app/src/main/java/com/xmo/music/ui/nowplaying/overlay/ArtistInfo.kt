@@ -23,7 +23,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -84,14 +83,6 @@ internal fun ArtistInfoBox(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Color.Black.copy(
-                            alpha =
-                                XmoPlayerAnimation
-                                    .overlayBackdropAlpha *
-                                    progress
-                        )
-                    )
                     .simpleTap {
                         scope.launch {
                             closeAnimated()
@@ -148,7 +139,8 @@ internal fun ArtistInfoBox(
                 Icon(
                     imageVector =
                         Icons.Rounded.Person,
-                    contentDescription = null,
+                    contentDescription =
+                        null,
                     tint =
                         colors.text,
                     modifier =
@@ -157,8 +149,7 @@ internal fun ArtistInfoBox(
             }
 
             Spacer(
-                modifier =
-                    Modifier.height(11.dp)
+                Modifier.height(11.dp)
             )
 
             Text(
@@ -170,14 +161,14 @@ internal fun ArtistInfoBox(
                     colors.text,
                 fontFamily =
                     XmoFont.bold,
-                fontSize = 19.sp,
+                fontSize =
+                    19.sp,
                 textAlign =
                     TextAlign.Center
             )
 
             Spacer(
-                modifier =
-                    Modifier.height(7.dp)
+                Modifier.height(7.dp)
             )
 
             Text(
@@ -191,14 +182,14 @@ internal fun ArtistInfoBox(
                     colors.sub,
                 fontFamily =
                     XmoFont.normal,
-                fontSize = 11.sp,
+                fontSize =
+                    11.sp,
                 textAlign =
                     TextAlign.Center
             )
 
             Spacer(
-                modifier =
-                    Modifier.height(16.dp)
+                Modifier.height(16.dp)
             )
 
             PremiumCircle(
