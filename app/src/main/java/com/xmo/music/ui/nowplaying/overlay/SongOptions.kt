@@ -12,16 +12,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
 import androidx.compose.material.icons.rounded.Share
-import androidx.compose.material.icons.rounded.Star
-import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -35,14 +31,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xmo.music.data.Song
 import com.xmo.music.data.UserCategory
 import com.xmo.music.ui.HomeColors
-import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 import kotlinx.coroutines.launch
 
@@ -61,14 +55,6 @@ internal fun SongOptionsBox(
     ) -> Unit,
     createCategory: (String) -> Boolean
 ) {
-    var newCategory by
-        remember {
-            mutableStateOf("")
-        }
-
-    val accent =
-        LocalXmoAccent.current
-
     val scope =
         rememberCoroutineScope()
 
@@ -108,23 +94,12 @@ internal fun SongOptionsBox(
         close()
     }
 
-    val progress =
-        reveal.value
-            .coerceIn(
-                0f,
-                1f
-            )
-
     Box(
         modifier =
             Modifier.fillMaxSize(),
         contentAlignment =
             Alignment.Center
     ) {
-        /*
-         * No visible black backdrop.
-         * This layer exists only as the outside-tap target.
-         */
         Box(
             modifier =
                 Modifier
@@ -148,7 +123,7 @@ internal fun SongOptionsBox(
                             XmoPlayerAnimation
                         ) {
                             centerOverlay(
-                                progress
+                                reveal.value
                             )
                         }
                     }
@@ -248,7 +223,8 @@ internal fun SongOptionsBox(
                     },
                 colors = colors,
                 active = liked,
-                click = toggleLike
+                click =
+                    toggleLike
             )
 
             OverlayAction(
@@ -271,157 +247,20 @@ internal fun SongOptionsBox(
                 enabled = false
             )
 
-            Text(
-                text = "CATEGORIES",
-                color = accent,
-                fontFamily =
-                    XmoFont.bold,
-                fontSize = 9.sp,
-                letterSpacing = 1.sp,
-                modifier =
-                    Modifier.padding(
-                        start = 5.dp,
-                        top = 14.dp,
-                        bottom = 5.dp
-                    )
-            )
-
-            categories
-                .take(6)
-                .forEach { category ->
-
-                    val added =
-                        song?.id in
-                            category.songIds
-
-                    OverlayAction(
-                        icon =
-                            if (added) {
-                                Icons.Rounded.Star
-                            } else {
-                                Icons.Rounded.StarBorder
-                            },
-                        title =
-                            category.name,
-                        trailing =
-                            if (added) {
-                                "Added"
-                            } else {
-                                "Add"
-                            },
-                        active = added,
-                        colors = colors
-                    ) {
-                        setCategory(
-                            category,
-                            !added
-                        )
-                    }
-                }
-
             Spacer(
-                Modifier.height(12.dp)
+                Modifier.height(14.dp)
             )
 
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .height(46.dp)
-                        .clip(
-                            RoundedCornerShape(
-                                14.dp
-                            )
-                        )
-                        .background(
-                            colors.button
-                        )
-                        .padding(
-                            start = 13.dp,
-                            end = 5.dp
-                        ),
-                verticalAlignment =
-                    Alignment.CenterVertically
-            ) {
-                BasicTextField(
-                    value = newCategory,
-                    onValueChange = {
-                        newCategory =
-                            it.take(24)
-                    },
-                    singleLine = true,
-                    textStyle =
-                        TextStyle(
-                            color =
-                                colors.text,
-                            fontFamily =
-                                XmoFont.normal,
-                            fontSize =
-                                12.sp
-                        ),
-                    modifier =
-                        Modifier.weight(1f),
-                    decorationBox = {
-                            inner ->
-
-                        Box {
-                            if (
-                                newCategory
-                                    .isBlank()
-                            ) {
-                                Text(
-                                    text =
-                                        "Create category",
-                                    color =
-                                        colors.sub,
-                                    fontFamily =
-                                        XmoFont.normal,
-                                    fontSize =
-                                        11.sp
-                                )
-                            }
-
-                            inner()
-                        }
-                    }
-                )
-
-                PremiumCircle(
-                    size = 36.dp,
-                    background =
-                        accent.copy(
-                            alpha = .16f
-                        ),
-                    enabled =
-                        newCategory
-                            .trim()
-                            .isNotEmpty(),
-                    onClick = {
-                        val value =
-                            newCategory
-                                .trim()
-
-                        if (
-                            value.isNotEmpty() &&
-                            createCategory(
-                                value
-                            )
-                        ) {
-                            newCategory = ""
-                        }
-                    }
-                ) {
-                    Icon(
-                        imageVector =
-                            Icons.Rounded.Add,
-                        contentDescription =
-                            "Create category",
-                        tint = accent,
-                        modifier =
-                            Modifier.size(20.dp)
-                    )
-                }
-            }
+            CategoryPickerContent(
+                song = song,
+                categories =
+                    categories,
+                colors = colors,
+                setCategory =
+                    setCategory,
+                createCategory =
+                    createCategory
+            )
         }
     }
 }
