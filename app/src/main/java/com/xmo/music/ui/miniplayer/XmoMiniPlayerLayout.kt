@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -74,13 +76,19 @@ internal fun xmoMiniBorder(
 ): Color =
     when (theme) {
         XmoTheme.Light ->
-            Color.Black.copy(alpha = .08f)
+            Color.Black.copy(
+                alpha = .08f
+            )
 
         XmoTheme.Dark ->
-            Color.White.copy(alpha = .105f)
+            Color.White.copy(
+                alpha = .105f
+            )
 
         XmoTheme.Amoled ->
-            Color.White.copy(alpha = .13f)
+            Color.White.copy(
+                alpha = .13f
+            )
     }
 
 @Composable
@@ -93,16 +101,20 @@ internal fun XmoMiniPlayerCard(
     colors: HomeColors,
     accent: Color,
     liked: Boolean,
+    inCategory: Boolean,
     transitionDirection: Int,
     moved: Boolean,
     opening: Boolean,
     togglePlay: () -> Unit,
     toggleLike: () -> Unit,
+    openCategories: () -> Unit,
     open: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val cardShape =
-        RoundedCornerShape(15.dp)
+        RoundedCornerShape(
+            15.dp
+        )
 
     Box(
         modifier =
@@ -155,6 +167,13 @@ internal fun XmoMiniPlayerCard(
             )
         }
 
+        /*
+         * Extra right padding accounts for:
+         *
+         * Heart 34
+         * Star  34
+         * Play  40
+         */
         Row(
             modifier =
                 Modifier
@@ -162,16 +181,12 @@ internal fun XmoMiniPlayerCard(
                     .padding(
                         start = 4.dp,
                         top = 4.dp,
-                        end = 94.dp,
+                        end = 122.dp,
                         bottom = 4.dp
                     ),
             verticalAlignment =
                 Alignment.CenterVertically
         ) {
-            /*
-             * Artwork position does not move.
-             * AnimatedContent is clipped to this exact square.
-             */
             Box(
                 modifier =
                     Modifier
@@ -186,7 +201,8 @@ internal fun XmoMiniPlayerCard(
                         )
             ) {
                 AnimatedContent(
-                    targetState = song,
+                    targetState =
+                        song,
                     modifier =
                         Modifier.fillMaxSize(),
                     transitionSpec = {
@@ -210,9 +226,6 @@ internal fun XmoMiniPlayerCard(
                 }
             }
 
-            /*
-             * Metadata owns the directional transition.
-             */
             Box(
                 modifier =
                     Modifier
@@ -225,7 +238,8 @@ internal fun XmoMiniPlayerCard(
                         )
             ) {
                 AnimatedContent(
-                    targetState = song,
+                    targetState =
+                        song,
                     modifier =
                         Modifier.fillMaxSize(),
                     transitionSpec = {
@@ -289,7 +303,9 @@ internal fun XmoMiniPlayerCard(
                     )
                     .fillMaxWidth()
                     .height(58.dp)
-                    .padding(end = 94.dp)
+                    .padding(
+                        end = 122.dp
+                    )
                     .pointerInput(
                         song.id,
                         moved,
@@ -315,7 +331,9 @@ internal fun XmoMiniPlayerCard(
                     .align(
                         Alignment.CenterEnd
                     )
-                    .padding(end = 6.dp)
+                    .padding(
+                        end = 5.dp
+                    )
                     .clip(
                         RoundedCornerShape(
                             24.dp
@@ -341,7 +359,7 @@ internal fun XmoMiniPlayerCard(
             Box(
                 modifier =
                     Modifier
-                        .size(38.dp)
+                        .size(34.dp)
                         .pointerInput(
                             liked,
                             song.id
@@ -366,24 +384,56 @@ internal fun XmoMiniPlayerCard(
                         if (liked) {
                             accent
                         } else {
-                            when (theme) {
-                                XmoTheme.Light ->
-                                    Color(0xFF15161A)
-
-                                XmoTheme.Dark,
-                                XmoTheme.Amoled ->
-                                    Color.White
-                            }
+                            colors.icon
                         },
                     modifier =
-                        Modifier.size(19.dp)
+                        Modifier.size(
+                            18.dp
+                        )
                 )
             }
 
             Box(
                 modifier =
                     Modifier
-                        .size(42.dp)
+                        .size(34.dp)
+                        .pointerInput(
+                            song.id,
+                            inCategory
+                        ) {
+                            detectTapGestures {
+                                openCategories()
+                            }
+                        },
+                contentAlignment =
+                    Alignment.Center
+            ) {
+                Icon(
+                    imageVector =
+                        if (inCategory) {
+                            Icons.Rounded.Star
+                        } else {
+                            Icons.Rounded.StarBorder
+                        },
+                    contentDescription =
+                        "Categories",
+                    tint =
+                        if (inCategory) {
+                            accent
+                        } else {
+                            colors.icon
+                        },
+                    modifier =
+                        Modifier.size(
+                            18.dp
+                        )
+                )
+            }
+
+            Box(
+                modifier =
+                    Modifier
+                        .size(40.dp)
                         .pointerInput(
                             isPlaying
                         ) {
@@ -396,15 +446,21 @@ internal fun XmoMiniPlayerCard(
             ) {
                 if (isPlaying) {
                     XmoPauseIcon(
-                        color = colors.text,
+                        color =
+                            colors.text,
                         modifier =
-                            Modifier.size(19.dp)
+                            Modifier.size(
+                                18.dp
+                            )
                     )
                 } else {
                     XmoPlayIcon(
-                        color = colors.text,
+                        color =
+                            colors.text,
                         modifier =
-                            Modifier.size(20.dp)
+                            Modifier.size(
+                                19.dp
+                            )
                     )
                 }
             }
