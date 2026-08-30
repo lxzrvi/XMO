@@ -52,7 +52,6 @@ internal fun NowPlayingContent(
 
     artistTrackCount: Int,
     inCategory: Boolean,
-
     lyrics: SongLyrics?,
 
     colors: HomeColors,
@@ -112,13 +111,7 @@ internal fun NowPlayingContent(
         modifier =
             Modifier
                 .fillMaxSize()
-                .pointerInput(
-                    Unit
-                ) {
-                    /*
-                     * Now Playing is a real full-screen overlay.
-                     * Unhandled touches never reach Home/NavBar.
-                     */
+                .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
                             awaitPointerEvent()
@@ -129,9 +122,7 @@ internal fun NowPlayingContent(
                     updateScreenHeight(
                         it.height
                             .toFloat()
-                            .coerceAtLeast(
-                                1f
-                            )
+                            .coerceAtLeast(1f)
                     )
                 }
                 .graphicsLayer {
@@ -154,6 +145,7 @@ internal fun NowPlayingContent(
                                             1f
                                         )
                                 ).dp,
+
                         topEnd =
                             (
                                 88f *
@@ -178,12 +170,6 @@ internal fun NowPlayingContent(
                 theme
         )
 
-        /*
-         * =====================================================
-         * MAIN FIXED PLAYER
-         * =====================================================
-         */
-
         Column(
             modifier =
                 Modifier
@@ -196,8 +182,7 @@ internal fun NowPlayingContent(
                 sourceIsCategory =
                     sourceIsCategory,
                 foreground =
-                    themeColors
-                        .overlayText,
+                    themeColors.overlayText,
                 playerY =
                     playerY,
                 screenHeight =
@@ -215,14 +200,10 @@ internal fun NowPlayingContent(
                 }
             )
 
-            /*
-             * Artwork remains lower than the header.
-             */
             Spacer(
-                modifier =
-                    Modifier.height(
-                        93.dp
-                    )
+                Modifier.height(
+                    93.dp
+                )
             )
 
             PlayerArtwork(
@@ -231,15 +212,12 @@ internal fun NowPlayingContent(
                 currentIndex =
                     currentIndex,
                 current =
-                    currentSong
-                        ?.artwork
+                    currentSong?.artwork
                         ?: fallbackArtwork,
                 previous =
-                    previousSong
-                        ?.artwork,
+                    previousSong?.artwork,
                 next =
-                    nextSong
-                        ?.artwork,
+                    nextSong?.artwork,
                 canPrevious =
                     state.hasPrevious,
                 canNext =
@@ -270,11 +248,6 @@ internal fun NowPlayingContent(
                 pickLyrics =
                     pickLyrics,
                 fullscreenLyrics = {
-                    /*
-                     * Keep the small lyrics presentation selected
-                     * under fullscreen so closing can morph back
-                     * to it directly.
-                     */
                     setArtworkLyrics(
                         true
                     )
@@ -286,46 +259,36 @@ internal fun NowPlayingContent(
             )
 
             /*
-             * Requested artwork -> panel breathing space.
+             * Panel brought upward from 95dp gap.
+             *
+             * Artwork still breathes, but the lower section has
+             * enough usable height for XMO/footer.
              */
             Spacer(
-                modifier =
-                    Modifier.height(
-                        95.dp
-                    )
+                Modifier.height(
+                    76.dp
+                )
             )
 
-            /*
-             * Translucent lower panel. Artwork splashes remain
-             * visible underneath instead of becoming a solid box.
-             */
             Column(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .weight(
-                            1f
-                        )
+                        .weight(1f)
                         .clip(
                             RoundedCornerShape(
-                                topStart =
-                                    28.dp,
-                                topEnd =
-                                    28.dp
+                                topStart = 28.dp,
+                                topEnd = 28.dp
                             )
                         )
                         .background(
                             themeColors.panel
                         )
                         .padding(
-                            start =
-                                12.dp,
-                            top =
-                                10.dp,
-                            end =
-                                12.dp,
-                            bottom =
-                                2.dp
+                            start = 12.dp,
+                            top = 8.dp,
+                            end = 12.dp,
+                            bottom = 1.dp
                         )
             ) {
                 PlayerInfo(
@@ -346,16 +309,15 @@ internal fun NowPlayingContent(
                     accent =
                         accent,
                     softButton =
-                        themeColors
-                            .softButton,
+                        themeColors.softButton,
+                    theme =
+                        theme,
                     toggleLike = {
                         toggleLike()
 
                         setPop(
                             PopMessage(
-                                if (
-                                    liked
-                                ) {
+                                if (liked) {
                                     "Removed from Liked Songs"
                                 } else {
                                     "Added to Liked Songs"
@@ -390,13 +352,6 @@ internal fun NowPlayingContent(
                     }
                 )
 
-                Spacer(
-                    modifier =
-                        Modifier.height(
-                            3.dp
-                        )
-                )
-
                 PlayerBody(
                     position =
                         state.position,
@@ -421,8 +376,7 @@ internal fun NowPlayingContent(
                     controlForeground =
                         themeColors.controls,
                     playBackground =
-                        themeColors
-                            .playBackground,
+                        themeColors.playBackground,
                     seekTo =
                         seekTo,
                     togglePlay =
@@ -439,15 +393,7 @@ internal fun NowPlayingContent(
             }
         }
 
-        /*
-         * =====================================================
-         * PLAYER OVERLAYS
-         * =====================================================
-         */
-
-        when (
-            overlay
-        ) {
+        when (overlay) {
             PlayerOverlay.Queue -> {
                 QueueSheet(
                     queue =
@@ -459,9 +405,7 @@ internal fun NowPlayingContent(
                     playIndex =
                         playQueueIndex,
                     dismiss = {
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
                     }
                 )
             }
@@ -477,19 +421,14 @@ internal fun NowPlayingContent(
                     liked =
                         liked,
                     close = {
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
                     },
                     toggleLike = {
                         toggleLike()
                     },
                     share = {
                         shareCurrentSong()
-
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
                     },
                     setCategory = {
                             category,
@@ -503,9 +442,7 @@ internal fun NowPlayingContent(
                     createCategory = {
                             name ->
 
-                        createCategory(
-                            name
-                        ) != null
+                        createCategory(name) != null
                     }
                 )
             }
@@ -515,13 +452,10 @@ internal fun NowPlayingContent(
                     colors =
                         colors,
                     active =
-                        state
-                            .sleepTimerRemainingMs >
+                        state.sleepTimerRemainingMs >
                             0L,
                     dismiss = {
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
                     },
                     setTimer = {
                             duration,
@@ -535,9 +469,7 @@ internal fun NowPlayingContent(
                             duration
                         )
 
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
 
                         setPop(
                             PopMessage(
@@ -546,15 +478,9 @@ internal fun NowPlayingContent(
                         )
                     },
                     cancel = {
-                        setSleepTotalMs(
-                            null
-                        )
-
+                        setSleepTotalMs(null)
                         cancelSleepTimer()
-
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
 
                         setPop(
                             PopMessage(
@@ -574,9 +500,7 @@ internal fun NowPlayingContent(
                     colors =
                         colors,
                     close = {
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
                     }
                 )
             }
@@ -590,9 +514,7 @@ internal fun NowPlayingContent(
                     colors =
                         colors,
                     close = {
-                        setOverlay(
-                            null
-                        )
+                        setOverlay(null)
                     }
                 )
             }
@@ -602,51 +524,28 @@ internal fun NowPlayingContent(
         }
 
         /*
-         * =====================================================
-         * FULLSCREEN LYRICS
-         * =====================================================
-         *
-         * This is a soft scale/fade from the existing small-card
-         * state. No large bottom slide that makes the two lyrics
-         * surfaces feel unrelated.
+         * Working fullscreen animation intentionally preserved.
          */
-
         AnimatedVisibility(
             visible =
                 fullLyrics,
             enter =
                 fadeIn(
-                    animationSpec =
-                        tween(
-                            durationMillis =
-                                310
-                        )
+                    tween(310)
                 ) +
                     scaleIn(
-                        initialScale =
-                            .94f,
+                        initialScale = .94f,
                         animationSpec =
-                            tween(
-                                durationMillis =
-                                    390
-                            )
+                            tween(390)
                     ),
             exit =
                 fadeOut(
-                    animationSpec =
-                        tween(
-                            durationMillis =
-                                250
-                        )
+                    tween(250)
                 ) +
                     scaleOut(
-                        targetScale =
-                            .95f,
+                        targetScale = .95f,
                         animationSpec =
-                            tween(
-                                durationMillis =
-                                    330
-                            )
+                            tween(330)
                     )
         ) {
             FullLyrics(
@@ -661,8 +560,7 @@ internal fun NowPlayingContent(
                 artist =
                     state.artist,
                 artwork =
-                    currentSong
-                        ?.artwork
+                    currentSong?.artwork
                         ?: fallbackArtwork,
                 dominant =
                     displayColor,
@@ -687,22 +585,11 @@ internal fun NowPlayingContent(
                 seekTo =
                     seekTo,
                 close = {
-                    setFullLyrics(
-                        false
-                    )
-
-                    setArtworkLyrics(
-                        true
-                    )
+                    setFullLyrics(false)
+                    setArtworkLyrics(true)
                 }
             )
         }
-
-        /*
-         * =====================================================
-         * TRANSIENT XMO POP
-         * =====================================================
-         */
 
         pop?.let {
             XmoPop(
@@ -717,8 +604,7 @@ internal fun NowPlayingContent(
                         )
                         .statusBarsPadding()
                         .padding(
-                            top =
-                                72.dp
+                            top = 72.dp
                         )
             )
         }
