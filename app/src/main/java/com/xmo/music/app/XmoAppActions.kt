@@ -17,20 +17,12 @@ internal fun buildXmoAppActions(
     persistence: XmoAppPersistence,
     requestAudioPermission: () -> Unit
 ): XmoAppActions {
-
     fun currentSong(): Song? =
-        state.songs
-            .firstOrNull {
-                it.id ==
-                    player.state
-                        .value
-                        .currentSongId
-            }
-            ?: player.currentSong()
+        state.songs.firstOrNull {
+            it.id == player.state.value.currentSongId
+        } ?: player.currentSong()
 
-    fun toggleLike(
-        songId: Long
-    ) {
+    fun toggleLike(songId: Long) {
         scope.launch {
             state.likedSongIds =
                 Store.toggleLiked(
@@ -61,12 +53,8 @@ internal fun buildXmoAppActions(
         song: Song?
     ): UserCategory? {
         val name =
-            rawName
-                .trim()
-                .replace(
-                    "\n",
-                    " "
-                )
+            rawName.trim()
+                .replace("\n", " ")
                 .take(24)
 
         if (name.isBlank()) {
@@ -75,12 +63,9 @@ internal fun buildXmoAppActions(
 
         val category =
             UserCategory(
-                id =
-                    "cat_${UUID.randomUUID()}",
+                id = "cat_${UUID.randomUUID()}",
                 name = name,
-                icon =
-                    state.categories.size %
-                        4,
+                icon = state.categories.size % 4,
                 songIds =
                     if (song != null) {
                         setOf(song.id)
@@ -90,21 +75,14 @@ internal fun buildXmoAppActions(
             )
 
         val nextCategories =
-            state.categories +
-                category
+            state.categories + category
 
         val nextOrder =
-            (
-                state.order +
-                    category.id
-                )
+            (state.order + category.id)
                 .distinct()
 
-        state.categories =
-            nextCategories
-
-        state.order =
-            nextOrder
+        state.categories = nextCategories
+        state.order = nextOrder
 
         scope.launch {
             Store.saveCategories(
@@ -143,14 +121,9 @@ internal fun buildXmoAppActions(
             state.profileOpen = false
         },
 
-        saveProfile = {
-            profile ->
-
-            state.profile =
-                profile
-
-            state.profileOpen =
-                false
+        saveProfile = { profile ->
+            state.profile = profile
+            state.profileOpen = false
 
             scope.launch {
                 Store.saveProfile(
@@ -160,11 +133,8 @@ internal fun buildXmoAppActions(
             }
         },
 
-        saveOrder = {
-            order ->
-
-            state.order =
-                order
+        saveOrder = { order ->
+            state.order = order
 
             scope.launch {
                 Store.saveOrder(
@@ -174,11 +144,8 @@ internal fun buildXmoAppActions(
             }
         },
 
-        saveCategories = {
-            categories ->
-
-            state.categories =
-                categories
+        saveCategories = { categories ->
+            state.categories = categories
 
             scope.launch {
                 Store.saveCategories(
@@ -188,13 +155,6 @@ internal fun buildXmoAppActions(
             }
         },
 
-        /*
-         * Any song row:
-         *
-         * start/change playback
-         * -> MiniPlayer
-         * -> no automatic Now Playing
-         */
         playSong = {
                 song,
                 source,
@@ -203,42 +163,26 @@ internal fun buildXmoAppActions(
 
             val index =
                 queue.indexOfFirst {
-                    it.id ==
-                        song.id
+                    it.id == song.id
                 }
 
             if (index >= 0) {
                 val hadPlayback =
-                    player.state
-                        .value
-                        .currentSongId !=
-                        null
+                    player.state.value
+                        .currentSongId != null
 
                 val miniWasVisible =
                     state.miniVisible &&
                         !state.showNowPlaying
 
-                state.playingSource =
-                    source
-
+                state.playingSource = source
                 state.playingSourceIsCategory =
                     isCategory
 
-                player.play(
-                    queue,
-                    index
-                )
+                player.play(queue, index)
 
-                state.showNowPlaying =
-                    false
+                state.showNowPlaying = false
 
-                /*
-                 * Whole-card rise only when MiniPlayer is being
-                 * introduced/reintroduced.
-                 *
-                 * Already-visible MiniPlayer changes only its
-                 * artwork/metadata.
-                 */
                 if (
                     !hadPlayback ||
                     !miniWasVisible
@@ -246,25 +190,33 @@ internal fun buildXmoAppActions(
                     state.miniRiseKey++
                 }
 
-                state.miniVisible =
-                    true
+                state.miniVisible = true
             }
         },
 
-        toggleLike = {
-            song ->
+        playNext = { song ->
+            player.playNext(song)
 
-            toggleLike(
-                song.id
-            )
+            if (
+                player.state.value.currentSongId !=
+                null
+            ) {
+                state.miniVisible = true
+            }
         },
 
-        toggleSongLikeById = {
-            songId ->
+        removeRecent = { song ->
+            scope.launch {
+                persistence.removeRecent(song.id)
+            }
+        },
 
-            toggleLike(
-                songId
-            )
+        toggleLike = { song ->
+            toggleLike(song.id)
+        },
+
+        toggleSongLikeById = { songId ->
+            toggleLike(songId)
         },
 
         setSongInCategory = {
@@ -273,12 +225,9 @@ internal fun buildXmoAppActions(
                 added ->
 
             updateCategoryMembership(
-                songId =
-                    song.id,
-                categoryId =
-                    categoryId,
-                added =
-                    added
+                song.id,
+                categoryId,
+                added
             )
         },
 
@@ -286,17 +235,11 @@ internal fun buildXmoAppActions(
                 name,
                 song ->
 
-            createCategory(
-                rawName = name,
-                song = song
-            )
+            createCategory(name, song)
         },
 
-        changeAppearance = {
-            appearance ->
-
-            state.appearance =
-                appearance
+        changeAppearance = { appearance ->
+            state.appearance = appearance
 
             scope.launch {
                 Store.saveAppearance(
@@ -306,9 +249,7 @@ internal fun buildXmoAppActions(
             }
         },
 
-        changeLibraryPreferences = {
-            preferences ->
-
+        changeLibraryPreferences = { preferences ->
             state.libraryPreferences =
                 preferences
 
@@ -322,17 +263,13 @@ internal fun buildXmoAppActions(
             }
         },
 
-        changePlaybackPreferences = {
-            preferences ->
-
+        changePlaybackPreferences = { preferences ->
             state.playbackPreferences =
                 preferences
 
             player.setPlaybackParameters(
-                speed =
-                    preferences.playbackSpeed,
-                pitch =
-                    preferences.playbackPitch
+                preferences.playbackSpeed,
+                preferences.playbackPitch
             )
 
             scope.launch {
@@ -343,11 +280,8 @@ internal fun buildXmoAppActions(
             }
         },
 
-        changeResumeOnHeadphones = {
-            enabled ->
-
-            state.resumeOnHeadphones =
-                enabled
+        changeResumeOnHeadphones = { enabled ->
+            state.resumeOnHeadphones = enabled
 
             scope.launch {
                 Store.saveResumeOnHeadphones(
@@ -358,52 +292,28 @@ internal fun buildXmoAppActions(
         },
 
         openNowPlayingFromMini = {
-            state.miniVisible =
-                false
-
-            state.showNowPlaying =
-                true
+            state.miniVisible = false
+            state.showNowPlaying = true
         },
 
         closePlaybackFromMini = {
             player.closePlayback()
-
-            state.miniVisible =
-                false
-
-            state.showNowPlaying =
-                false
+            state.miniVisible = false
+            state.showNowPlaying = false
         },
 
         togglePlay = {
             player.togglePlayPause()
         },
 
-        /*
-         * MiniPlayer debounce commits only its final preview.
-         *
-         * Now Playing Queue also uses this same real callback.
-         */
-        playQueueIndex = {
-            index ->
+        playQueueIndex = { index ->
+            val queue = player.queue()
 
-            val queue =
-                player.queue()
-
-            if (
-                index in
-                queue.indices
-            ) {
-                player.play(
-                    queue,
-                    index
-                )
+            if (index in queue.indices) {
+                player.play(queue, index)
             }
         },
 
-        /*
-         * Immediate Now Playing transport controls.
-         */
         next = {
             player.next()
         },
@@ -417,8 +327,7 @@ internal fun buildXmoAppActions(
         },
 
         nowPlayingOpened = {
-            state.miniVisible =
-                false
+            state.miniVisible = false
         },
 
         refreshPosition = {
@@ -430,12 +339,9 @@ internal fun buildXmoAppActions(
         },
 
         toggleCurrentLike = {
-            player.state
-                .value
+            player.state.value
                 .currentSongId
-                ?.let {
-                    toggleLike(it)
-                }
+                ?.let(::toggleLike)
         },
 
         toggleShuffle = {
@@ -454,13 +360,9 @@ internal fun buildXmoAppActions(
             player.cancelSleepTimer()
         },
 
-        saveLyricsUri = {
-            uri ->
-
+        saveLyricsUri = { uri ->
             val songId =
-                player.state
-                    .value
-                    .currentSongId
+                player.state.value.currentSongId
 
             if (songId != null) {
                 scope.launch {
@@ -470,8 +372,7 @@ internal fun buildXmoAppActions(
                         uri
                     )
 
-                    persistence
-                        .reloadLyricsFiles()
+                    persistence.reloadLyricsFiles()
                 }
             }
         },
@@ -480,45 +381,33 @@ internal fun buildXmoAppActions(
                 categoryId,
                 added ->
 
-            currentSong()
-                ?.let {
-                    updateCategoryMembership(
-                        songId =
-                            it.id,
-                        categoryId =
-                            categoryId,
-                        added =
-                            added
-                    )
-                }
+            currentSong()?.let {
+                updateCategoryMembership(
+                    it.id,
+                    categoryId,
+                    added
+                )
+            }
         },
 
-        createCategoryForCurrentSong = {
-            name ->
-
+        createCategoryForCurrentSong = { name ->
             createCategory(
-                rawName = name,
-                song = currentSong()
+                name,
+                currentSong()
             )
         },
 
         dismissNowPlaying = {
-            state.showNowPlaying =
-                false
+            state.showNowPlaying = false
 
             if (
-                player.state
-                    .value
-                    .currentSongId !=
-                null
+                player.state.value
+                    .currentSongId != null
             ) {
                 state.miniRiseKey++
-
-                state.miniVisible =
-                    true
+                state.miniVisible = true
             } else {
-                state.miniVisible =
-                    false
+                state.miniVisible = false
             }
         }
     )
