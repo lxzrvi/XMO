@@ -1,13 +1,19 @@
 package com.xmo.music.ui.nowplaying
 
 import android.net.Uri
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -159,6 +165,12 @@ internal fun NowPlayingContent(
             theme = theme
         )
 
+        /*
+         * =====================================================
+         * MAIN PLAYER
+         * =====================================================
+         */
+
         Column(
             modifier =
                 Modifier
@@ -187,7 +199,7 @@ internal fun NowPlayingContent(
             )
 
             /*
-             * Cover position remains unchanged.
+             * Cover remains exactly where it was.
              */
             Spacer(
                 Modifier.height(
@@ -237,16 +249,18 @@ internal fun NowPlayingContent(
                 pickLyrics =
                     pickLyrics,
                 fullscreenLyrics = {
-                    setArtworkLyrics(true)
-                    setFullLyrics(true)
+                    setArtworkLyrics(
+                        true
+                    )
+
+                    setFullLyrics(
+                        true
+                    )
                 }
             )
 
             /*
-             * Was 76dp.
-             *
-             * Cover has not moved. Only panel top starts 16dp
-             * earlier.
+             * Panel top moved upward while cover remains fixed.
              */
             Spacer(
                 Modifier.height(
@@ -275,32 +289,21 @@ internal fun NowPlayingContent(
                             bottom = 1.dp
                         )
             ) {
-                /*
-                 * Only the action-row portion is visually pulled
-                 * toward the new panel top. Title/body positions
-                 * are compensated inside PlayerInfo.
-                 */
                 PlayerInfo(
-                    title =
-                        state.title,
-                    artist =
-                        state.artist,
-                    liked =
-                        liked,
+                    title = state.title,
+                    artist = state.artist,
+                    liked = liked,
                     inCategory =
                         inCategory,
                     sleepRemainingMs =
                         state.sleepTimerRemainingMs,
                     sleepTotalMs =
                         sleepTotalMs,
-                    colors =
-                        colors,
-                    accent =
-                        accent,
+                    colors = colors,
+                    accent = accent,
                     softButton =
                         themeColors.softButton,
-                    theme =
-                        theme,
+                    theme = theme,
                     toggleLike = {
                         toggleLike()
 
@@ -342,8 +345,8 @@ internal fun NowPlayingContent(
                 )
 
                 /*
-                 * Body is compensated for the 16dp panel-edge
-                 * movement so progress/transport do not jump up.
+                 * Keep progress/transport/footer near their
+                 * previous screen positions.
                  */
                 Box(
                     modifier =
@@ -366,24 +369,19 @@ internal fun NowPlayingContent(
                             state.shuffleEnabled,
                         repeatMode =
                             state.repeatMode,
-                        colors =
-                            colors,
-                        accent =
-                            accent,
+                        colors = colors,
+                        accent = accent,
                         border =
                             themeColors.border,
                         controlForeground =
                             themeColors.controls,
                         playBackground =
                             themeColors.playBackground,
-                        seekTo =
-                            seekTo,
+                        seekTo = seekTo,
                         togglePlay =
                             togglePlay,
-                        previous =
-                            previous,
-                        next =
-                            next,
+                        previous = previous,
+                        next = next,
                         toggleShuffle =
                             toggleShuffle,
                         cycleRepeat =
@@ -393,125 +391,223 @@ internal fun NowPlayingContent(
             }
         }
 
-        when (overlay) {
-            PlayerOverlay.Queue -> {
-                QueueSheet(
-                    queue = queue,
-                    currentSongId =
-                        state.currentSongId,
-                    colors = colors,
-                    playIndex =
-                        playQueueIndex,
-                    dismiss = {
-                        setOverlay(null)
-                    }
-                )
-            }
+        /*
+         * =====================================================
+         * PLAYER OVERLAYS
+         * =====================================================
+         *
+         * AnimatedContent retains outgoing overlay long enough to
+         * animate it away instead of removing it instantly.
+         */
 
-            PlayerOverlay.Options -> {
-                SongOptionsBox(
-                    song = currentSong,
-                    categories =
-                        categories,
-                    colors = colors,
-                    liked = liked,
-                    close = {
-                        setOverlay(null)
-                    },
-                    toggleLike =
-                        toggleLike,
-                    share = {
-                        shareCurrentSong()
-                        setOverlay(null)
-                    },
-                    setCategory = {
-                            category,
-                            add ->
-
-                        setSongInCategory(
-                            category.id,
-                            add
-                        )
-                    },
-                    createCategory = {
-                            name ->
-
-                        createCategory(name) != null
-                    }
-                )
-            }
-
-            PlayerOverlay.Sleep -> {
-                SleepTimerBox(
-                    colors = colors,
-                    active =
-                        state
-                            .sleepTimerRemainingMs >
-                            0L,
-                    dismiss = {
-                        setOverlay(null)
-                    },
-                    setTimer = {
-                            duration,
-                            label ->
-
-                        setSleepTotalMs(duration)
-                        setSleepTimer(duration)
-                        setOverlay(null)
-
-                        setPop(
-                            PopMessage(
-                                "Sleep timer set for $label"
+        AnimatedContent(
+            targetState = overlay,
+            modifier =
+                Modifier.fillMaxSize(),
+            transitionSpec = {
+                if (
+                    targetState != null &&
+                    initialState == null
+                ) {
+                    (
+                        fadeIn(
+                            animationSpec =
+                                tween(
+                                    durationMillis = 220
+                                )
+                        ) +
+                            scaleIn(
+                                initialScale = .965f,
+                                animationSpec =
+                                    spring(
+                                        dampingRatio = .86f,
+                                        stiffness = 430f
+                                    )
                             )
                         )
-                    },
-                    cancel = {
-                        setSleepTotalMs(null)
-                        cancelSleepTimer()
-                        setOverlay(null)
-
-                        setPop(
-                            PopMessage(
-                                "Sleep timer cancelled"
+                        .togetherWith(
+                            fadeOut(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 130
+                                    )
                             )
                         )
-                    }
-                )
-            }
+                } else if (
+                    targetState == null
+                ) {
+                    fadeIn(
+                        animationSpec =
+                            tween(
+                                durationMillis = 120
+                            )
+                    )
+                        .togetherWith(
+                            fadeOut(
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 190
+                                )
+                        ) +
+                            scaleOut(
+                                targetScale = .975f,
+                                animationSpec =
+                                    tween(
+                                        durationMillis = 190
+                                    )
+                            )
+                        )
+                } else {
+                    fadeIn(
+                        tween(180)
+                    )
+                        .togetherWith(
+                            fadeOut(
+                                tween(150)
+                            )
+                        )
+                }
+            },
+            label =
+                "playerOverlay"
+        ) { visibleOverlay ->
 
-            PlayerOverlay.Details -> {
-                SongDetailsBox(
-                    song = currentSong,
-                    album = state.album,
-                    colors = colors,
-                    close = {
-                        setOverlay(null)
-                    }
-                )
-            }
+            when (visibleOverlay) {
+                PlayerOverlay.Queue -> {
+                    QueueSheet(
+                        queue = queue,
+                        currentSongId =
+                            state.currentSongId,
+                        colors = colors,
+                        playIndex =
+                            playQueueIndex,
+                        dismiss = {
+                            setOverlay(null)
+                        }
+                    )
+                }
 
-            PlayerOverlay.Artist -> {
-                ArtistInfoBox(
-                    artist = state.artist,
-                    trackCount =
-                        artistTrackCount,
-                    colors = colors,
-                    close = {
-                        setOverlay(null)
-                    }
-                )
-            }
+                PlayerOverlay.Options -> {
+                    SongOptionsBox(
+                        song = currentSong,
+                        categories =
+                            categories,
+                        colors = colors,
+                        liked = liked,
+                        close = {
+                            setOverlay(null)
+                        },
+                        toggleLike =
+                            toggleLike,
+                        share = {
+                            shareCurrentSong()
+                            setOverlay(null)
+                        },
+                        setCategory = {
+                                category,
+                                add ->
 
-            null ->
-                Unit
+                            setSongInCategory(
+                                category.id,
+                                add
+                            )
+                        },
+                        createCategory = {
+                                name ->
+
+                            createCategory(
+                                name
+                            ) != null
+                        }
+                    )
+                }
+
+                PlayerOverlay.Sleep -> {
+                    SleepTimerBox(
+                        colors = colors,
+                        active =
+                            state
+                                .sleepTimerRemainingMs >
+                                0L,
+                        dismiss = {
+                            setOverlay(null)
+                        },
+                        setTimer = {
+                                duration,
+                                label ->
+
+                            setSleepTotalMs(
+                                duration
+                            )
+
+                            setSleepTimer(
+                                duration
+                            )
+
+                            setOverlay(null)
+
+                            setPop(
+                                PopMessage(
+                                    "Sleep timer set for $label"
+                                )
+                            )
+                        },
+                        cancel = {
+                            setSleepTotalMs(null)
+                            cancelSleepTimer()
+                            setOverlay(null)
+
+                            setPop(
+                                PopMessage(
+                                    "Sleep timer cancelled"
+                                )
+                            )
+                        }
+                    )
+                }
+
+                PlayerOverlay.Details -> {
+                    SongDetailsBox(
+                        song = currentSong,
+                        album = state.album,
+                        colors = colors,
+                        close = {
+                            setOverlay(null)
+                        }
+                    )
+                }
+
+                PlayerOverlay.Artist -> {
+                    ArtistInfoBox(
+                        artist = state.artist,
+                        trackCount =
+                            artistTrackCount,
+                        colors = colors,
+                        close = {
+                            setOverlay(null)
+                        }
+                    )
+                }
+
+                null -> {
+                    /*
+                     * Must still occupy the AnimatedContent host,
+                     * but draws nothing.
+                     */
+                }
+            }
         }
 
         /*
-         * Existing fullscreen animation preserved.
+         * =====================================================
+         * FULLSCREEN LYRICS
+         * =====================================================
+         *
+         * Existing working fullscreen animation retained.
          */
+
         AnimatedVisibility(
-            visible =
-                fullLyrics,
+            visible = fullLyrics,
             enter =
                 fadeIn(
                     tween(310)
@@ -562,24 +658,78 @@ internal fun NowPlayingContent(
                 close = {
                     setFullLyrics(false)
                     setArtworkLyrics(true)
-                }
+                },
+                /*
+                 * Real local picker. No fake + control.
+                 */
+                pickLyrics =
+                    pickLyrics
             )
         }
 
-        pop?.let {
-            XmoPop(
-                message = it.text,
-                theme = theme,
-                modifier =
-                    Modifier
-                        .align(
-                            Alignment.TopCenter
-                        )
-                        .statusBarsPadding()
-                        .padding(
-                            top = 72.dp
-                        )
-            )
+        /*
+         * =====================================================
+         * XMO POP
+         * =====================================================
+         *
+         * AnimatedVisibility provides the exit lifetime that
+         * PlayerPop itself cannot own after pop becomes null.
+         */
+
+        AnimatedVisibility(
+            visible = pop != null,
+            modifier =
+                Modifier
+                    .align(
+                        Alignment.TopCenter
+                    )
+                    .statusBarsPadding()
+                    .padding(
+                        top = 72.dp
+                    ),
+            enter =
+                fadeIn(
+                    tween(210)
+                ) +
+                    scaleIn(
+                        initialScale = .94f,
+                        animationSpec =
+                            tween(
+                                durationMillis = 250,
+                                easing =
+                                    FastOutSlowInEasing
+                            )
+                    ) +
+                    slideInVertically(
+                        initialOffsetY = {
+                            -it / 5
+                        },
+                        animationSpec =
+                            tween(250)
+                    ),
+            exit =
+                fadeOut(
+                    tween(190)
+                ) +
+                    scaleOut(
+                        targetScale = .96f,
+                        animationSpec =
+                            tween(190)
+                    ) +
+                    slideOutVertically(
+                        targetOffsetY = {
+                            -it / 7
+                        },
+                        animationSpec =
+                            tween(190)
+                    )
+        ) {
+            pop?.let {
+                XmoPop(
+                    message = it.text,
+                    theme = theme
+                )
+            }
         }
     }
 }
