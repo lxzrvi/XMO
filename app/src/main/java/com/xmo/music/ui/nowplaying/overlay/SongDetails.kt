@@ -24,7 +24,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,14 +86,6 @@ internal fun SongDetailsBox(
             modifier =
                 Modifier
                     .fillMaxSize()
-                    .background(
-                        Color.Black.copy(
-                            alpha =
-                                XmoPlayerAnimation
-                                    .overlayBackdropAlpha *
-                                    progress
-                        )
-                    )
                     .simpleTap {
                         scope.launch {
                             closeAnimated()
@@ -138,7 +129,8 @@ internal fun SongDetailsBox(
                     Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Song Details",
+                    text =
+                        "Song Details",
                     color =
                         colors.text,
                     fontFamily =
@@ -173,27 +165,26 @@ internal fun SongDetailsBox(
             }
 
             Spacer(
-                modifier =
-                    Modifier.height(13.dp)
+                Modifier.height(13.dp)
             )
 
             song?.let { current ->
                 DetailValue(
-                    label = "Title",
-                    value = current.title,
-                    colors = colors
+                    "Title",
+                    current.title,
+                    colors
                 )
 
                 DetailValue(
-                    label = "Artist",
-                    value = current.artist,
-                    colors = colors
+                    "Artist",
+                    current.artist,
+                    colors
                 )
 
                 DetailValue(
-                    label = "Album",
-                    value = album,
-                    colors = colors
+                    "Album",
+                    album,
+                    colors
                 )
 
                 current.metadata?.let { meta ->
@@ -322,7 +313,8 @@ private fun DetailValue(
                 colors.text,
             fontFamily =
                 XmoFont.bold,
-            fontSize = 11.sp,
+            fontSize =
+                11.sp,
             modifier =
                 Modifier.width(92.dp)
         )
@@ -333,7 +325,8 @@ private fun DetailValue(
                 colors.sub,
             fontFamily =
                 XmoFont.normal,
-            fontSize = 11.sp,
+            fontSize =
+                11.sp,
             maxLines = 2,
             textAlign =
                 TextAlign.End,
