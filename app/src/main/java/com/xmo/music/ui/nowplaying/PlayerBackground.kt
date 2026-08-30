@@ -15,82 +15,52 @@ internal fun PlayerBackground(
     deep: Color,
     theme: XmoTheme
 ) {
-    /*
-     * Neutral base remains visible between large artwork-derived
-     * clouds. Dominant color is NOT used as a solid full-screen
-     * background.
-     */
     val base =
-        when (
-            theme
-        ) {
+        when (theme) {
             XmoTheme.Light ->
-                Color(
-                    0xFFF5F6F8
-                )
+                Color(0xFFF4F5F7)
 
             XmoTheme.Dark ->
-                Color(
-                    0xFF191A1E
-                )
+                Color(0xFF17181C)
 
             XmoTheme.Amoled ->
-                Color(
-                    0xFF020203
-                )
+                Color(0xFF010102)
         }
 
     val bright =
         brightenSplash(
-            color =
-                dominant,
+            color = dominant,
             amount =
-                when (
-                    theme
-                ) {
-                    XmoTheme.Light ->
-                        .17f
-
-                    XmoTheme.Dark ->
-                        .11f
-
-                    XmoTheme.Amoled ->
-                        .08f
+                when (theme) {
+                    XmoTheme.Light -> .19f
+                    XmoTheme.Dark -> .13f
+                    XmoTheme.Amoled -> .08f
                 }
         )
 
-    /*
-     * Deep remains in the same color family rather than becoming
-     * a second muddy/black Palette field.
-     */
-    val secondary =
+    val rich =
         mixColor(
-            from =
-                deep,
-            to =
-                bright,
-            fraction =
-                .64f
+            from = deep,
+            to = dominant,
+            fraction = .58f
+        )
+
+    val middle =
+        mixColor(
+            from = dominant,
+            to = bright,
+            fraction = .46f
         )
 
     val soft =
         mixColor(
-            from =
-                bright,
-            to =
-                Color.White,
+            from = bright,
+            to = Color.White,
             fraction =
-                when (
-                    theme
-                ) {
-                    XmoTheme.Light ->
-                        .20f
-
-                    XmoTheme.Dark ->
-                        .09f
-
-                    XmoTheme.Amoled ->
-                        .045f
+                when (theme) {
+                    XmoTheme.Light -> .23f
+                    XmoTheme.Dark -> .08f
+                    XmoTheme.Amoled -> .035f
                 }
         )
 
@@ -99,136 +69,52 @@ internal fun PlayerBackground(
             Modifier.fillMaxSize()
     ) {
         drawRect(
-            color =
-                base
+            color = base
         )
 
         /*
-         * Broad top-left splash.
+         * Oversized fields deliberately extend well beyond the
+         * viewport. They read as distributed artwork light rather
+         * than individual circular gradient spots.
          */
         drawRect(
             brush =
                 Brush.radialGradient(
-                    colors =
-                        listOf(
-                            bright.copy(
-                                alpha =
-                                    when (
-                                        theme
-                                    ) {
-                                        XmoTheme.Light ->
-                                            .44f
-
-                                        XmoTheme.Dark ->
-                                            .47f
-
-                                        XmoTheme.Amoled ->
-                                            .38f
-                                    }
-                            ),
-                            bright.copy(
-                                alpha =
-                                    .20f
-                            ),
-                            Color.Transparent
+                    colorStops =
+                        arrayOf(
+                            0f to
+                                bright.copy(
+                                    alpha =
+                                        when (theme) {
+                                            XmoTheme.Light -> .50f
+                                            XmoTheme.Dark -> .50f
+                                            XmoTheme.Amoled -> .36f
+                                        }
+                                ),
+                            .38f to
+                                bright.copy(
+                                    alpha =
+                                        when (theme) {
+                                            XmoTheme.Light -> .30f
+                                            XmoTheme.Dark -> .29f
+                                            XmoTheme.Amoled -> .20f
+                                        }
+                                ),
+                            .72f to
+                                bright.copy(
+                                    alpha = .09f
+                                ),
+                            1f to
+                                Color.Transparent
                         ),
                     center =
                         Offset(
                             x =
                                 size.width *
-                                    .03f,
+                                    -.10f,
                             y =
                                 size.height *
-                                    .07f
-                        ),
-                    radius =
-                        size.width *
-                            1.23f
-                )
-        )
-
-        /*
-         * Upper-right secondary splash.
-         */
-        drawRect(
-            brush =
-                Brush.radialGradient(
-                    colors =
-                        listOf(
-                            secondary.copy(
-                                alpha =
-                                    when (
-                                        theme
-                                    ) {
-                                        XmoTheme.Light ->
-                                            .33f
-
-                                        XmoTheme.Dark ->
-                                            .38f
-
-                                        XmoTheme.Amoled ->
-                                            .29f
-                                    }
-                            ),
-                            secondary.copy(
-                                alpha =
-                                    .12f
-                            ),
-                            Color.Transparent
-                        ),
-                    center =
-                        Offset(
-                            x =
-                                size.width *
-                                    1.02f,
-                            y =
-                                size.height *
-                                    .25f
-                        ),
-                    radius =
-                        size.width *
-                            1.08f
-                )
-        )
-
-        /*
-         * Oversized center cloud prevents obvious circular spots
-         * and distributes the cover hue through the screen.
-         */
-        drawRect(
-            brush =
-                Brush.radialGradient(
-                    colors =
-                        listOf(
-                            soft.copy(
-                                alpha =
-                                    when (
-                                        theme
-                                    ) {
-                                        XmoTheme.Light ->
-                                            .30f
-
-                                        XmoTheme.Dark ->
-                                            .31f
-
-                                        XmoTheme.Amoled ->
-                                            .24f
-                                    }
-                            ),
-                            soft.copy(
-                                alpha =
-                                    .11f
-                            ),
-                            Color.Transparent
-                        ),
-                    center =
-                        Offset(
-                            x =
-                                size.width *
-                                    .37f,
-                            y =
-                                size.height *
-                                    .52f
+                                    .05f
                         ),
                     radius =
                         size.width *
@@ -236,109 +122,179 @@ internal fun PlayerBackground(
                 )
         )
 
-        /*
-         * Lower-left cloud remains visible through the translucent
-         * player panel.
-         */
         drawRect(
             brush =
                 Brush.radialGradient(
-                    colors =
-                        listOf(
-                            secondary.copy(
-                                alpha =
-                                    when (
-                                        theme
-                                    ) {
-                                        XmoTheme.Light ->
-                                            .26f
-
-                                        XmoTheme.Dark ->
-                                            .31f
-
-                                        XmoTheme.Amoled ->
-                                            .25f
-                                    }
-                            ),
-                            Color.Transparent
-                        ),
-                    center =
-                        Offset(
-                            x =
-                                -size.width *
-                                    .06f,
-                            y =
-                                size.height *
-                                    .82f
-                        ),
-                    radius =
-                        size.width *
-                            1.20f
-                )
-        )
-
-        /*
-         * Lower-right balancing cloud.
-         */
-        drawRect(
-            brush =
-                Brush.radialGradient(
-                    colors =
-                        listOf(
-                            bright.copy(
-                                alpha =
-                                    when (
-                                        theme
-                                    ) {
-                                        XmoTheme.Light ->
-                                            .25f
-
-                                        XmoTheme.Dark ->
-                                            .28f
-
-                                        XmoTheme.Amoled ->
-                                            .21f
-                                    }
-                            ),
-                            Color.Transparent
+                    colorStops =
+                        arrayOf(
+                            0f to
+                                rich.copy(
+                                    alpha =
+                                        when (theme) {
+                                            XmoTheme.Light -> .38f
+                                            XmoTheme.Dark -> .43f
+                                            XmoTheme.Amoled -> .29f
+                                        }
+                                ),
+                            .48f to
+                                rich.copy(
+                                    alpha = .18f
+                                ),
+                            1f to
+                                Color.Transparent
                         ),
                     center =
                         Offset(
                             x =
                                 size.width *
-                                    1.04f,
+                                    1.13f,
                             y =
                                 size.height *
-                                    .93f
+                                    .25f
                         ),
                     radius =
                         size.width *
-                            1.32f
+                            1.37f
+                )
+        )
+
+        drawRect(
+            brush =
+                Brush.radialGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to
+                                soft.copy(
+                                    alpha =
+                                        when (theme) {
+                                            XmoTheme.Light -> .35f
+                                            XmoTheme.Dark -> .30f
+                                            XmoTheme.Amoled -> .20f
+                                        }
+                                ),
+                            .42f to
+                                middle.copy(
+                                    alpha =
+                                        when (theme) {
+                                            XmoTheme.Light -> .22f
+                                            XmoTheme.Dark -> .21f
+                                            XmoTheme.Amoled -> .15f
+                                        }
+                                ),
+                            1f to
+                                Color.Transparent
+                        ),
+                    center =
+                        Offset(
+                            x =
+                                size.width *
+                                    .43f,
+                            y =
+                                size.height *
+                                    .49f
+                        ),
+                    radius =
+                        size.width *
+                            1.72f
                 )
         )
 
         /*
-         * Tiny finishing veil keeps Light, Dark and AMOLED
-         * distinct without covering artwork color.
+         * Lower fields stay visible through the glass player
+         * panel so the panel does not become a flat solid block.
          */
-        when (
-            theme
-        ) {
+        drawRect(
+            brush =
+                Brush.radialGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to
+                                rich.copy(
+                                    alpha =
+                                        when (theme) {
+                                            XmoTheme.Light -> .34f
+                                            XmoTheme.Dark -> .37f
+                                            XmoTheme.Amoled -> .27f
+                                        }
+                                ),
+                            .50f to
+                                rich.copy(
+                                    alpha = .14f
+                                ),
+                            1f to
+                                Color.Transparent
+                        ),
+                    center =
+                        Offset(
+                            x =
+                                size.width *
+                                    -.16f,
+                            y =
+                                size.height *
+                                    .84f
+                        ),
+                    radius =
+                        size.width *
+                            1.50f
+                )
+        )
+
+        drawRect(
+            brush =
+                Brush.radialGradient(
+                    colorStops =
+                        arrayOf(
+                            0f to
+                                middle.copy(
+                                    alpha =
+                                        when (theme) {
+                                            XmoTheme.Light -> .32f
+                                            XmoTheme.Dark -> .34f
+                                            XmoTheme.Amoled -> .23f
+                                        }
+                                ),
+                            .54f to
+                                middle.copy(
+                                    alpha = .13f
+                                ),
+                            1f to
+                                Color.Transparent
+                        ),
+                    center =
+                        Offset(
+                            x =
+                                size.width *
+                                    1.12f,
+                            y =
+                                size.height *
+                                    .96f
+                        ),
+                    radius =
+                        size.width *
+                            1.58f
+                )
+        )
+
+        /*
+         * Neutral veil preserves the identity of each theme.
+         */
+        when (theme) {
             XmoTheme.Light -> {
                 drawRect(
                     brush =
                         Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    Color.White.copy(
-                                        alpha =
-                                            .04f
-                                    ),
-                                    Color.Transparent,
-                                    Color.White.copy(
-                                        alpha =
-                                            .07f
-                                    )
+                            colorStops =
+                                arrayOf(
+                                    0f to
+                                        Color.White.copy(
+                                            alpha = .05f
+                                        ),
+                                    .50f to
+                                        Color.Transparent,
+                                    1f to
+                                        Color.White.copy(
+                                            alpha = .08f
+                                        )
                                 )
                         )
                 )
@@ -348,17 +304,18 @@ internal fun PlayerBackground(
                 drawRect(
                     brush =
                         Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    Color.White.copy(
-                                        alpha =
-                                            .012f
-                                    ),
-                                    Color.Transparent,
-                                    Color.Black.copy(
-                                        alpha =
-                                            .035f
-                                    )
+                            colorStops =
+                                arrayOf(
+                                    0f to
+                                        Color.White.copy(
+                                            alpha = .012f
+                                        ),
+                                    .55f to
+                                        Color.Transparent,
+                                    1f to
+                                        Color.Black.copy(
+                                            alpha = .05f
+                                        )
                                 )
                         )
                 )
@@ -368,17 +325,18 @@ internal fun PlayerBackground(
                 drawRect(
                     brush =
                         Brush.verticalGradient(
-                            colors =
-                                listOf(
-                                    Color.Transparent,
-                                    Color.Black.copy(
-                                        alpha =
-                                            .035f
-                                    ),
-                                    Color.Black.copy(
-                                        alpha =
-                                            .075f
-                                    )
+                            colorStops =
+                                arrayOf(
+                                    0f to
+                                        Color.Black.copy(
+                                            alpha = .02f
+                                        ),
+                                    .52f to
+                                        Color.Transparent,
+                                    1f to
+                                        Color.Black.copy(
+                                            alpha = .11f
+                                        )
                                 )
                         )
                 )
@@ -400,29 +358,16 @@ private fun brightenSplash(
     return Color(
         red =
             color.red +
-                (
-                    1f -
-                        color.red
-                    ) *
+                (1f - color.red) *
                 value,
-
         green =
             color.green +
-                (
-                    1f -
-                        color.green
-                    ) *
+                (1f - color.green) *
                 value,
-
         blue =
             color.blue +
-                (
-                    1f -
-                        color.blue
-                    ) *
+                (1f - color.blue) *
                 value,
-
-        alpha =
-            1f
+        alpha = 1f
     )
 }
