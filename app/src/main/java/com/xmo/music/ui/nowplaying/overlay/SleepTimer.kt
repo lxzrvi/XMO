@@ -1,9 +1,7 @@
 package com.xmo.music.ui.nowplaying
 
-import androidx.compose.foundation.Canvas
+import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -16,33 +14,36 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Close
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.composables.icons.lucide.Clock3
-import com.composables.icons.lucide.Lucide
-import com.composables.icons.lucide.X
 import com.xmo.music.ui.HomeColors
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun SleepTimerBox(
     colors: HomeColors,
     active: Boolean,
+    remainingMs: Long,
     dismiss: () -> Unit,
     setTimer: (
         Long,
@@ -60,8 +61,50 @@ internal fun SleepTimerBox(
             mutableStateOf("")
         }
 
+    var closing by
+        remember {
+            mutableStateOf(false)
+        }
+
+    val scope =
+        rememberCoroutineScope()
+
     val accent =
         LocalXmoAccent.current
+
+    val reveal =
+        remember {
+            Animatable(0f)
+        }
+
+    LaunchedEffect(Unit) {
+        reveal.animateTo(
+            targetValue = 1f,
+            animationSpec =
+                XmoPlayerAnimation
+                    .overlayRevealSpec
+        )
+    }
+
+    suspend fun closeAnimated(
+        action: (() -> Unit)? = null
+    ) {
+        if (closing) {
+            return
+        }
+
+        closing = true
+
+        reveal.animateTo(
+            targetValue = 0f,
+            animationSpec =
+                XmoPlayerAnimation
+                    .overlayHideSpec
+        )
+
+        action?.invoke()
+            ?: dismiss()
+    }
 
     val minutes =
         customMinutes
@@ -73,17 +116,12 @@ internal fun SleepTimerBox(
             .toLongOrNull()
             ?: 0L
 
-    /*
-     * Seconds input is normalized to 0..59.
-     * Minutes can be 0..9999.
-     */
     val validCustom =
         (
             minutes > 0L ||
                 seconds > 0L
             ) &&
-            seconds in
-                0L..59L
+            seconds in 0L..59L
 
     val customDurationMs =
         (
@@ -95,33 +133,40 @@ internal fun SleepTimerBox(
 
     Box(
         modifier =
-            Modifier
-                .fillMaxSize()
-                .background(
-                    Color.Black.copy(
-                        alpha = .30f
-                    )
-                )
-                .clickable(
-                    interactionSource =
-                        remember {
-                            MutableInteractionSource()
-                        },
-                    indication = null,
-                    onClick =
-                        dismiss
-                ),
+            Modifier.fillMaxSize(),
         contentAlignment =
             Alignment.Center
     ) {
+        /*
+         * Invisible outside-tap target.
+         */
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .simpleTap {
+                        scope.launch {
+                            closeAnimated()
+                        }
+                    }
+        )
+
         Column(
             modifier =
                 Modifier
                     .padding(
-                        horizontal =
-                            30.dp
+                        horizontal = 30.dp
                     )
                     .fillMaxWidth()
+                    .graphicsLayer {
+                        with(
+                            XmoPlayerAnimation
+                        ) {
+                            centerOverlay(
+                                reveal.value
+                            )
+                        }
+                    }
                     .clip(
                         RoundedCornerShape(
                             25.dp
@@ -130,14 +175,7 @@ internal fun SleepTimerBox(
                     .background(
                         colors.surface
                     )
-                    .clickable(
-                        interactionSource =
-                            remember {
-                                MutableInteractionSource()
-                            },
-                        indication = null,
-                        onClick = {}
-                    )
+                    .simpleTap {}
                     .padding(
                         17.dp
                     )
@@ -148,56 +186,71 @@ internal fun SleepTimerBox(
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
-                Text(
-                    text =
-                        "Sleep Timer",
-                    color =
-                        colors.text,
-                    fontFamily =
-                        XmoFont.bold,
-                    fontSize =
-                        17.sp,
+                Column(
                     modifier =
-                        Modifier.weight(
-                            1f
+                        Modifier.weight(1f)
+                ) {
+                    Text(
+                        text = "Sleep Timer",
+                        color =
+                            colors.text,
+                        fontFamily =
+                            XmoFont.bold,
+                        fontSize =
+                            17.sp
+                    )
+
+                    if (
+                        active &&
+                        remainingMs > 0L
+                    ) {
+                        Text(
+                            text =
+                                "${sleepRemainingTime(remainingMs)} remaining",
+                            color =
+                                accent,
+                            fontFamily =
+                                XmoFont.medium,
+                            fontSize =
+                                10.sp
                         )
-                )
+                    }
+                }
 
                 PremiumCircle(
-                    size =
-                        36.dp,
+                    size = 36.dp,
                     background =
                         colors.button,
-                    onClick =
-                        dismiss
+                    onClick = {
+                        scope.launch {
+                            closeAnimated()
+                        }
+                    }
                 ) {
-                    SleepCloseIcon(
-                        color =
+                    Icon(
+                        imageVector =
+                            Icons.Rounded.Close,
+                        contentDescription =
+                            "Close",
+                        tint =
                             colors.text,
                         modifier =
                             Modifier.size(
-                                17.dp
+                                19.dp
                             )
                     )
                 }
             }
 
             Spacer(
-                modifier =
-                    Modifier.height(
-                        9.dp
-                    )
+                Modifier.height(9.dp)
             )
 
             listOf(
-                15L to
-                    "15 minutes",
-                30L to
-                    "30 minutes",
-                45L to
-                    "45 minutes",
-                60L to
-                    "1 hour"
+                15L to "15 minutes",
+                30L to "30 minutes",
+                45L to "45 minutes",
+                60L to "1 hour"
             ).forEach {
                     (
                         presetMinutes,
@@ -206,30 +259,28 @@ internal fun SleepTimerBox(
 
                 OverlayAction(
                     icon =
-                        Lucide.Clock3,
-                    title =
-                        label,
-                    colors =
-                        colors
+                        Icons.Rounded.Schedule,
+                    title = label,
+                    colors = colors
                 ) {
-                    setTimer(
-                        presetMinutes *
-                            60_000L,
-                        label
-                    )
+                    scope.launch {
+                        closeAnimated {
+                            setTimer(
+                                presetMinutes *
+                                    60_000L,
+                                label
+                            )
+                        }
+                    }
                 }
             }
 
             Spacer(
-                modifier =
-                    Modifier.height(
-                        8.dp
-                    )
+                Modifier.height(8.dp)
             )
 
             Text(
-                text =
-                    "Custom timer",
+                text = "Custom timer",
                 color =
                     colors.sub,
                 fontFamily =
@@ -238,60 +289,42 @@ internal fun SleepTimerBox(
                     10.sp,
                 modifier =
                     Modifier.padding(
-                        start =
-                            2.dp,
-                        bottom =
-                            6.dp
+                        start = 2.dp,
+                        bottom = 6.dp
                     )
             )
 
-            /*
-             * Two independent fields:
-             *
-             * MINUTES | SECONDS | SET
-             */
             Row(
                 modifier =
                     Modifier
                         .fillMaxWidth()
-                        .height(
-                            52.dp
-                        ),
+                        .height(52.dp),
                 verticalAlignment =
                     Alignment.CenterVertically
             ) {
                 TimerNumberBox(
                     value =
                         customMinutes,
-                    placeholder =
-                        "00",
-                    label =
-                        "MIN",
-                    colors =
-                        colors,
+                    placeholder = "00",
+                    label = "MIN",
+                    colors = colors,
                     modifier =
-                        Modifier.weight(
-                            1f
-                        ),
+                        Modifier.weight(1f),
                     onValueChange = {
                         customMinutes =
                             it
                                 .filter(
                                     Char::isDigit
                                 )
-                                .take(
-                                    4
-                                )
+                                .take(4)
                     }
                 )
 
                 Text(
-                    text =
-                        ":",
+                    text = ":",
                     color =
                         colors.text.copy(
-                            alpha =
-                                .64f
+                            alpha = .64f
                         ),
                     fontFamily =
                         XmoFont.bold,
@@ -300,43 +333,27 @@ internal fun SleepTimerBox(
                     textAlign =
                         TextAlign.Center,
                     modifier =
-                        Modifier.width(
-                            20.dp
-                        )
+                        Modifier.width(20.dp)
                 )
 
                 TimerNumberBox(
                     value =
                         customSeconds,
-                    placeholder =
-                        "00",
-                    label =
-                        "SEC",
-                    colors =
-                        colors,
+                    placeholder = "00",
+                    label = "SEC",
+                    colors = colors,
                     modifier =
-                        Modifier.weight(
-                            1f
-                        ),
+                        Modifier.weight(1f),
                     onValueChange = {
                         val digits =
                             it
                                 .filter(
                                     Char::isDigit
                                 )
-                                .take(
-                                    2
-                                )
+                                .take(2)
 
-                        /*
-                         * Keep the seconds field immediately valid.
-                         * Typing 99 becomes 59 instead of silently
-                         * creating 99 seconds.
-                         */
                         customSeconds =
-                            if (
-                                digits.isBlank()
-                            ) {
+                            if (digits.isBlank()) {
                                 ""
                             } else {
                                 digits
@@ -352,22 +369,15 @@ internal fun SleepTimerBox(
                 )
 
                 Spacer(
-                    modifier =
-                        Modifier.width(
-                            9.dp
-                        )
+                    Modifier.width(9.dp)
                 )
 
                 PremiumCircle(
-                    size =
-                        42.dp,
+                    size = 42.dp,
                     background =
-                        if (
-                            validCustom
-                        ) {
+                        if (validCustom) {
                             accent.copy(
-                                alpha =
-                                    .18f
+                                alpha = .18f
                             )
                         } else {
                             colors.button
@@ -376,44 +386,44 @@ internal fun SleepTimerBox(
                         validCustom,
                     onClick = {
                         if (
-                            !validCustom ||
-                            customDurationMs <=
+                            validCustom &&
+                            customDurationMs >
                             0L
                         ) {
-                            return@PremiumCircle
+                            scope.launch {
+                                closeAnimated {
+                                    setTimer(
+                                        customDurationMs,
+                                        customTimerLabel(
+                                            minutes =
+                                                minutes,
+                                            seconds =
+                                                seconds
+                                        )
+                                    )
+                                }
+                            }
                         }
-
-                        setTimer(
-                            customDurationMs,
-                            customTimerLabel(
-                                minutes =
-                                    minutes,
-                                seconds =
-                                    seconds
-                            )
-                        )
                     }
                 ) {
-                    SleepTimerSetIcon(
-                        color =
-                            if (
-                                validCustom
-                            ) {
+                    Icon(
+                        imageVector =
+                            Icons.Rounded.Schedule,
+                        contentDescription =
+                            "Set timer",
+                        tint =
+                            if (validCustom) {
                                 accent
                             } else {
                                 colors.sub
                             },
                         modifier =
-                            Modifier.size(
-                                20.dp
-                            )
+                            Modifier.size(21.dp)
                     )
                 }
             }
 
-            if (
-                validCustom
-            ) {
+            if (validCustom) {
                 Text(
                     text =
                         customTimerLabel(
@@ -424,8 +434,7 @@ internal fun SleepTimerBox(
                         ),
                     color =
                         accent.copy(
-                            alpha =
-                                .88f
+                            alpha = .88f
                         ),
                     fontFamily =
                         XmoFont.medium,
@@ -433,35 +442,31 @@ internal fun SleepTimerBox(
                         10.sp,
                     modifier =
                         Modifier.padding(
-                            start =
-                                2.dp,
-                            top =
-                                5.dp
+                            start = 2.dp,
+                            top = 5.dp
                         )
                 )
             }
 
-            if (
-                active
-            ) {
+            if (active) {
                 Spacer(
-                    modifier =
-                        Modifier.height(
-                            9.dp
-                        )
+                    Modifier.height(9.dp)
                 )
 
                 OverlayAction(
                     icon =
-                        Lucide.X,
+                        Icons.Rounded.Close,
                     title =
                         "Cancel Timer",
-                    active =
-                        true,
-                    colors =
-                        colors,
-                    click =
-                        cancel
+                    active = true,
+                    colors = colors,
+                    click = {
+                        scope.launch {
+                            closeAnimated {
+                                cancel()
+                            }
+                        }
+                    }
                 )
             }
         }
@@ -480,9 +485,7 @@ private fun TimerNumberBox(
     Box(
         modifier =
             modifier
-                .height(
-                    52.dp
-                )
+                .height(52.dp)
                 .clip(
                     RoundedCornerShape(
                         14.dp
@@ -492,8 +495,7 @@ private fun TimerNumberBox(
                     colors.button
                 )
                 .padding(
-                    horizontal =
-                        10.dp
+                    horizontal = 10.dp
                 ),
         contentAlignment =
             Alignment.Center
@@ -503,12 +505,10 @@ private fun TimerNumberBox(
                 Alignment.CenterHorizontally
         ) {
             BasicTextField(
-                value =
-                    value,
+                value = value,
                 onValueChange =
                     onValueChange,
-                singleLine =
-                    true,
+                singleLine = true,
                 textStyle =
                     TextStyle(
                         color =
@@ -531,23 +531,18 @@ private fun TimerNumberBox(
                         contentAlignment =
                             Alignment.Center
                     ) {
-                        if (
-                            value.isBlank()
-                        ) {
+                        if (value.isBlank()) {
                             Text(
                                 text =
                                     placeholder,
                                 color =
                                     colors.sub.copy(
-                                        alpha =
-                                            .62f
+                                        alpha = .62f
                                     ),
                                 fontFamily =
                                     XmoFont.bold,
                                 fontSize =
-                                    15.sp,
-                                textAlign =
-                                    TextAlign.Center
+                                    15.sp
                             )
                         }
 
@@ -557,191 +552,55 @@ private fun TimerNumberBox(
             )
 
             Text(
-                text =
-                    label,
+                text = label,
                 color =
                     colors.sub.copy(
-                        alpha =
-                            .72f
+                        alpha = .72f
                     ),
                 fontFamily =
                     XmoFont.medium,
-                fontSize =
-                    7.sp
+                fontSize = 7.sp
             )
         }
     }
 }
 
-@Composable
-private fun SleepCloseIcon(
-    color: Color,
-    modifier: Modifier
-) {
-    Canvas(
-        modifier
-    ) {
-        val stroke =
-            size.minDimension *
-                .115f
+private fun sleepRemainingTime(
+    milliseconds: Long
+): String {
+    val totalSeconds =
+        (
+            milliseconds
+                .coerceAtLeast(0L) +
+                999L
+            ) /
+            1_000L
 
-        drawLine(
-            color =
-                color,
-            start =
-                Offset(
-                    size.width *
-                        .25f,
-                    size.height *
-                        .25f
-                ),
-            end =
-                Offset(
-                    size.width *
-                        .75f,
-                    size.height *
-                        .75f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
+    val hours =
+        totalSeconds /
+            3_600L
+
+    val minutes =
+        (
+            totalSeconds %
+                3_600L
+            ) /
+            60L
+
+    val seconds =
+        totalSeconds %
+            60L
+
+    return if (hours > 0L) {
+        "%d:%02d:%02d".format(
+            hours,
+            minutes,
+            seconds
         )
-
-        drawLine(
-            color =
-                color,
-            start =
-                Offset(
-                    size.width *
-                        .75f,
-                    size.height *
-                        .25f
-                ),
-            end =
-                Offset(
-                    size.width *
-                        .25f,
-                    size.height *
-                        .75f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
-        )
-    }
-}
-
-@Composable
-private fun SleepTimerSetIcon(
-    color: Color,
-    modifier: Modifier
-) {
-    Canvas(
-        modifier
-    ) {
-        val stroke =
-            size.minDimension *
-                .09f
-
-        drawCircle(
-            color =
-                color,
-            radius =
-                size.minDimension *
-                    .30f,
-            center =
-                center,
-            style =
-                androidx.compose.ui.graphics.drawscope.Stroke(
-                    width =
-                        stroke
-                )
-        )
-
-        drawLine(
-            color =
-                color,
-            start =
-                center,
-            end =
-                Offset(
-                    center.x,
-                    size.height *
-                        .31f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
-        )
-
-        drawLine(
-            color =
-                color,
-            start =
-                center,
-            end =
-                Offset(
-                    size.width *
-                        .64f,
-                    size.height *
-                        .56f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
-        )
-
-        /*
-         * Small filled confirmation mark.
-         */
-        drawLine(
-            color =
-                color,
-            start =
-                Offset(
-                    size.width *
-                        .62f,
-                    size.height *
-                        .75f
-                ),
-            end =
-                Offset(
-                    size.width *
-                        .71f,
-                    size.height *
-                        .83f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
-        )
-
-        drawLine(
-            color =
-                color,
-            start =
-                Offset(
-                    size.width *
-                        .71f,
-                    size.height *
-                        .83f
-                ),
-            end =
-                Offset(
-                    size.width *
-                        .88f,
-                    size.height *
-                        .65f
-                ),
-            strokeWidth =
-                stroke,
-            cap =
-                StrokeCap.Round
+    } else {
+        "%02d:%02d".format(
+            minutes,
+            seconds
         )
     }
 }
