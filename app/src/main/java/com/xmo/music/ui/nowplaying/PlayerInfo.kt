@@ -10,14 +10,21 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.Info
+import androidx.compose.material.icons.rounded.QueueMusic
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.material3.Text
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,10 +51,10 @@ internal fun PlayerInfo(
     openDetails: () -> Unit,
     openArtist: () -> Unit
 ) {
-    val inactiveHeart =
+    val iconColor =
         when (theme) {
             XmoTheme.Light ->
-                Color(0xFF202126)
+                Color(0xFF15161A)
 
             XmoTheme.Dark,
             XmoTheme.Amoled ->
@@ -58,7 +65,11 @@ internal fun PlayerInfo(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .height(104.dp)
+                /*
+                 * Extra internal room compensates title position
+                 * while action row follows the higher panel top.
+                 */
+                .height(120.dp)
     ) {
         Row(
             modifier =
@@ -79,19 +90,25 @@ internal fun PlayerInfo(
                 onClick =
                     toggleLike
             ) {
-                /*
-                 * Always filled:
-                 * inactive = neutral/white
-                 * liked = XMO accent red
-                 */
-                FilledHeart(
-                    filled = true,
-                    color =
+                Icon(
+                    imageVector =
+                        Icons.Rounded.Favorite,
+                    contentDescription =
+                        if (liked) {
+                            "Unlike"
+                        } else {
+                            "Like"
+                        },
+                    tint =
                         if (liked) {
                             accent
                         } else {
-                            inactiveHeart
-                        }
+                            iconColor
+                        },
+                    modifier =
+                        Modifier.size(
+                            21.dp
+                        )
                 )
             }
 
@@ -106,15 +123,25 @@ internal fun PlayerInfo(
                 onClick =
                     openCategories
             ) {
-                FilledStar(
-                    filled =
-                        inCategory,
-                    color =
+                Icon(
+                    imageVector =
+                        if (inCategory) {
+                            Icons.Rounded.Star
+                        } else {
+                            Icons.Rounded.StarBorder
+                        },
+                    contentDescription =
+                        "Categories",
+                    tint =
                         if (inCategory) {
                             accent
                         } else {
-                            colors.icon
-                        }
+                            iconColor
+                        },
+                    modifier =
+                        Modifier.size(
+                            21.dp
+                        )
                 )
             }
         }
@@ -140,6 +167,8 @@ internal fun PlayerInfo(
                     colors,
                 accent =
                     accent,
+                iconColor =
+                    iconColor,
                 onClick =
                     openSleep
             )
@@ -149,12 +178,16 @@ internal fun PlayerInfo(
                 onClick =
                     openQueue
             ) {
-                PremiumQueueIcon(
-                    color =
-                        colors.icon,
+                Icon(
+                    imageVector =
+                        Icons.Rounded.QueueMusic,
+                    contentDescription =
+                        "Queue",
+                    tint =
+                        iconColor,
                     modifier =
                         Modifier.size(
-                            19.dp
+                            21.dp
                         )
                 )
             }
@@ -164,17 +197,25 @@ internal fun PlayerInfo(
                 onClick =
                     openDetails
             ) {
-                PremiumInfoIcon(
-                    color =
-                        colors.icon,
+                Icon(
+                    imageVector =
+                        Icons.Rounded.Info,
+                    contentDescription =
+                        "Song details",
+                    tint =
+                        iconColor,
                     modifier =
                         Modifier.size(
-                            19.dp
+                            21.dp
                         )
                 )
             }
         }
 
+        /*
+         * Title stays around the previous screen position even
+         * though the panel edge/actions moved 16dp upward.
+         */
         Column(
             modifier =
                 Modifier
@@ -234,6 +275,7 @@ private fun SleepRingButton(
     totalMs: Long?,
     colors: HomeColors,
     accent: Color,
+    iconColor: Color,
     onClick: () -> Unit
 ) {
     val active =
@@ -258,47 +300,42 @@ private fun SleepRingButton(
         }
 
     Box(
-        modifier =
-            Modifier.size(
-                40.dp
-            ),
+        Modifier.size(40.dp),
         contentAlignment =
             Alignment.Center
     ) {
         CapsuleButton(
             size = 40.dp,
-            onClick =
-                onClick
+            onClick = onClick
         ) {
-            PremiumClockIcon(
-                color =
+            Icon(
+                imageVector =
+                    Icons.Rounded.Schedule,
+                contentDescription =
+                    "Sleep timer",
+                tint =
                     if (active) {
                         accent
                     } else {
-                        colors.icon
+                        iconColor
                     },
                 modifier =
                     Modifier.size(
-                        19.dp
+                        21.dp
                     )
             )
         }
 
         if (progress != null) {
             Canvas(
-                Modifier.size(
-                    32.dp
-                )
+                Modifier.size(32.dp)
             ) {
                 drawArc(
-                    color =
-                        accent,
-                    startAngle =
-                        -90f,
+                    color = accent,
+                    startAngle = -90f,
                     sweepAngle =
                         360f * progress,
-                    useCenter =
-                        false,
+                    useCenter = false,
                     style =
                         Stroke(
                             width =
@@ -309,171 +346,5 @@ private fun SleepRingButton(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun PremiumClockIcon(
-    color: Color,
-    modifier: Modifier
-) {
-    Canvas(modifier) {
-        val stroke =
-            size.minDimension * .095f
-
-        drawCircle(
-            color = color,
-            radius =
-                size.minDimension * .31f,
-            center = center,
-            style =
-                Stroke(
-                    width = stroke
-                )
-        )
-
-        drawLine(
-            color = color,
-            start = center,
-            end =
-                Offset(
-                    center.x,
-                    size.height * .31f
-                ),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-
-        drawLine(
-            color = color,
-            start = center,
-            end =
-                Offset(
-                    size.width * .64f,
-                    size.height * .57f
-                ),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-    }
-}
-
-@Composable
-private fun PremiumQueueIcon(
-    color: Color,
-    modifier: Modifier
-) {
-    Canvas(modifier) {
-        val stroke =
-            size.minDimension * .11f
-
-        val ys =
-            listOf(
-                .31f,
-                .50f,
-                .69f
-            )
-
-        ys.forEachIndexed {
-                index,
-                value ->
-
-            drawLine(
-                color = color,
-                start =
-                    Offset(
-                        size.width * .22f,
-                        size.height * value
-                    ),
-                end =
-                    Offset(
-                        size.width *
-                            if (index == 1) {
-                                .73f
-                            } else {
-                                .63f
-                            },
-                        size.height * value
-                    ),
-                strokeWidth = stroke,
-                cap = StrokeCap.Round
-            )
-        }
-
-        drawCircle(
-            color = color,
-            radius =
-                size.minDimension * .075f,
-            center =
-                Offset(
-                    size.width * .75f,
-                    size.height * .68f
-                )
-        )
-
-        drawLine(
-            color = color,
-            start =
-                Offset(
-                    size.width * .81f,
-                    size.height * .30f
-                ),
-            end =
-                Offset(
-                    size.width * .81f,
-                    size.height * .67f
-                ),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
-    }
-}
-
-@Composable
-private fun PremiumInfoIcon(
-    color: Color,
-    modifier: Modifier
-) {
-    Canvas(modifier) {
-        val stroke =
-            size.minDimension * .095f
-
-        drawCircle(
-            color = color,
-            radius =
-                size.minDimension * .31f,
-            center = center,
-            style =
-                Stroke(
-                    width = stroke
-                )
-        )
-
-        drawCircle(
-            color = color,
-            radius =
-                size.minDimension * .055f,
-            center =
-                Offset(
-                    center.x,
-                    size.height * .35f
-                )
-        )
-
-        drawLine(
-            color = color,
-            start =
-                Offset(
-                    center.x,
-                    size.height * .49f
-                ),
-            end =
-                Offset(
-                    center.x,
-                    size.height * .67f
-                ),
-            strokeWidth = stroke,
-            cap = StrokeCap.Round
-        )
     }
 }
