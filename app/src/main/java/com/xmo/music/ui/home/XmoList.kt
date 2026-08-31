@@ -2,6 +2,7 @@ package com.xmo.music.ui.home
 
 import android.content.Intent
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -13,9 +14,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
@@ -35,12 +36,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
-import com.xmo.music.data.UserCategory
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 
@@ -51,11 +53,11 @@ internal fun XmoList(
     dismiss: () -> Unit,
     content: @Composable ColumnScope.() -> Unit
 ) {
-    val maxHeight =
+    val height =
         LocalConfiguration.current
             .screenHeightDp.dp * .70f
 
-    val sheetState =
+    val state =
         rememberModalBottomSheetState(
             skipPartiallyExpanded = true
         )
@@ -64,7 +66,7 @@ internal fun XmoList(
 
     ModalBottomSheet(
         onDismissRequest = dismiss,
-        sheetState = sheetState,
+        sheetState = state,
         containerColor = c.surface,
         contentColor = c.text,
         scrimColor = Color.Transparent
@@ -72,7 +74,7 @@ internal fun XmoList(
         Column(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = maxHeight)
+                .heightIn(max = height)
                 .verticalScroll(
                     rememberScrollState()
                 )
@@ -88,17 +90,12 @@ internal fun XmoSongList(
     liked: Boolean,
     recent: Boolean,
     categoryName: String?,
-    categories: List<UserCategory>,
     c: HomeColors,
     dismiss: () -> Unit,
     toggleLike: () -> Unit,
     playNext: () -> Unit,
     removeRecent: () -> Unit,
-    removeCategory: () -> Unit,
-    setCategory: (
-        String,
-        Boolean
-    ) -> Unit
+    removeCategory: () -> Unit
 ) {
     val context =
         LocalContext.current
@@ -107,34 +104,51 @@ internal fun XmoSongList(
         c = c,
         dismiss = dismiss
     ) {
-        Column(
-            Modifier.padding(
-                horizontal = 20.dp,
-                vertical = 10.dp
-            )
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    start = 18.dp,
+                    end = 18.dp,
+                    bottom = 12.dp
+                ),
+            verticalAlignment =
+                Alignment.CenterVertically
         ) {
-            Text(
-                text = song.title,
-                color = c.text,
-                fontFamily = XmoFont.bold,
-                fontSize = 16.sp,
-                maxLines = 1
+            AsyncImage(
+                model = song.artwork,
+                contentDescription = null,
+                modifier = Modifier
+                    .size(58.dp)
+                    .background(
+                        c.button,
+                        RoundedCornerShape(12.dp)
+                    ),
+                contentScale = ContentScale.Crop
             )
 
-            Text(
-                text = song.artist,
-                color = c.sub,
-                fontFamily = XmoFont.normal,
-                fontSize = 10.sp,
-                maxLines = 1
-            )
+            Column(
+                Modifier
+                    .weight(1f)
+                    .padding(start = 12.dp)
+            ) {
+                Text(
+                    text = song.title,
+                    color = c.text,
+                    fontFamily = XmoFont.bold,
+                    fontSize = 14.sp,
+                    maxLines = 1
+                )
+
+                Text(
+                    text = song.artist,
+                    color = c.sub,
+                    fontFamily = XmoFont.normal,
+                    fontSize = 10.sp,
+                    maxLines = 1
+                )
+            }
         }
-
-        XmoListAction(
-            title = "Details",
-            icon = Icons.Rounded.Info,
-            c = c
-        ) {}
 
         if (categoryName != null) {
             XmoListAction(
@@ -175,43 +189,6 @@ internal fun XmoSongList(
             dismiss()
         }
 
-        if (categories.isNotEmpty()) {
-            Text(
-                text = "ADD TO CATEGORY",
-                color = LocalXmoAccent.current,
-                fontFamily = XmoFont.bold,
-                fontSize = 9.sp,
-                letterSpacing = .8.sp,
-                modifier = Modifier.padding(
-                    start = 20.dp,
-                    top = 12.dp,
-                    bottom = 4.dp
-                )
-            )
-
-            categories.forEach { category ->
-                val added =
-                    song.id in category.songIds
-
-                XmoListAction(
-                    title =
-                        if (added) {
-                            "${category.name} ✓"
-                        } else {
-                            category.name
-                        },
-                    icon = Icons.Rounded.Category,
-                    active = added,
-                    c = c
-                ) {
-                    setCategory(
-                        category.id,
-                        !added
-                    )
-                }
-            }
-        }
-
         XmoListAction(
             title = "Share",
             icon = Icons.Rounded.Share,
@@ -245,6 +222,12 @@ internal fun XmoSongList(
                 dismiss()
             }
         }
+
+        XmoListAction(
+            title = "Details",
+            icon = Icons.Rounded.Info,
+            c = c
+        ) {}
     }
 }
 
@@ -267,24 +250,32 @@ internal fun XmoListAction(
     Row(
         Modifier
             .fillMaxWidth()
+            .padding(
+                horizontal = 14.dp,
+                vertical = 3.dp
+            )
             .graphicsLayer {
-                val scale =
+                val value =
                     if (pressed) {
-                        .975f
+                        .97f
                     } else {
                         1f
                     }
 
-                scaleX = scale
-                scaleY = scale
+                scaleX = value
+                scaleY = value
             }
+            .background(
+                c.button,
+                RoundedCornerShape(14.dp)
+            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
                 onClick = click
             )
             .padding(
-                horizontal = 20.dp,
+                horizontal = 14.dp,
                 vertical = 12.dp
             ),
         verticalAlignment =
