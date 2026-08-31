@@ -2,16 +2,15 @@ package com.xmo.music.ui.home
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imePadding
@@ -43,17 +42,18 @@ internal fun XmoBox(
 
     Dialog(
         onDismissRequest = dismiss,
-        properties = DialogProperties(
-            dismissOnBackPress = true,
-            dismissOnClickOutside = true,
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
+        properties =
+            DialogProperties(
+                dismissOnBackPress = true,
+                dismissOnClickOutside = true,
+                usePlatformDefaultWidth = false,
+                decorFitsSystemWindows = false
+            )
     ) {
         AnimatedVisibility(
             visible = true,
-            enter = fadeIn(tween(160)),
-            exit = fadeOut(tween(130))
+            enter = fadeIn(tween(150)),
+            exit = fadeOut(tween(120))
         ) {
             Box(
                 Modifier
@@ -70,7 +70,7 @@ internal fun XmoBox(
                             RoundedCornerShape(24.dp)
                         )
                         .border(
-                            .8.dp,
+                            .7.dp,
                             c.border,
                             RoundedCornerShape(24.dp)
                         )
@@ -86,15 +86,15 @@ internal fun XmoBox(
                         Text(
                             text = title,
                             color = c.text,
-                            fontFamily = XmoFont.bold,
-                            fontSize = 17.sp,
+                            fontFamily = XmoFont.logo,
+                            fontSize = 18.sp,
                             modifier = Modifier.weight(1f)
                         )
 
                         IconButton(
                             onClick = dismiss,
-                            modifier = Modifier
-                                .background(
+                            modifier =
+                                Modifier.background(
                                     c.button,
                                     CircleShape
                                 )
