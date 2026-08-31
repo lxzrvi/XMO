@@ -9,8 +9,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,7 +21,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -43,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -73,13 +70,12 @@ internal fun HomeRecentlyPlayed(
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Nothing played yet",
+                "Nothing played yet",
                 color = c.sub,
                 fontFamily = XmoFont.normal,
                 fontSize = 12.sp
             )
         }
-
         return
     }
 
@@ -89,25 +85,20 @@ internal fun HomeRecentlyPlayed(
     val fling =
         rememberSnapFlingBehavior(state)
 
-    var current by
+    var currentIndex by
         remember {
             mutableIntStateOf(0)
         }
 
-    LaunchedEffect(
-        songs.firstOrNull()?.id
-    ) {
-        if (songs.isNotEmpty()) {
-            state.scrollToItem(0)
-            current = 0
-        }
+    LaunchedEffect(songs.first().id) {
+        state.animateScrollToItem(0)
     }
 
     LaunchedEffect(state) {
         snapshotFlow {
             state.firstVisibleItemIndex
         }.collect {
-            current =
+            currentIndex =
                 it.coerceIn(
                     0,
                     songs.lastIndex
@@ -128,18 +119,15 @@ internal fun HomeRecentlyPlayed(
             contentPadding =
                 PaddingValues(horizontal = 12.dp)
         ) {
-            itemsIndexed(
+            items(
                 items = songs,
-                key = { _, song ->
-                    song.id
-                }
-            ) { _, song ->
+                key = { it.id }
+            ) { song ->
                 BoxWithConstraints(
                     Modifier.fillParentMaxWidth()
                 ) {
                     RecentCard(
                         song = song,
-                        c = c,
                         current =
                             currentSongId ==
                                 song.id,
@@ -147,10 +135,11 @@ internal fun HomeRecentlyPlayed(
                             currentSongId ==
                                 song.id &&
                                 isPlaying,
+                        c = c,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(122.dp),
-                        play = {
+                        click = {
                             if (
                                 currentSongId ==
                                 song.id
@@ -160,7 +149,7 @@ internal fun HomeRecentlyPlayed(
                                 play(song)
                             }
                         },
-                        options = {
+                        longClick = {
                             options(song)
                         }
                     )
@@ -171,16 +160,15 @@ internal fun HomeRecentlyPlayed(
         val dots =
             minOf(6, songs.size)
 
-        val active =
+        val selected =
             if (songs.size <= 1) {
                 0
             } else {
                 (
-                    current.toFloat() /
+                    currentIndex.toFloat() /
                         (songs.size - 1) *
                         (dots - 1)
-                    )
-                    .roundToInt()
+                    ).roundToInt()
                     .coerceIn(0, dots - 1)
             }
 
@@ -193,14 +181,14 @@ internal fun HomeRecentlyPlayed(
                 Box(
                     Modifier
                         .size(
-                            if (index == active) {
+                            if (selected == index) {
                                 7.dp
                             } else {
                                 5.dp
                             }
                         )
                         .background(
-                            if (index == active) {
+                            if (selected == index) {
                                 LocalXmoAccent.current
                             } else {
                                 c.sub.copy(alpha = .30f)
@@ -217,34 +205,15 @@ internal fun HomeRecentlyPlayed(
 @Composable
 private fun RecentCard(
     song: Song,
-    c: HomeColors,
     current: Boolean,
     playing: Boolean,
+    c: HomeColors,
     modifier: Modifier,
-    play: () -> Unit,
-    options: () -> Unit
+    click: () -> Unit,
+    longClick: () -> Unit
 ) {
-    val interaction =
-        remember {
-            MutableInteractionSource()
-        }
-
-    val pressed by
-        interaction.collectIsPressedAsState()
-
     Box(
         modifier
-            .graphicsLayer {
-                val scale =
-                    if (pressed) {
-                        .985f
-                    } else {
-                        1f
-                    }
-
-                scaleX = scale
-                scaleY = scale
-            }
             .background(
                 c.surface,
                 RoundedCornerShape(18.dp)
@@ -255,16 +224,22 @@ private fun RecentCard(
                 RoundedCornerShape(18.dp)
             )
             .combinedClickable(
-                interactionSource = interaction,
                 indication = null,
-                onClick = play,
-                onLongClick = options
+                interactionSource =
+                    remember {
+                        androidx.compose.foundation.interaction
+                            .MutableInteractionSource()
+                    },
+                onClick = click,
+                onLongClick = longClick
             )
     ) {
         AsyncImage(
             model = song.artwork,
             contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(.5.dp),
             contentScale = ContentScale.Crop
         )
 
@@ -276,9 +251,7 @@ private fun RecentCard(
                         listOf(
                             Color.Transparent,
                             Color.Transparent,
-                            Color.Black.copy(
-                                alpha = .84f
-                            )
+                            Color.Black.copy(alpha = .84f)
                         )
                     )
                 )
@@ -321,12 +294,11 @@ private fun RecentCard(
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
-                targetState =
-                    current to playing,
+                targetState = current to playing,
                 transitionSpec = {
                     fadeIn() togetherWith fadeOut()
                 },
-                label = "recentPlayback"
+                label = "recentState"
             ) { value ->
                 if (value.first) {
                     Row(
@@ -344,8 +316,7 @@ private fun RecentCard(
                                 },
                             contentDescription = null,
                             tint = Color.White,
-                            modifier =
-                                Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp)
                         )
 
                         Text(
