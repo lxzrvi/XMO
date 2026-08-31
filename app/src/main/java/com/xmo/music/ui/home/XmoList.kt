@@ -3,6 +3,8 @@ package com.xmo.music.ui.home
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -13,9 +15,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Delete
 import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.FavoriteBorder
+import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.QueueMusic
 import androidx.compose.material.icons.rounded.Share
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -24,15 +28,19 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xmo.music.data.Song
+import com.xmo.music.data.UserCategory
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 
@@ -80,14 +88,20 @@ internal fun XmoSongList(
     liked: Boolean,
     recent: Boolean,
     categoryName: String?,
+    categories: List<UserCategory>,
     c: HomeColors,
     dismiss: () -> Unit,
     toggleLike: () -> Unit,
     playNext: () -> Unit,
     removeRecent: () -> Unit,
-    removeCategory: () -> Unit
+    removeCategory: () -> Unit,
+    setCategory: (
+        String,
+        Boolean
+    ) -> Unit
 ) {
-    val context = LocalContext.current
+    val context =
+        LocalContext.current
 
     XmoList(
         c = c,
@@ -116,9 +130,16 @@ internal fun XmoSongList(
             )
         }
 
+        XmoListAction(
+            title = "Details",
+            icon = Icons.Rounded.Info,
+            c = c
+        ) {}
+
         if (categoryName != null) {
             XmoListAction(
-                title = "Remove from $categoryName",
+                title =
+                    "Remove from $categoryName",
                 icon = Icons.Rounded.Delete,
                 c = c
             ) {
@@ -154,6 +175,43 @@ internal fun XmoSongList(
             dismiss()
         }
 
+        if (categories.isNotEmpty()) {
+            Text(
+                text = "ADD TO CATEGORY",
+                color = LocalXmoAccent.current,
+                fontFamily = XmoFont.bold,
+                fontSize = 9.sp,
+                letterSpacing = .8.sp,
+                modifier = Modifier.padding(
+                    start = 20.dp,
+                    top = 12.dp,
+                    bottom = 4.dp
+                )
+            )
+
+            categories.forEach { category ->
+                val added =
+                    song.id in category.songIds
+
+                XmoListAction(
+                    title =
+                        if (added) {
+                            "${category.name} ✓"
+                        } else {
+                            category.name
+                        },
+                    icon = Icons.Rounded.Category,
+                    active = added,
+                    c = c
+                ) {
+                    setCategory(
+                        category.id,
+                        !added
+                    )
+                }
+            }
+        }
+
         XmoListAction(
             title = "Share",
             icon = Icons.Rounded.Share,
@@ -173,6 +231,7 @@ internal fun XmoSongList(
                     "Share song"
                 )
             )
+
             dismiss()
         }
 
@@ -197,10 +256,33 @@ internal fun XmoListAction(
     active: Boolean = false,
     click: () -> Unit
 ) {
+    val interaction =
+        remember {
+            MutableInteractionSource()
+        }
+
+    val pressed by
+        interaction.collectIsPressedAsState()
+
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = click)
+            .graphicsLayer {
+                val scale =
+                    if (pressed) {
+                        .975f
+                    } else {
+                        1f
+                    }
+
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = click
+            )
             .padding(
                 horizontal = 20.dp,
                 vertical = 12.dp
@@ -230,7 +312,8 @@ internal fun XmoListAction(
                 },
             fontFamily = XmoFont.medium,
             fontSize = 12.sp,
-            modifier = Modifier.padding(start = 14.dp)
+            modifier =
+                Modifier.padding(start = 14.dp)
         )
     }
 }
