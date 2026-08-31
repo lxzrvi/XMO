@@ -4,6 +4,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -15,9 +16,11 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xmo.music.R
 import com.xmo.music.data.Song
 import com.xmo.music.data.UserCategory
 import com.xmo.music.ui.XmoFont
@@ -33,11 +36,15 @@ internal fun HomeCategories(
     open: (UserCategory) -> Unit,
     options: (UserCategory) -> Unit
 ) {
-    BackHandler(onBack = back)
+    BackHandler(
+        onBack = back
+    )
 
     val songsById =
         remember(songs) {
-            songs.associateBy { it.id }
+            songs.associateBy {
+                it.id
+            }
         }
 
     Column(
@@ -48,14 +55,24 @@ internal fun HomeCategories(
             subtitle =
                 "${categories.size} categories",
             icon =
-                com.xmo.music.R.drawable
-                    .ic_xmo_all,
-            c = c,
-            action =
-                com.xmo.music.R.drawable
-                    .ic_xmo_add,
-            onAction = create
+                R.drawable.ic_xmo_all,
+            c = c
         )
+
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .padding(
+                    end = 12.dp,
+                    bottom = 6.dp
+                ),
+            contentAlignment =
+                Alignment.CenterEnd
+        ) {
+            HomeCircleAdd(
+                click = create
+            )
+        }
 
         if (categories.isEmpty()) {
             HomeEmpty(
@@ -66,7 +83,8 @@ internal fun HomeCategories(
         }
 
         LazyVerticalGrid(
-            columns = GridCells.Fixed(3),
+            columns =
+                GridCells.Fixed(3),
             contentPadding =
                 PaddingValues(
                     start = 10.dp,
@@ -80,14 +98,18 @@ internal fun HomeCategories(
         ) {
             items(
                 items = categories,
-                key = { it.id },
+                key = {
+                    it.id
+                },
                 contentType = {
                     "category"
                 }
             ) { category ->
                 val categorySongs =
                     category.songIds
-                        .mapNotNull(songsById::get)
+                        .mapNotNull(
+                            songsById::get
+                        )
 
                 Column(
                     Modifier
@@ -107,15 +129,19 @@ internal fun HomeCategories(
                         )
                 ) {
                     HomeCategoryCover(
-                        songs = categorySongs,
-                        cover = covers[category.id],
+                        songs =
+                            categorySongs,
+                        cover =
+                            covers[category.id],
                         c = c
                     )
 
                     Text(
-                        text = category.name,
+                        text =
+                            category.name,
                         color = c.text,
-                        fontFamily = XmoFont.medium,
+                        fontFamily =
+                            XmoFont.medium,
                         fontSize = 11.sp,
                         maxLines = 1,
                         modifier =
