@@ -1,8 +1,9 @@
 package com.xmo.music.ui.home
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,12 +13,16 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Favorite
+import androidx.compose.material.icons.rounded.LibraryMusic
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,6 +33,7 @@ import com.xmo.music.ui.XmoFont
 internal fun HomeMenuDialog(
     c: HomeColors,
     dismiss: () -> Unit,
+    allSongs: () -> Unit,
     liked: () -> Unit,
     categories: () -> Unit,
     scanner: () -> Unit
@@ -38,24 +44,31 @@ internal fun HomeMenuDialog(
         dismiss = dismiss
     ) {
         MenuItem(
-            title = "Liked Songs",
-            icon = Icons.Rounded.Favorite,
-            c = c,
-            click = liked
+            "All Songs",
+            Icons.Rounded.LibraryMusic,
+            c,
+            allSongs
         )
 
         MenuItem(
-            title = "Categories",
-            icon = Icons.Rounded.Category,
-            c = c,
-            click = categories
+            "Liked Songs",
+            Icons.Rounded.Favorite,
+            c,
+            liked
         )
 
         MenuItem(
-            title = "Scan Music",
-            icon = Icons.Rounded.Refresh,
-            c = c,
-            click = scanner
+            "Categories",
+            Icons.Rounded.Category,
+            c,
+            categories
+        )
+
+        MenuItem(
+            "Scan Music",
+            Icons.Rounded.Refresh,
+            c,
+            scanner
         )
     }
 }
@@ -85,7 +98,8 @@ internal fun HomeScannerDialog(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = Icons.Rounded.Refresh,
+                imageVector =
+                    Icons.Rounded.Refresh,
                 contentDescription = null,
                 tint = LocalXmoAccent.current,
                 modifier = Modifier.size(32.dp)
@@ -126,10 +140,33 @@ private fun MenuItem(
     c: HomeColors,
     click: () -> Unit
 ) {
+    val interaction =
+        remember {
+            MutableInteractionSource()
+        }
+
+    val pressed by
+        interaction.collectIsPressedAsState()
+
     Row(
         Modifier
             .fillMaxWidth()
-            .clickable(onClick = click)
+            .graphicsLayer {
+                val scale =
+                    if (pressed) {
+                        .975f
+                    } else {
+                        1f
+                    }
+
+                scaleX = scale
+                scaleY = scale
+            }
+            .clickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = click
+            )
             .padding(12.dp),
         verticalAlignment =
             Alignment.CenterVertically
@@ -146,7 +183,8 @@ private fun MenuItem(
             color = c.text,
             fontFamily = XmoFont.medium,
             fontSize = 12.sp,
-            modifier = Modifier.padding(start = 13.dp)
+            modifier =
+                Modifier.padding(start = 13.dp)
         )
     }
 }
