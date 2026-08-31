@@ -1,7 +1,6 @@
 package com.xmo.music.ui.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,9 +14,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Shuffle
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -25,14 +24,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xmo.music.data.Song
-import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 
 @Composable
 internal fun HomeLiked(
     songs: List<Song>,
-    playback: PlaybackState,
+    currentSongId: Long?,
     c: HomeColors,
     play: (Song) -> Unit,
     shuffle: () -> Unit,
@@ -76,19 +74,24 @@ internal fun HomeLiked(
                         LocalXmoAccent.current
                             .copy(alpha = .15f),
                         CircleShape
-                    )
-                    .clickable(
-                        enabled = songs.isNotEmpty(),
-                        onClick = shuffle
                     ),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Rounded.Shuffle,
-                    contentDescription = "Shuffle All",
-                    tint = LocalXmoAccent.current,
-                    modifier = Modifier.size(21.dp)
-                )
+                IconButton(
+                    enabled = songs.isNotEmpty(),
+                    onClick = shuffle
+                ) {
+                    Icon(
+                        imageVector =
+                            Icons.Rounded.Shuffle,
+                        contentDescription =
+                            "Shuffle All",
+                        tint =
+                            LocalXmoAccent.current,
+                        modifier =
+                            Modifier.size(21.dp)
+                    )
+                }
             }
         }
 
@@ -112,16 +115,24 @@ internal fun HomeLiked(
         ) {
             items(
                 items = songs,
-                key = { it.id }
+                key = { it.id },
+                contentType = {
+                    "liked_song"
+                }
             ) { song ->
                 HomeSongRow(
                     song = song,
                     c = c,
                     playing =
-                        playback.currentSongId ==
+                        currentSongId ==
                             song.id,
                     play = {
-                        play(song)
+                        if (
+                            currentSongId !=
+                            song.id
+                        ) {
+                            play(song)
+                        }
                     },
                     options = {
                         options(song)
