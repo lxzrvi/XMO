@@ -75,7 +75,10 @@ internal fun XmoAppContent(
                             recentPlays =
                                 state.recentPlays,
                             scanning = state.scanning,
-                            playback = state.playback,
+                            currentSongId =
+                                state.playback.currentSongId,
+                            isPlaying =
+                                state.playback.isPlaying,
                             modeName = state.homeMode,
                             changeMode =
                                 actions.saveHomeMode,
@@ -222,10 +225,12 @@ internal fun XmoAppContent(
                         NowPlaying(
                             state = state.playback,
                             theme = state.theme,
-                            source = state.playingSource,
+                            source =
+                                state.playingSource,
                             sourceIsCategory =
                                 state.playingSourceIsCategory,
-                            queue = state.playbackQueue,
+                            queue =
+                                state.playbackQueue,
                             songs = state.songs,
                             liked =
                                 id != null &&
@@ -246,8 +251,7 @@ internal fun XmoAppContent(
                                 actions.previous,
                             previousItem =
                                 actions.previousItem,
-                            next =
-                                actions.next,
+                            next = actions.next,
                             playQueueIndex =
                                 actions.playQueueIndex,
                             seekTo = actions.seekTo,
