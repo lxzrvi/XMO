@@ -1,29 +1,30 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+package com.xvox.music
 
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.core.view.WindowCompat
+import com.xvox.music.core.design.theme.XvoxTheme
+import com.xvox.music.features.setup.SetupScreen
 
-    <application
-        android:allowBackup="true"
-        android:label="XVOX"
-        android:supportsRtl="true"
-        android:theme="@style/Theme.XVOX">
+class MainActivity : ComponentActivity() {
 
-        <activity
-            android:name=".MainActivity"
-            android:exported="true">
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+        WindowCompat.setDecorFitsSystemWindows(
+            window,
+            false
+        )
 
-        </activity>
-
-    </application>
-
-</manifest>
+        setContent {
+            XvoxTheme {
+                SetupScreen(
+                    onSetupComplete = {
+                        // Navigation to Home comes next.
+                    }
+                )
+            }
+        }
+    }
+}
