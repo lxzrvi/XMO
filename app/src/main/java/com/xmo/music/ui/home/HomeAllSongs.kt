@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -118,10 +119,17 @@ internal fun HomeAllSongs(
                     "song_slot"
                 }
             ) { slot ->
-                val page = slot / 16
-                val local = slot % 16
-                val row = local % 4
-                val column = local / 4
+                val page =
+                    slot / 16
+
+                val local =
+                    slot % 16
+
+                val row =
+                    local % 4
+
+                val column =
+                    local / 4
 
                 val sourceIndex =
                     page * 16 +
@@ -213,30 +221,36 @@ private fun HomeSongTile(
                 Color(0xFF080808)
         }
 
-    val border =
+    val cardBorder =
         when (theme) {
             XmoTheme.Light ->
-                Color.Black.copy(alpha = .06f)
+                Color.Black.copy(
+                    alpha = .06f
+                )
 
             XmoTheme.Dark ->
-                Color.White.copy(alpha = .06f)
+                Color.White.copy(
+                    alpha = .06f
+                )
 
             XmoTheme.Amoled ->
-                Color.White.copy(alpha = .085f)
+                Color.White.copy(
+                    alpha = .085f
+                )
         }
 
     Column(
         modifier
             .graphicsLayer {
-                val value =
+                val scale =
                     if (pressed) {
                         .955f
                     } else {
                         1f
                     }
 
-                scaleX = value
-                scaleY = value
+                scaleX = scale
+                scaleY = scale
             }
             .background(
                 surface,
@@ -244,7 +258,7 @@ private fun HomeSongTile(
             )
             .border(
                 .45.dp,
-                border,
+                cardBorder,
                 RoundedCornerShape(10.dp)
             )
             .combinedClickable(
@@ -271,8 +285,7 @@ private fun HomeSongTile(
                     model = request,
                     contentDescription = null,
                     modifier =
-                        Modifier.fillMaxWidth()
-                            .height(maxWidth),
+                        Modifier.fillMaxSize(),
                     contentScale =
                         ContentScale.Crop
                 )
@@ -285,8 +298,11 @@ private fun HomeSongTile(
                                 ?.uppercase()
                                 ?: "X",
                         color =
-                            c.text.copy(alpha = .60f),
-                        fontFamily = XmoFont.bold,
+                            c.text.copy(
+                                alpha = .60f
+                            ),
+                        fontFamily =
+                            XmoFont.bold,
                         fontSize = 16.sp,
                         modifier =
                             Modifier.align(
@@ -310,7 +326,8 @@ private fun HomeSongTile(
                 fontFamily = XmoFont.bold,
                 fontSize = 9.5.sp,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow =
+                    TextOverflow.Ellipsis
             )
 
             Text(
@@ -319,7 +336,8 @@ private fun HomeSongTile(
                 fontFamily = XmoFont.normal,
                 fontSize = 7.5.sp,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow =
+                    TextOverflow.Ellipsis
             )
         }
     }
