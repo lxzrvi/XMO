@@ -1,19 +1,15 @@
 package com.xmo.music.ui.home
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.ArrowBack
@@ -29,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xmo.music.data.Song
 import com.xmo.music.data.UserCategory
-import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 
@@ -37,7 +32,7 @@ import com.xmo.music.ui.XmoFont
 internal fun HomeCategoryDetail(
     category: UserCategory,
     songs: List<Song>,
-    playback: PlaybackState,
+    currentSongId: Long?,
     c: HomeColors,
     back: () -> Unit,
     add: () -> Unit,
@@ -101,7 +96,8 @@ internal fun HomeCategoryDetail(
                 }
             ) {
                 Icon(
-                    imageVector = Icons.Rounded.Shuffle,
+                    imageVector =
+                        Icons.Rounded.Shuffle,
                     contentDescription = "Shuffle",
                     tint = LocalXmoAccent.current
                 )
@@ -109,16 +105,19 @@ internal fun HomeCategoryDetail(
 
             IconButton(onClick = add) {
                 Icon(
-                    imageVector = Icons.Rounded.Add,
-                    contentDescription = "Add Songs",
+                    imageVector =
+                        Icons.Rounded.Add,
+                    contentDescription = "Add songs",
                     tint = LocalXmoAccent.current
                 )
             }
 
             IconButton(onClick = delete) {
                 Icon(
-                    imageVector = Icons.Rounded.Delete,
-                    contentDescription = "Delete",
+                    imageVector =
+                        Icons.Rounded.Delete,
+                    contentDescription =
+                        "Delete category",
                     tint = c.sub
                 )
             }
@@ -144,17 +143,20 @@ internal fun HomeCategoryDetail(
         ) {
             items(
                 items = categorySongs,
-                key = { it.id }
+                key = { it.id },
+                contentType = {
+                    "category_song"
+                }
             ) { song ->
                 HomeSongRow(
                     song = song,
                     c = c,
                     playing =
-                        playback.currentSongId ==
+                        currentSongId ==
                             song.id,
                     play = {
                         if (
-                            playback.currentSongId !=
+                            currentSongId !=
                             song.id
                         ) {
                             play(
