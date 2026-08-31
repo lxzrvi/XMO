@@ -9,8 +9,11 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -38,16 +41,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import com.xmo.music.data.Song
-import com.xmo.music.player.PlaybackState
 import com.xmo.music.ui.LocalXmoAccent
 import com.xmo.music.ui.XmoFont
 import kotlin.math.roundToInt
@@ -57,34 +59,66 @@ import kotlin.math.roundToInt
 internal fun HomeRecentlyPlayed(
     songs: List<Song>,
     c: HomeColors,
-    playback: PlaybackState,
+    currentSongId: Long?,
+    isPlaying: Boolean,
     play: (Song) -> Unit,
     togglePlay: () -> Unit,
     options: (Song) -> Unit
 ) {
-    if (songs.isEmpty()) return
+    if (songs.isEmpty()) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(153.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Nothing played yet",
+                color = c.sub,
+                fontFamily = XmoFont.normal,
+                fontSize = 12.sp
+            )
+        }
 
-    val state = rememberLazyListState()
+        return
+    }
+
+    val state =
+        rememberLazyListState()
+
     val fling =
         rememberSnapFlingBehavior(state)
 
-    var current by remember {
-        mutableIntStateOf(0)
+    var current by
+        remember {
+            mutableIntStateOf(0)
+        }
+
+    LaunchedEffect(
+        songs.firstOrNull()?.id
+    ) {
+        if (songs.isNotEmpty()) {
+            state.scrollToItem(0)
+            current = 0
+        }
     }
 
     LaunchedEffect(state) {
         snapshotFlow {
             state.firstVisibleItemIndex
         }.collect {
-            current = it.coerceIn(
-                0,
-                songs.lastIndex
-            )
+            current =
+                it.coerceIn(
+                    0,
+                    songs.lastIndex
+                )
         }
     }
 
     Column(
-        Modifier.fillMaxWidth(),
+        Modifier
+            .fillMaxWidth()
+            .height(153.dp),
         horizontalAlignment =
             Alignment.CenterHorizontally
     ) {
@@ -92,9 +126,7 @@ internal fun HomeRecentlyPlayed(
             state = state,
             flingBehavior = fling,
             contentPadding =
-                PaddingValues(horizontal = 12.dp),
-            horizontalArrangement =
-                Arrangement.spacedBy(24.dp)
+                PaddingValues(horizontal = 12.dp)
         ) {
             itemsIndexed(
                 items = songs,
@@ -102,23 +134,25 @@ internal fun HomeRecentlyPlayed(
                     song.id
                 }
             ) { _, song ->
-                androidx.compose.foundation.layout.BoxWithConstraints(
+                BoxWithConstraints(
                     Modifier.fillParentMaxWidth()
                 ) {
                     RecentCard(
                         song = song,
                         c = c,
-                        width = maxWidth - 24.dp,
                         current =
-                            playback.currentSongId ==
+                            currentSongId ==
                                 song.id,
                         playing =
-                            playback.currentSongId ==
+                            currentSongId ==
                                 song.id &&
-                                playback.isPlaying,
+                                isPlaying,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(122.dp),
                         play = {
                             if (
-                                playback.currentSongId ==
+                                currentSongId ==
                                 song.id
                             ) {
                                 togglePlay()
@@ -151,7 +185,7 @@ internal fun HomeRecentlyPlayed(
             }
 
         Row(
-            Modifier.padding(top = 8.dp),
+            Modifier.padding(top = 9.dp),
             horizontalArrangement =
                 Arrangement.spacedBy(6.dp)
         ) {
@@ -165,13 +199,13 @@ internal fun HomeRecentlyPlayed(
                                 5.dp
                             }
                         )
-                        .clip(CircleShape)
                         .background(
                             if (index == active) {
                                 LocalXmoAccent.current
                             } else {
                                 c.sub.copy(alpha = .30f)
-                            }
+                            },
+                            CircleShape
                         )
                 )
             }
@@ -179,35 +213,57 @@ internal fun HomeRecentlyPlayed(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun RecentCard(
     song: Song,
     c: HomeColors,
-    width: androidx.compose.ui.unit.Dp,
     current: Boolean,
     playing: Boolean,
+    modifier: Modifier,
     play: () -> Unit,
     options: () -> Unit
 ) {
+    val interaction =
+        remember {
+            MutableInteractionSource()
+        }
+
+    val pressed by
+        interaction.collectIsPressedAsState()
+
     Box(
-        Modifier
-            .fillMaxWidth()
-            .height(122.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .combinedClickable(
-                onClick = play,
-                onLongClick = options
+        modifier
+            .graphicsLayer {
+                val scale =
+                    if (pressed) {
+                        .985f
+                    } else {
+                        1f
+                    }
+
+                scaleX = scale
+                scaleY = scale
+            }
+            .background(
+                c.surface,
+                RoundedCornerShape(18.dp)
             )
-            .background(c.surface)
             .border(
                 .5.dp,
                 c.border,
                 RoundedCornerShape(18.dp)
             )
+            .combinedClickable(
+                interactionSource = interaction,
+                indication = null,
+                onClick = play,
+                onLongClick = options
+            )
     ) {
         AsyncImage(
             model = song.artwork,
-            contentDescription = song.title,
+            contentDescription = null,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop
         )
@@ -220,7 +276,9 @@ private fun RecentCard(
                         listOf(
                             Color.Transparent,
                             Color.Transparent,
-                            Color.Black.copy(alpha = .84f)
+                            Color.Black.copy(
+                                alpha = .84f
+                            )
                         )
                     )
                 )
@@ -230,7 +288,7 @@ private fun RecentCard(
             text = song.title,
             color = Color.White,
             fontFamily = XmoFont.bold,
-            fontSize = 12.sp,
+            fontSize = 15.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier
@@ -244,32 +302,31 @@ private fun RecentCard(
                 .align(Alignment.TopEnd)
                 .padding(10.dp)
                 .height(34.dp)
-                .clip(
+                .background(
+                    Color.Black.copy(alpha = .52f),
                     if (current) {
                         RoundedCornerShape(18.dp)
                     } else {
                         CircleShape
                     }
                 )
-                .background(
-                    Color.Black.copy(alpha = .52f)
-                )
-                .combinedClickable(
-                    onClick = play,
-                    onLongClick = options
-                )
                 .padding(
                     horizontal =
-                        if (current) 10.dp else 7.dp
+                        if (current) {
+                            10.dp
+                        } else {
+                            7.dp
+                        }
                 ),
             contentAlignment = Alignment.Center
         ) {
             AnimatedContent(
-                targetState = current to playing,
+                targetState =
+                    current to playing,
                 transitionSpec = {
                     fadeIn() togetherWith fadeOut()
                 },
-                label = "recentControl"
+                label = "recentPlayback"
             ) { value ->
                 if (value.first) {
                     Row(
@@ -287,7 +344,8 @@ private fun RecentCard(
                                 },
                             contentDescription = null,
                             tint = Color.White,
-                            modifier = Modifier.size(18.dp)
+                            modifier =
+                                Modifier.size(18.dp)
                         )
 
                         Text(
