@@ -1,5 +1,6 @@
 package com.xmo.music.ui.home
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Category
 import androidx.compose.material.icons.rounded.Favorite
@@ -35,8 +37,7 @@ internal fun HomeMenuDialog(
     dismiss: () -> Unit,
     allSongs: () -> Unit,
     liked: () -> Unit,
-    categories: () -> Unit,
-    scanner: () -> Unit
+    categories: () -> Unit
 ) {
     XmoBox(
         title = "XMO",
@@ -63,13 +64,6 @@ internal fun HomeMenuDialog(
             c,
             categories
         )
-
-        MenuItem(
-            "Scan Music",
-            Icons.Rounded.Refresh,
-            c,
-            scanner
-        )
     }
 }
 
@@ -82,12 +76,7 @@ internal fun HomeScannerDialog(
     dismiss: () -> Unit
 ) {
     XmoBox(
-        title =
-            if (scanning) {
-                "Scanning music…"
-            } else {
-                "Scan local music"
-            },
+        title = "XMO",
         c = c,
         dismiss = dismiss
     ) {
@@ -98,8 +87,7 @@ internal fun HomeScannerDialog(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector =
-                    Icons.Rounded.Refresh,
+                imageVector = Icons.Rounded.Refresh,
                 contentDescription = null,
                 tint = LocalXmoAccent.current,
                 modifier = Modifier.size(32.dp)
@@ -109,7 +97,7 @@ internal fun HomeScannerDialog(
         Text(
             text =
                 if (scanning) {
-                    "Reading local music…"
+                    "Scanning local music…"
                 } else {
                     "$songCount songs currently available."
                 },
@@ -152,16 +140,20 @@ private fun MenuItem(
         Modifier
             .fillMaxWidth()
             .graphicsLayer {
-                val scale =
+                val value =
                     if (pressed) {
-                        .975f
+                        .97f
                     } else {
                         1f
                     }
 
-                scaleX = scale
-                scaleY = scale
+                scaleX = value
+                scaleY = value
             }
+            .background(
+                c.button,
+                RoundedCornerShape(14.dp)
+            )
             .clickable(
                 interactionSource = interaction,
                 indication = null,
@@ -187,4 +179,6 @@ private fun MenuItem(
                 Modifier.padding(start = 13.dp)
         )
     }
+
+    Spacer(Modifier.height(6.dp))
 }
